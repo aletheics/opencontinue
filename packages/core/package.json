@@ -1,0 +1,15 @@
+{
+  "name": "@opencontinue/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Event-sourced session kernel for OpenContinue.",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@opencontinue/protocol": "0.0.1"
+  }
+}

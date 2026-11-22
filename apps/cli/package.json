@@ -1,0 +1,18 @@
+{
+  "name": "@opencontinue/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "OpenContinue command line client.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@opencontinue/core": "0.0.1",
+    "@opencontinue/protocol": "0.0.1",
+    "@opencontinue/server": "0.0.1",
+    "commander": "^12.1.0"
+  }
+}
