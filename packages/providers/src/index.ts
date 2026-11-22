@@ -264,22 +264,21 @@ export type ProviderSelection = {
   warning?: string
 }
 
-/**
- * Environment-first provider selection:
- *
- *   OPENCONTINUE_PROVIDER=openai-compatible | ollama | echo
- *   OPENCONTINUE_BASE_URL=https://api.deepseek.com/v1
- *   OPENCONTINUE_API_KEY=...
- *   OPENCONTINUE_MODEL=deepseek-chat
- */
-export function createProviderFromEnv(env: NodeJS.ProcessEnv = process.env): ProviderSelection {
-  const kind = (env.OPENCONTINUE_PROVIDER ?? "").toLowerCase()
+export type ProviderSettings = {
+  provider?: string
+  baseUrl?: string
+  apiKey?: string
+  model?: string
+}
+
+export function createProvider(settings: ProviderSettings = {}): ProviderSelection {
+  const kind = (settings.provider ?? "").toLowerCase()
 
   if (kind === "echo") {
     return {
       provider: new EchoProvider(),
       fallback: true,
-      warning: "OPENCONTINUE_PROVIDER=echo",
+      warning: "provider=echo",
     }
   }
 
@@ -287,31 +286,40 @@ export function createProviderFromEnv(env: NodeJS.ProcessEnv = process.env): Pro
     return {
       provider: new EchoProvider(),
       fallback: true,
-      warning: `Unknown OPENCONTINUE_PROVIDER="${kind}"; using echo.`,
+      warning: `Unknown provider "${kind}"; using echo.`,
     }
   }
 
   const ollama = kind === "ollama"
   const baseUrl =
-    env.OPENCONTINUE_BASE_URL ??
-    (ollama ? "http://127.0.0.1:11434/v1" : (env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"))
-  const apiKey = env.OPENCONTINUE_API_KEY ?? env.OPENAI_API_KEY
-  const model =
-    env.OPENCONTINUE_MODEL ??
-    env.OPENAI_MODEL ??
-    (ollama ? "qwen2.5-coder:7b" : "gpt-4o-mini")
+    settings.baseUrl ??
+    (ollama ? "http://127.0.0.1:11434/v1" : "https://api.openai.com/v1")
+  const model = settings.model ?? (ollama ? "qwen2.5-coder:7b" : "gpt-4o-mini")
 
-  if (!apiKey && baseUrl.includes("api.openai.com")) {
+  if (!settings.apiKey && baseUrl.includes("api.openai.com")) {
     return {
       provider: new EchoProvider(),
       fallback: true,
       warning:
-        "No API key configured; using echo. Set OPENCONTINUE_API_KEY, or OPENCONTINUE_BASE_URL for a local provider.",
+        "No API key configured; using echo. Run `opencontinue setup` or set OPENCONTINUE_API_KEY.",
     }
   }
 
   return {
-    provider: new OpenAICompatibleProvider({ baseUrl, apiKey, model }),
+    provider: new OpenAICompatibleProvider({ baseUrl, apiKey: settings.apiKey, model }),
     fallback: false,
   }
+}
+
+/**
+ * Environment-first selection for CI and containers. The CLI normally resolves
+ * settings from `~/.opencontinue` first, with environment variables overriding.
+ */
+export function createProviderFromEnv(env: NodeJS.ProcessEnv = process.env): ProviderSelection {
+  return createProvider({
+    provider: env.OPENCONTINUE_PROVIDER ?? env.OPENAI_PROVIDER,
+    baseUrl: env.OPENCONTINUE_BASE_URL ?? env.OPENAI_BASE_URL,
+    apiKey: env.OPENCONTINUE_API_KEY ?? env.OPENAI_API_KEY,
+    model: env.OPENCONTINUE_MODEL ?? env.OPENAI_MODEL,
+  })
 }

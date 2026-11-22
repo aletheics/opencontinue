@@ -32,6 +32,7 @@ Do not copy wholesale. If code is adapted, keep attribution in [NOTICE](NOTICE).
 | Path | Responsibility |
 |---|---|
 | `packages/protocol` | Wire schemas and the public event contract |
+| `packages/config` | Global provider config and auth files |
 | `packages/core` | Event-sourced session store and projections |
 | `packages/providers` | OpenAI-compatible streaming, tool calls, echo fallback |
 | `packages/tools` | read / write / edit / glob / grep / bash + permission gate |

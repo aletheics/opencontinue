@@ -10,7 +10,8 @@ import {
   SendMessageRequest,
   type SessionEvent,
 } from "@opencontinue/protocol"
-import { createProviderFromEnv, type ChatProvider } from "@opencontinue/providers"
+import { resolveProviderSettings } from "@opencontinue/config"
+import { createProvider, type ChatProvider } from "@opencontinue/providers"
 import { ToolRegistry } from "@opencontinue/tools"
 
 import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
@@ -152,7 +153,7 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
   const store = options.store ?? createSessionStore({ workspace })
   const selection = options.provider
     ? { provider: options.provider, warning: undefined }
-    : createProviderFromEnv()
+    : createProvider(resolveProviderSettings())
   const project = loadProjectConfig(workspace)
   const baseSystemPrompt =
     options.systemPrompt ?? process.env.OPENCONTINUE_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT

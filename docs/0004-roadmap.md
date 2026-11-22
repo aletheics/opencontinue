@@ -19,7 +19,7 @@
 3. [x] Tools: read, write, edit, glob, grep, bash.
 4. [x] Capability-based permissions with an audit event per call.
 5. [x] SQLite persistence and crash recovery (store-level export/import included).
-6. Config file plus import from Continue, Claude, and Codex configs.
+6. [x] Global config and auth files; import from Continue, Claude, and Codex configs pending.
 7. MCP client.
 8. Minimal TUI on top of the same session API.
 

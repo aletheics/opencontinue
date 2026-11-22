@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { OpenAICompatibleProvider, type ChatStreamEvent } from "./index.js"
+import { createProvider, OpenAICompatibleProvider, type ChatStreamEvent } from "./index.js"
 
 function sseBody(events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -11,6 +11,20 @@ function sseBody(events: string[]): ReadableStream<Uint8Array> {
     },
   })
 }
+
+describe("createProvider", () => {
+  it("falls back to echo when the default OpenAI endpoint has no key", () => {
+    const selection = createProvider({ baseUrl: "https://api.openai.com/v1", model: "m" })
+    expect(selection.provider.id).toBe("echo")
+    expect(selection.fallback).toBe(true)
+  })
+
+  it("creates a provider for a local OpenAI-compatible endpoint", () => {
+    const selection = createProvider({ baseUrl: "http://127.0.0.1:11434/v1", model: "m" })
+    expect(selection.provider.id).toBe("openai-compatible")
+    expect(selection.fallback).toBe(false)
+  })
+})
 
 describe("OpenAICompatibleProvider", () => {
   it("streams text deltas and sends the expected request", async () => {

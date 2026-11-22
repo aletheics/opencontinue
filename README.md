@@ -29,10 +29,18 @@ Requires Node.js 22+.
 git clone https://github.com/aletheics/opencontinue.git
 cd opencontinue
 npm install
-cp .env.example .env
+npm run dev -- setup
 ```
 
-Configure an OpenAI-compatible provider in `.env`:
+`setup` writes `~/.opencontinue/config.json` and `~/.opencontinue/auth.json` (mode `0600`). It supports OpenAI, DeepSeek, Ollama, vLLM, LM Studio, or `echo`.
+
+Show the current configuration:
+
+```bash
+npm run dev -- config
+```
+
+For CI and containers, environment variables override the files:
 
 ```dotenv
 OPENCONTINUE_PROVIDER=openai-compatible
@@ -41,7 +49,7 @@ OPENCONTINUE_API_KEY=sk-...
 OPENCONTINUE_MODEL=gpt-4o-mini
 ```
 
-DeepSeek, Ollama, vLLM, and LM Studio use the same interface. Without a key, `echo` mode keeps sessions and streaming testable.
+See [`.env.example`](.env.example). Without a key, `echo` mode keeps sessions and streaming testable.
 
 ## Usage
 

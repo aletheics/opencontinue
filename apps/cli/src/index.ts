@@ -7,9 +7,10 @@ import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
+import { resolveProviderSettings } from "@opencontinue/config"
 import { createSessionStore } from "@opencontinue/core"
 import type { SessionEvent, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
-import { createProviderFromEnv } from "@opencontinue/providers"
+import { createProvider } from "@opencontinue/providers"
 import { closeServer, startServer } from "@opencontinue/server"
 
 import {
@@ -19,6 +20,7 @@ import {
   runChecks,
   summarizeResults,
 } from "./checks.js"
+import { configCommand, setupCommand } from "./setup.js"
 
 const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
 if (existsSync(envPath)) loadEnvFile(envPath)
@@ -345,7 +347,7 @@ function collect(value: string, previous: string[] = []): string[] {
 async function checkCommand(options: CheckCommandOptions): Promise<void> {
   const repo = process.env.INIT_CWD ?? process.cwd()
   const base = await resolveBase(repo, options.base ?? "main")
-  const selection = createProviderFromEnv()
+  const selection = createProvider(resolveProviderSettings())
 
   if (selection.provider.id === "echo") {
     console.error("No model provider configured. Set OPENCONTINUE_API_KEY or OPENCONTINUE_BASE_URL.")
@@ -430,6 +432,16 @@ program
       readonly: Boolean(program.opts().readonly),
     }),
   )
+
+program
+  .command("setup")
+  .description("Configure the provider and API key")
+  .action(setupCommand)
+
+program
+  .command("config")
+  .description("Show provider configuration")
+  .action(configCommand)
 
 program
   .command("check")
