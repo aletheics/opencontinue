@@ -13,10 +13,50 @@ This repository is the **0.0.1 scaffold**. The architecture and contracts are in
 - [x] HTTP server with SSE event stream
 - [x] CLI with interactive and headless modes
 - [x] Session list / resume primitives
-- [ ] Provider adapters (OpenAI-compatible, Anthropic, Gemini, Ollama)
+- [x] Provider adapter (OpenAI-compatible + `echo` fallback)
+- [x] Streaming agent loop (no tools yet)
 - [ ] Tool loop (read / write / edit / grep / bash) with capability permissions
 - [ ] Worktree-isolated checks and GitHub Action
 - [ ] Web client, TUI, desktop shell
+
+## Configure a provider
+
+Provider settings are read from environment variables and from a `.env` file at the repository root:
+
+```bash
+cp .env.example .env
+```
+
+OpenAI:
+
+```dotenv
+OPENCONTINUE_PROVIDER=openai-compatible
+OPENCONTINUE_BASE_URL=https://api.openai.com/v1
+OPENCONTINUE_API_KEY=sk-...
+OPENCONTINUE_MODEL=gpt-4o-mini
+```
+
+DeepSeek (or any OpenAI-compatible endpoint):
+
+```dotenv
+OPENCONTINUE_PROVIDER=openai-compatible
+OPENCONTINUE_BASE_URL=https://api.deepseek.com/v1
+OPENCONTINUE_API_KEY=sk-...
+OPENCONTINUE_MODEL=deepseek-chat
+```
+
+Ollama:
+
+```dotenv
+OPENCONTINUE_PROVIDER=ollama
+OPENCONTINUE_MODEL=qwen2.5-coder:7b
+```
+
+With no key configured, OpenContinue falls back to an `echo` provider so a fresh checkout can still exercise sessions, streaming, and resume:
+
+```dotenv
+OPENCONTINUE_PROVIDER=echo
+```
 
 ## Quickstart
 

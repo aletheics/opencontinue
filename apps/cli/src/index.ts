@@ -1,12 +1,18 @@
 #!/usr/bin/env node
 
+import { existsSync } from "node:fs"
+import { loadEnvFile } from "node:process"
 import { createInterface } from "node:readline/promises"
+import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
 import { SessionStore } from "@opencontinue/core"
 import type { SessionEvent, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
 import { closeServer, startServer } from "@opencontinue/server"
+
+const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
+if (existsSync(envPath)) loadEnvFile(envPath)
 
 type ChatOptions = {
   print?: boolean
@@ -150,6 +156,8 @@ async function withServer(
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
   const running = startServer({ store: new SessionStore(), port })
   console.log(`embedded server on http://127.0.0.1:${running.port}`)
+  if (running.warning) console.warn(`provider: ${running.warning}`)
+  else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
   try {
     await run(`http://127.0.0.1:${running.port}`)
   } finally {
@@ -219,6 +227,8 @@ async function serveCommand(options: { port?: string }): Promise<void> {
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
   const running = startServer({ store: new SessionStore(), port })
   console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)
+  if (running.warning) console.warn(`provider: ${running.warning}`)
+  else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
 
   const shutdown = async () => {
     console.log("\nShutting down...")

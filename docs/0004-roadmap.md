@@ -6,12 +6,14 @@
 - HTTP server with SSE
 - CLI interactive + headless
 - session list
+- OpenAI-compatible provider + `echo` fallback
+- streaming agent loop
 - tests and typecheck
 
 ## 0.1 — usable local agent (target: 6–10 weeks)
 
-1. Provider adapter: OpenAI-compatible first, then Anthropic, Gemini, Ollama.
-2. Agent loop with streaming, cancellation, and retry.
+1. [x] Provider adapter: OpenAI-compatible first (covers OpenAI, DeepSeek, Ollama, vLLM).
+2. [x] Agent loop with streaming; cancellation and retry next.
 3. Tools: read, write, edit, grep, glob, bash, fetch.
 4. Capability-based permissions with an audit event per call.
 5. SQLite persistence and crash recovery.

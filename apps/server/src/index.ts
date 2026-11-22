@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto"
-
 import { serve, type ServerType } from "@hono/node-server"
 import { Hono } from "hono"
 import { cors } from "hono/cors"
@@ -11,11 +9,16 @@ import {
   SendMessageRequest,
   type SessionEvent,
 } from "@opencontinue/protocol"
+import { createProviderFromEnv, type ChatProvider } from "@opencontinue/providers"
+
+import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
 
 export type StartServerOptions = {
   store?: SessionStore
   port?: number
   hostname?: string
+  provider?: ChatProvider
+  systemPrompt?: string
 }
 
 export type RunningServer = {
@@ -23,38 +26,15 @@ export type RunningServer = {
   store: SessionStore
   server: ServerType
   port: number
+  provider: ChatProvider
+  warning?: string
 }
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
-/**
- * Placeholder agent. Replace this with the real provider + tool loop.
- * It deliberately uses the same event contract as a real run.
- */
-async function runEcho(store: SessionStore, sessionId: string, text: string): Promise<void> {
-  const runId = randomUUID()
-  try {
-    store.append(sessionId, { type: "run.started", runId })
-    const reply = `Echo: ${text}`
-    for (let index = 0; index < reply.length; index += 8) {
-      await sleep(40)
-      store.append(sessionId, {
-        type: "message.assistant.delta",
-        runId,
-        text: reply.slice(index, index + 8),
-      })
-    }
-    store.append(sessionId, { type: "run.completed", runId })
-  } catch (error) {
-    store.append(sessionId, {
-      type: "run.failed",
-      runId,
-      error: error instanceof Error ? error.message : String(error),
-    })
-  }
-}
-
-export function createApp(store: SessionStore): Hono {
+export function createApp(
+  store: SessionStore,
+  provider: ChatProvider,
+  systemPrompt: string,
+): Hono {
   const app = new Hono()
 
   app.use("*", cors())
@@ -87,7 +67,7 @@ export function createApp(store: SessionStore): Hono {
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
 
     store.append(sessionId, { type: "message.user", text: parsed.data.text })
-    void runEcho(store, sessionId, parsed.data.text)
+    void runAgent({ store, sessionId, provider, systemPrompt })
     return c.json({ accepted: true }, 202)
   })
 
@@ -135,14 +115,28 @@ export function createApp(store: SessionStore): Hono {
 
 export function startServer(options: StartServerOptions = {}): RunningServer {
   const store = options.store ?? new SessionStore()
-  const app = createApp(store)
+  const selection = options.provider
+    ? { provider: options.provider, warning: undefined }
+    : createProviderFromEnv()
+  const systemPrompt =
+    options.systemPrompt ?? process.env.OPENCONTINUE_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT
+
+  const app = createApp(store, selection.provider, systemPrompt)
   const port = options.port ?? Number(process.env.OPENCONTINUE_PORT ?? 8787)
   const server = serve({
     fetch: app.fetch,
     port,
     hostname: options.hostname ?? "127.0.0.1",
   })
-  return { app, store, server, port }
+
+  return {
+    app,
+    store,
+    server,
+    port,
+    provider: selection.provider,
+    warning: selection.warning,
+  }
 }
 
 export async function closeServer(server: ServerType): Promise<void> {
