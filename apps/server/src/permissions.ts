@@ -5,14 +5,25 @@ import type { PermissionGate, Tool, ToolContext } from "@opencontinue/tools"
 
 export type PermissionMode = "ask" | "auto" | "readonly"
 
+export type PermissionPolicy = {
+  allow: string[]
+  ask: string[]
+  deny: string[]
+}
+
+const EMPTY_POLICY: PermissionPolicy = { allow: [], ask: [], deny: [] }
+
 type Pending = {
   sessionId: string
   resolve: (approved: boolean) => void
 }
 
 /**
- * Server-side permission broker. In `ask` mode it emits a durable
- * `permission.requested` event and waits for a client decision.
+ * Server-side permission broker.
+ *
+ * Precedence: deny > allow > explicit ask > capability/mode defaults.
+ * In `ask` mode it emits a durable `permission.requested` event and waits
+ * for a client decision.
  */
 export class PermissionBroker implements PermissionGate {
   private readonly pending = new Map<string, Pending>()
@@ -20,13 +31,22 @@ export class PermissionBroker implements PermissionGate {
   constructor(
     private readonly store: SessionStore,
     private readonly mode: PermissionMode,
+    private readonly policy: PermissionPolicy = EMPTY_POLICY,
   ) {}
 
   async authorize(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {
-    if (tool.capability === "read") return true
-    if (this.mode === "auto") return true
-    if (this.mode === "readonly") return false
+    if (this.policy.deny.includes(tool.name)) return false
+    if (this.policy.allow.includes(tool.name)) return true
 
+    const explicitAsk = this.policy.ask.includes(tool.name)
+    if (!explicitAsk && tool.capability === "read") return true
+    if (this.mode === "readonly") return false
+    if (this.mode === "auto" && !explicitAsk) return true
+
+    return this.request(tool, input, context)
+  }
+
+  private request(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {
     const requestId = randomUUID()
     const decision = new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {

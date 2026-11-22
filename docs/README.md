@@ -2,6 +2,7 @@
 
 - [BLUEPRINT.md](../BLUEPRINT.md) — canonical plan and milestones
 - [AGENTS.md](../AGENTS.md) — rules for AI agents and contributors
+- [.opencontinue/](../.opencontinue) — project constraints, agents, commands, and skills
 - [0001-product-thesis.md](0001-product-thesis.md)
 - [0002-architecture.md](0002-architecture.md)
 - [0003-license-and-governance.md](0003-license-and-governance.md)

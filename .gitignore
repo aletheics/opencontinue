@@ -5,6 +5,7 @@ coverage/
 .env.*
 !.env.example
 *.log
-.opencontinue/
+.opencontinue/sessions/
+.opencontinue/cache/
 .DS_Store
 Thumbs.db

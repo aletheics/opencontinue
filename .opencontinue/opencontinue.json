@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "mode": "ask",
+    "allow": ["read", "glob", "grep"],
+    "ask": ["write", "edit", "bash"],
+    "deny": []
+  },
+  "instructions": [".opencontinue/AGENTS.md"],
+  "checks": {
+    "agents": [".opencontinue/agent/*.md"]
+  }
+}

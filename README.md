@@ -47,6 +47,7 @@ Permissions: read-only tools are always allowed. `write` and `bash` ask in inter
 - [BLUEPRINT.md](BLUEPRINT.md) — product direction, milestones, and the spiral development process
 - [AGENTS.md](AGENTS.md) — rules for AI agents and contributors
 - [docs/](docs) — architecture, license, roadmap, ADRs
+- [.opencontinue/](.opencontinue) — project constraints, agents, commands, and skills
 
 ## Contributing
 
@@ -55,5 +56,3 @@ Read [BLUEPRINT.md](BLUEPRINT.md) and [AGENTS.md](AGENTS.md) first. One vertical
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-OpenContinue is not affiliated with Continue Dev or OpenCode.

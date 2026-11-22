@@ -94,7 +94,7 @@ Rules:
 ### M4 — checks
 
 - Diff against a base ref.
-- Agent discovery from `.continue/agents` and `.continue/checks`.
+- Agent discovery from `.opencontinue/agent`, `.continue/agents`, and `.continue/checks`.
 - Isolated git worktree per check.
 - Text, JSON, and patch output; non-zero exit on failure.
 - GitHub Action using the same command.

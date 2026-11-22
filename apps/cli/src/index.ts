@@ -162,15 +162,15 @@ class SessionClient {
   }
 }
 
-function permissionMode(options: ChatOptions, headless = false): PermissionMode {
+function permissionMode(options: ChatOptions, headless = false): PermissionMode | undefined {
   if (options.auto) return "auto"
   if (options.readonly) return "readonly"
-  return headless ? "readonly" : "ask"
+  return headless ? "readonly" : undefined
 }
 
 async function withServer(
   options: ChatOptions,
-  mode: PermissionMode,
+  mode: PermissionMode | undefined,
   run: (baseUrl: string) => Promise<void>,
 ): Promise<void> {
   if (options.url) {
@@ -290,7 +290,11 @@ async function serveCommand(options: {
   if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
 
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
-  const mode: PermissionMode = options.auto ? "auto" : options.readonly ? "readonly" : "ask"
+  const mode: PermissionMode | undefined = options.auto
+    ? "auto"
+    : options.readonly
+      ? "readonly"
+      : undefined
   const workspace = process.env.INIT_CWD ?? process.cwd()
   const running = startServer({ store: new SessionStore(), port, permissionMode: mode, workspace })
   console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)
@@ -345,16 +349,22 @@ program
 program
   .command("serve")
   .description("Start the HTTP/SSE server")
-  .option("--port <port>", "Port to listen on", "8787")
-  .option("--auto", "Allow write and shell tools without approval")
-  .option("--readonly", "Deny write and shell tools")
-  .action(serveCommand)
+  .addHelpText("after", "\nGlobal flags: --port <port>, --auto, --readonly")
+  .action(() =>
+    serveCommand({
+      port: String(program.opts().port ?? "8787"),
+      auto: Boolean(program.opts().auto),
+      readonly: Boolean(program.opts().readonly),
+    }),
+  )
 
 program
   .command("sessions")
   .description("List sessions from a running server")
   .option("--url <url>", "Server URL", "http://127.0.0.1:8787")
-  .action(sessionsCommand)
+  .action((options: { url?: string }) =>
+    sessionsCommand({ url: String(program.opts().url ?? options.url) }),
+  )
 
 try {
   await program.parseAsync(process.argv)

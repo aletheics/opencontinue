@@ -15,6 +15,7 @@ import { ToolRegistry } from "@opencontinue/tools"
 
 import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
 import { PermissionBroker, type PermissionMode } from "./permissions.js"
+import { loadProjectConfig } from "./project.js"
 
 export type StartServerOptions = {
   store?: SessionStore
@@ -151,12 +152,16 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
   const selection = options.provider
     ? { provider: options.provider, warning: undefined }
     : createProviderFromEnv()
-  const systemPrompt =
-    options.systemPrompt ?? process.env.OPENCONTINUE_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT
-  const tools = options.tools ?? new ToolRegistry()
-  const permissionMode = options.permissionMode ?? "ask"
   const workspace = options.workspace ?? process.cwd()
-  const permissions = new PermissionBroker(store, permissionMode)
+  const project = loadProjectConfig(workspace)
+  const baseSystemPrompt =
+    options.systemPrompt ?? process.env.OPENCONTINUE_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT
+  const systemPrompt = project.instructions
+    ? `${baseSystemPrompt}\n\n${project.instructions}`
+    : baseSystemPrompt
+  const tools = options.tools ?? new ToolRegistry()
+  const permissionMode = options.permissionMode ?? project.permissionMode ?? "ask"
+  const permissions = new PermissionBroker(store, permissionMode, project)
 
   const app = createApp(store, selection.provider, systemPrompt, tools, permissions, workspace)
   const port = options.port ?? Number(process.env.OPENCONTINUE_PORT ?? 8787)

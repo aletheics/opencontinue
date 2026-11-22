@@ -8,6 +8,16 @@ Guidance for AI coding agents and contributors.
 2. [docs/0002-architecture.md](docs/0002-architecture.md) — event model and boundaries.
 3. [docs/adr/](docs/adr) — accepted decisions.
 
+## Project constraints
+
+`/.opencontinue` is the project-level constraint set:
+
+- `opencontinue.json` — permission mode and instruction files, loaded at server start.
+- `AGENTS.md` — runtime rules injected into the agent system prompt.
+- `agent/` — review and check agents, consumed by checks in M4.
+- `command/` and `skills/` — reusable guides for agents.
+- `scripts/validate-constraints.test.ts` enforces the structure in CI.
+
 ## Reference implementations
 
 These are read-only references for behavior and edge cases:

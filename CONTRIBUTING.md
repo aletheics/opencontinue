@@ -1,6 +1,6 @@
 # Contributing to OpenContinue
 
-Read [BLUEPRINT.md](BLUEPRINT.md) and [AGENTS.md](AGENTS.md) first.
+Read [BLUEPRINT.md](BLUEPRINT.md), [AGENTS.md](AGENTS.md), and [`.opencontinue/`](.opencontinue) first.
 
 ## Development
 
