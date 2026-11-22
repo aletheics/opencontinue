@@ -6,6 +6,7 @@ Run, in order:
 
 1. `npm run typecheck`
 2. `npm test`
+3. `npm run check -- --base main --format json` when a provider is configured
 
 Then inspect `git diff` for behavior changes that the tests do not cover.
 

@@ -23,13 +23,13 @@
 7. MCP client.
 8. Minimal TUI on top of the same session API.
 
-## 0.2 — checks (target: 4–6 weeks after 0.1)
+## 0.2 — checks (done)
 
-1. Worktree-isolated check runner.
-2. `opencontinue check --base <ref> --format json --patch`.
-3. `--fix`, `--fail-fast`, and non-zero exit codes.
-4. GitHub Action and a demo repository.
-5. A Checks view in the CLI and web client.
+1. [x] Worktree-isolated check runner.
+2. [x] `opencontinue check --base <ref> --format json --patch`.
+3. [x] `--fix`, `--fail-fast`, and non-zero exit codes.
+4. [x] Pull-request workflow and reusable action scaffold.
+5. [ ] A Checks view in the CLI and web client.
 
 ## 0.3 — continuity
 

@@ -77,8 +77,8 @@ Rules:
 | M1 | done | Provider adapter and streaming | Real model streams into a session |
 | M2 | done | Tools and capability permissions | Model edits files, shell is gated |
 | M3 | done | SQLite persistence and recovery | Kill the server mid-run, restart, resume |
-| M4 | next | Checks, worktree, GitHub Action | One check runs locally and in CI identically |
-| M5 | planned | TUI and web client | Same session continues in two clients |
+| M4 | done | Checks, worktree, GitHub Action | One check runs locally and in CI identically |
+| M5 | next | TUI and web client | Same session continues in two clients |
 | M6 | planned | Desktop and VS Code | Thin clients over the same API |
 | M7 | planned | Plugin API and sandbox | Third-party tool without core changes |
 | M8 | planned | Team and commercial features | Paid design partners |
@@ -91,14 +91,14 @@ Rules:
 - Session export/import at the store layer.
 - Out of scope: multi-user sync and HTTP/CLI export commands.
 
-### M4 — checks
+### M4 — checks (done)
 
 - Diff against a base ref.
 - Agent discovery from `.opencontinue/agent`, `.continue/agents`, and `.continue/checks`.
-- Isolated git worktree per check.
-- Text, JSON, and patch output; non-zero exit on failure.
-- GitHub Action using the same command.
-- Out of scope: hosted dashboard.
+- Isolated git worktree per check, including uncommitted and untracked files.
+- Text, JSON, and patch output; `--fix`, `--fail-fast`, non-zero exit on failure.
+- Pull-request workflow and reusable action scaffold using the same command.
+- Out of scope: hosted dashboard and automatic PR comments.
 
 ### M5 — clients
 

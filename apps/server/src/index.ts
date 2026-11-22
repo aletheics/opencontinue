@@ -183,6 +183,10 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
   }
 }
 
+export { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
+export { PermissionBroker, type PermissionMode } from "./permissions.js"
+export { loadProjectConfig } from "./project.js"
+
 export async function closeServer(server: ServerType): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()))

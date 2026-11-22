@@ -37,6 +37,8 @@ Do not copy wholesale. If code is adapted, keep attribution in [NOTICE](NOTICE).
 | `packages/tools` | read / write / edit / glob / grep / bash + permission gate |
 | `apps/server` | HTTP/SSE server, agent loop, permission broker |
 | `apps/cli` | Interactive and headless CLI |
+| `apps/cli/src/checks.ts` | Worktree-isolated checks and patch capture |
+| `actions/check` | Reusable GitHub Action for checks |
 
 ## Rules
 

@@ -1,0 +1,49 @@
+name: OpenContinue Checks
+description: Run source-controlled AI checks on a pull request.
+
+inputs:
+  base:
+    description: Base git ref to diff against
+    required: false
+    default: origin/main
+  format:
+    description: Output format (text or json)
+    required: false
+    default: json
+  patch:
+    description: Print patches
+    required: false
+    default: "false"
+  fix:
+    description: Apply suggested patches to the working tree
+    required: false
+    default: "false"
+  api-key:
+    description: OpenAI-compatible API key
+    required: true
+  base-url:
+    description: OpenAI-compatible base URL
+    required: false
+  model:
+    description: Model name
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+    - name: Run OpenContinue checks
+      shell: bash
+      env:
+        OPENCONTINUE_API_KEY: ${{ inputs.api-key }}
+        OPENCONTINUE_BASE_URL: ${{ inputs.base-url }}
+        OPENCONTINUE_MODEL: ${{ inputs.model }}
+      run: |
+        npm i -g @opencontinue/cli
+        opencontinue check \
+          --base "${{ inputs.base }}" \
+          --format "${{ inputs.format }}" \
+          ${{ inputs.patch == 'true' && '--patch' || '' }} \
+          ${{ inputs.fix == 'true' && '--fix' || '' }}

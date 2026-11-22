@@ -1,0 +1,31 @@
+name: Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENCONTINUE_API_KEY: ${{ secrets.OPENCONTINUE_API_KEY }}
+      OPENCONTINUE_BASE_URL: ${{ secrets.OPENCONTINUE_BASE_URL }}
+      OPENCONTINUE_MODEL: ${{ secrets.OPENCONTINUE_MODEL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Provider not configured
+        if: ${{ env.OPENCONTINUE_API_KEY == '' }}
+        run: echo "::notice::OPENCONTINUE_API_KEY is not set; skipping AI checks."
+      - name: Run checks
+        if: ${{ env.OPENCONTINUE_API_KEY != '' }}
+        run: npm run check -- --base origin/${{ github.base_ref }} --format json --fail-fast

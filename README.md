@@ -34,6 +34,7 @@ npm run dev -- --auto "fix tests"    # headless, write/shell allowed
 npm run dev -- --readonly "review"   # headless, read-only
 npm run dev -- serve --port 8787     # server only
 npm run dev -- sessions              # list sessions
+npm run check -- --base main         # run source-controlled checks
 ```
 
 Flags: `--auto`, `--readonly`, `--resume <id>`, `--url <url>`, `--port <port>`.

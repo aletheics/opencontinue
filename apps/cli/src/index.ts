@@ -9,7 +9,16 @@ import { Command } from "commander"
 
 import { createSessionStore } from "@opencontinue/core"
 import type { SessionEvent, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
+import { createProviderFromEnv } from "@opencontinue/providers"
 import { closeServer, startServer } from "@opencontinue/server"
+
+import {
+  applyPatch,
+  formatText,
+  resolveBase,
+  runChecks,
+  summarizeResults,
+} from "./checks.js"
 
 const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
 if (existsSync(envPath)) loadEnvFile(envPath)
@@ -318,6 +327,66 @@ async function serveCommand(options: {
   await new Promise<void>(() => {})
 }
 
+type CheckCommandOptions = {
+  base?: string
+  format?: string
+  patch?: boolean
+  fix?: boolean
+  failFast?: boolean
+  agent?: string[]
+  concurrency?: string
+  timeout?: string
+}
+
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value]
+}
+
+async function checkCommand(options: CheckCommandOptions): Promise<void> {
+  const repo = process.env.INIT_CWD ?? process.cwd()
+  const base = await resolveBase(repo, options.base ?? "main")
+  const selection = createProviderFromEnv()
+
+  if (selection.provider.id === "echo") {
+    console.error("No model provider configured. Set OPENCONTINUE_API_KEY or OPENCONTINUE_BASE_URL.")
+    process.exitCode = 2
+    return
+  }
+  if (selection.warning) console.warn(`provider: ${selection.warning}`)
+
+  const results = await runChecks({
+    repo,
+    base,
+    provider: selection.provider,
+    agents: options.agent,
+    failFast: options.failFast,
+    concurrency: Number(options.concurrency ?? 4),
+    timeoutMs: Number(options.timeout ?? 300) * 1000,
+  })
+  const summary = summarizeResults(results)
+
+  if (options.fix) {
+    const patch = results
+      .filter((result) => result.patch)
+      .map((result) => result.patch)
+      .join("\n")
+    if (patch.trim()) await applyPatch(repo, patch)
+  }
+
+  if (options.format === "json") {
+    console.log(JSON.stringify({ checks: results, summary }, null, 2))
+  } else {
+    console.log(formatText(results))
+    if (options.patch) {
+      for (const result of results) {
+        if (result.patch) console.log(`\n# ${result.name}\n${result.patch.trimEnd()}`)
+      }
+    }
+  }
+
+  if (summary.failed > 0 || summary.errored > 0) process.exitCode = 1
+}
+
 async function sessionsCommand(options: { url?: string }): Promise<void> {
   const baseUrl = (options.url ?? "http://127.0.0.1:8787").replace(/\/$/, "")
   const sessions = await request<SessionSummary[]>(baseUrl, "/v1/sessions")
@@ -359,6 +428,24 @@ program
       port: String(program.opts().port ?? "8787"),
       auto: Boolean(program.opts().auto),
       readonly: Boolean(program.opts().readonly),
+    }),
+  )
+
+program
+  .command("check")
+  .description("Run source-controlled checks against a base ref")
+  .option("--base <ref>", "Base git ref", "main")
+  .option("--format <format>", "Output format: text or json", "text")
+  .option("--patch", "Print patches")
+  .option("--fix", "Apply patches to the working tree")
+  .option("--fail-fast", "Stop after the first failing check")
+  .option("--agent <path>", "Agent file or directory (repeatable)", collect, [])
+  .option("--concurrency <n>", "Parallel checks", "4")
+  .option("--timeout <seconds>", "Per-check timeout", "300")
+  .action((options: CheckCommandOptions) =>
+    checkCommand({
+      ...options,
+      format: String(program.opts().format ?? options.format ?? "text"),
     }),
   )
 
