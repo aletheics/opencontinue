@@ -76,20 +76,20 @@ Rules:
 | M0 | done | Scaffold, event store, CLI, SSE | `npm run dev` works |
 | M1 | done | Provider adapter and streaming | Real model streams into a session |
 | M2 | done | Tools and capability permissions | Model edits files, shell is gated |
-| M3 | next | SQLite persistence and recovery | Kill the server mid-run, restart, resume |
-| M4 | planned | Checks, worktree, GitHub Action | One check runs locally and in CI identically |
+| M3 | done | SQLite persistence and recovery | Kill the server mid-run, restart, resume |
+| M4 | next | Checks, worktree, GitHub Action | One check runs locally and in CI identically |
 | M5 | planned | TUI and web client | Same session continues in two clients |
 | M6 | planned | Desktop and VS Code | Thin clients over the same API |
 | M7 | planned | Plugin API and sandbox | Third-party tool without core changes |
 | M8 | planned | Team and commercial features | Paid design partners |
 
-### M3 — persistence and recovery
+### M3 — persistence and recovery (done)
 
-- SQLite event store behind the current `SessionStore` interface.
+- SQLite event store behind the `SessionStore` interface.
 - Migrations and a schema version.
 - Startup recovery for interrupted runs.
-- Session export/import.
-- Out of scope: multi-user sync.
+- Session export/import at the store layer.
+- Out of scope: multi-user sync and HTTP/CLI export commands.
 
 ### M4 — checks
 

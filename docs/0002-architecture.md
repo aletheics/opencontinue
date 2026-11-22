@@ -13,7 +13,7 @@ clients: CLI / TUI / Web / Desktop / VS Code / CI
              core (event-sourced)
        agent loop · tools · providers · worktrees
                      │
-             SQLite (later)
+             SQLite (node:sqlite)
 ```
 
 ## Decisions
@@ -31,7 +31,7 @@ Every state change is an immutable event with a session ID and monotonic sequenc
 
 Reads are projections. This gives replay, resume, multi-client sync, and auditability with one mechanism.
 
-The current store is in memory. The interface is designed so a SQLite store can replace it without touching the server or clients.
+SQLite is the default store (`node:sqlite`, WAL mode). An in-memory store remains for tests and embedders. Both implement the same interface, so the server and clients do not change.
 
 ### One server, many clients
 
@@ -45,7 +45,7 @@ Public shapes live in `packages/protocol` as Zod schemas. The HTTP API will be d
 
 - Node.js 22+ and TypeScript strict
 - Hono for HTTP
-- SQLite + Drizzle when persistence lands
+- SQLite via built-in `node:sqlite`; no native dependency
 - React for web and desktop UI
 - Electron for desktop v1; Tauri is a possible later "lite" build
 - Rust only for narrow native components if measurements justify it

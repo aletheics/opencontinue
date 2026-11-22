@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { z } from "zod"
 
-import { SessionStore } from "@opencontinue/core"
+import { MemorySessionStore } from "@opencontinue/core"
 import type { Tool, ToolContext } from "@opencontinue/tools"
 
 import { PermissionBroker, type PermissionPolicy } from "./permissions.js"
@@ -27,7 +27,7 @@ const readTool: Tool = {
 }
 
 function setup(mode: "ask" | "auto" | "readonly", policy?: PermissionPolicy) {
-  const store = new SessionStore()
+  const store = new MemorySessionStore()
   const session = store.create()
   const context: ToolContext = { workspace: process.cwd(), sessionId: session.id }
   return { store, session, context, broker: new PermissionBroker(store, mode, policy) }

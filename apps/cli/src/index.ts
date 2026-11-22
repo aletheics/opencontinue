@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
-import { SessionStore } from "@opencontinue/core"
+import { createSessionStore } from "@opencontinue/core"
 import type { SessionEvent, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
 import { closeServer, startServer } from "@opencontinue/server"
 
@@ -180,7 +180,8 @@ async function withServer(
 
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
   const workspace = process.env.INIT_CWD ?? process.cwd()
-  const running = startServer({ store: new SessionStore(), port, permissionMode: mode, workspace })
+  const store = createSessionStore({ workspace })
+  const running = startServer({ store, port, permissionMode: mode, workspace })
   console.log(`embedded server on http://127.0.0.1:${running.port}`)
   if (running.warning) console.warn(`provider: ${running.warning}`)
   else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
@@ -189,6 +190,7 @@ async function withServer(
     await run(`http://127.0.0.1:${running.port}`)
   } finally {
     await closeServer(running.server)
+    store.close()
   }
 }
 
@@ -296,7 +298,8 @@ async function serveCommand(options: {
       ? "readonly"
       : undefined
   const workspace = process.env.INIT_CWD ?? process.cwd()
-  const running = startServer({ store: new SessionStore(), port, permissionMode: mode, workspace })
+  const store = createSessionStore({ workspace })
+  const running = startServer({ store, port, permissionMode: mode, workspace })
   console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)
   if (running.warning) console.warn(`provider: ${running.warning}`)
   else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
@@ -306,6 +309,7 @@ async function serveCommand(options: {
   const shutdown = async () => {
     console.log("\nShutting down...")
     await closeServer(running.server)
+    store.close()
     process.exit(0)
   }
   process.on("SIGINT", () => void shutdown())

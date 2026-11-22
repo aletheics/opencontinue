@@ -38,6 +38,8 @@ npm run dev -- sessions              # list sessions
 
 Flags: `--auto`, `--readonly`, `--resume <id>`, `--url <url>`, `--port <port>`.
 
+Sessions persist in `.opencontinue/sessions/sessions.db` (WAL). Set `OPENCONTINUE_DB` to use another path. Interrupted runs are marked failed on the next start.
+
 Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
 
 Permissions: read-only tools are always allowed. `write` and `bash` ask in interactive mode, are denied in headless read-only mode, and are allowed with `--auto`.

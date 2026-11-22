@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { SessionStore } from "./index.js"
+import { MemorySessionStore } from "./index.js"
 
-describe("SessionStore", () => {
+describe("MemorySessionStore", () => {
   it("projects user and assistant messages", () => {
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create("test")
     store.append(session.id, { type: "message.user", text: "hi" })
     store.append(session.id, { type: "run.started", runId: "r1" })
@@ -18,7 +18,7 @@ describe("SessionStore", () => {
   })
 
   it("replays events after a sequence number", () => {
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create()
     store.append(session.id, { type: "message.user", text: "a" })
     store.append(session.id, { type: "message.user", text: "b" })
@@ -27,7 +27,7 @@ describe("SessionStore", () => {
   })
 
   it("notifies subscribers until they unsubscribe", () => {
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create()
     const seen: string[] = []
     const unsubscribe = store.subscribe(session.id, (event) => seen.push(event.type))

@@ -3,7 +3,7 @@ import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
 
-import { SessionStore } from "@opencontinue/core"
+import { createSessionStore, type SessionStore } from "@opencontinue/core"
 import {
   CreateSessionRequest,
   PermissionDecisionRequest,
@@ -148,11 +148,11 @@ export function createApp(
 }
 
 export function startServer(options: StartServerOptions = {}): RunningServer {
-  const store = options.store ?? new SessionStore()
+  const workspace = options.workspace ?? process.cwd()
+  const store = options.store ?? createSessionStore({ workspace })
   const selection = options.provider
     ? { provider: options.provider, warning: undefined }
     : createProviderFromEnv()
-  const workspace = options.workspace ?? process.cwd()
   const project = loadProjectConfig(workspace)
   const baseSystemPrompt =
     options.systemPrompt ?? process.env.OPENCONTINUE_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT

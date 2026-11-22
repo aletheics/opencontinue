@@ -17,6 +17,7 @@ console.log(`permissions: ${running.permissionMode}`)
 const shutdown = async () => {
   console.log("\nShutting down...")
   await closeServer(running.server)
+  running.store.close()
   process.exit(0)
 }
 

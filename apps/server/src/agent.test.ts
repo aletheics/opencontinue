@@ -4,7 +4,7 @@ import path from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import { SessionStore } from "@opencontinue/core"
+import { MemorySessionStore } from "@opencontinue/core"
 import type { ChatMessage, ChatProvider } from "@opencontinue/providers"
 import { ToolRegistry, type PermissionGate } from "@opencontinue/tools"
 
@@ -31,7 +31,7 @@ async function makeWorkspace(): Promise<string> {
 describe("runAgent", () => {
   it("streams provider text into the session", async () => {
     const workspace = await makeWorkspace()
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create()
     store.append(session.id, { type: "message.user", text: "hi" })
 
@@ -64,7 +64,7 @@ describe("runAgent", () => {
 
   it("executes a tool call and continues the conversation", async () => {
     const workspace = await makeWorkspace()
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create()
     store.append(session.id, { type: "message.user", text: "write a.txt" })
 
@@ -110,7 +110,7 @@ describe("runAgent", () => {
 
   it("reconstructs multi-step history across turns", async () => {
     const workspace = await makeWorkspace()
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create()
     store.append(session.id, { type: "message.user", text: "write a.txt" })
 
@@ -176,7 +176,7 @@ describe("runAgent", () => {
 
   it("records a failed run", async () => {
     const workspace = await makeWorkspace()
-    const store = new SessionStore()
+    const store = new MemorySessionStore()
     const session = store.create()
     store.append(session.id, { type: "message.user", text: "hi" })
 
