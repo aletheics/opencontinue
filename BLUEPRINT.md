@@ -97,7 +97,7 @@ Rules:
 - Agent discovery from `.opencontinue/agent`, `.continue/agents`, and `.continue/checks`.
 - Isolated git worktree per check, including uncommitted and untracked files.
 - Text, JSON, and patch output; `--fix`, `--fail-fast`, non-zero exit on failure.
-- Pull-request workflow and reusable action scaffold using the same command.
+- Pull-request workflow and repo-hosted action that posts a comment and gates the job.
 - Out of scope: hosted dashboard and automatic PR comments.
 
 ### M5 — clients

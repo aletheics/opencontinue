@@ -5,6 +5,8 @@ coverage/
 .env.*
 !.env.example
 *.log
+opencontinue-check.json
+opencontinue-check.log
 .opencontinue/sessions/
 .opencontinue/cache/
 .DS_Store

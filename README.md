@@ -45,6 +45,10 @@ Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
 
 Permissions: read-only tools are always allowed. `write` and `bash` ask in interactive mode, are denied in headless read-only mode, and are allowed with `--auto`.
 
+## GitHub Actions
+
+Use [`actions/check`](actions/check) on pull requests. Checkout with `fetch-depth: 0`, grant `pull-requests: write` and `issues: write`, and set `OPENCONTINUE_API_KEY`.
+
 ## Documentation
 
 - [BLUEPRINT.md](BLUEPRINT.md) — product direction, milestones, and the spiral development process

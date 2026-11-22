@@ -28,7 +28,7 @@
 1. [x] Worktree-isolated check runner.
 2. [x] `opencontinue check --base <ref> --format json --patch`.
 3. [x] `--fix`, `--fail-fast`, and non-zero exit codes.
-4. [x] Pull-request workflow and reusable action scaffold.
+4. [x] Pull-request workflow and repo-hosted action with PR comments.
 5. [ ] A Checks view in the CLI and web client.
 
 ## 0.3 — continuity

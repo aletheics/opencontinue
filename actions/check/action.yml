@@ -1,23 +1,12 @@
 name: OpenContinue Checks
 description: Run source-controlled AI checks on a pull request.
+author: OpenContinue
 
 inputs:
   base:
     description: Base git ref to diff against
     required: false
     default: origin/main
-  format:
-    description: Output format (text or json)
-    required: false
-    default: json
-  patch:
-    description: Print patches
-    required: false
-    default: "false"
-  fix:
-    description: Apply suggested patches to the working tree
-    required: false
-    default: "false"
   api-key:
     description: OpenAI-compatible API key
     required: true
@@ -27,23 +16,177 @@ inputs:
   model:
     description: Model name
     required: false
+  patch:
+    description: Include suggested patches in the PR comment
+    required: false
+    default: "true"
+  comment:
+    description: Post or update a PR comment
+    required: false
+    default: "true"
+  fail-on-error:
+    description: Fail the action when a check fails or errors
+    required: false
+    default: "true"
+  timeout:
+    description: Per-check timeout in seconds
+    required: false
+    default: "300"
+
+outputs:
+  summary:
+    description: JSON result
+    value: ${{ steps.run.outputs.summary }}
+  exit-code:
+    description: Check exit code
+    value: ${{ steps.run.outputs.exit-code }}
 
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v6
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.api-key }}" ]; then
+          echo "::error::api-key is required"
+          exit 1
+        fi
+        if [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
+          echo "::error::Checkout must use fetch-depth: 0"
+          exit 1
+        fi
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
       with:
         node-version: 24
-    - name: Run OpenContinue checks
+        cache: npm
+        cache-dependency-path: ${{ github.action_path }}/package-lock.json
+
+    - name: Install OpenContinue
       shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci
+
+    - name: Run checks
+      id: run
+      shell: bash
+      working-directory: ${{ github.workspace }}
       env:
+        OPENCONTINUE_PROVIDER: openai-compatible
         OPENCONTINUE_API_KEY: ${{ inputs.api-key }}
-        OPENCONTINUE_BASE_URL: ${{ inputs.base-url }}
-        OPENCONTINUE_MODEL: ${{ inputs.model }}
+        OPENCONTINUE_BASE_URL: ${{ inputs.base-url || 'https://api.openai.com/v1' }}
+        OPENCONTINUE_MODEL: ${{ inputs.model || 'gpt-4o-mini' }}
       run: |
-        npm i -g @opencontinue/cli
-        opencontinue check \
+        set +e
+        ACTION_PATH="${GITHUB_ACTION_PATH//\\//}"
+        node "$ACTION_PATH/node_modules/tsx/dist/cli.mjs" \
+          "$ACTION_PATH/apps/cli/src/index.ts" check \
           --base "${{ inputs.base }}" \
-          --format "${{ inputs.format }}" \
-          ${{ inputs.patch == 'true' && '--patch' || '' }} \
-          ${{ inputs.fix == 'true' && '--fix' || '' }}
+          --format json \
+          --timeout "${{ inputs.timeout }}" \
+          --fail-fast > opencontinue-check.json 2> opencontinue-check.log
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ -f opencontinue-check.json ]; then
+          echo "summary<<EOF" >> "$GITHUB_OUTPUT"
+          cat opencontinue-check.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          cat opencontinue-check.json
+        fi
+        cat opencontinue-check.log >&2
+        exit 0
+
+    - name: Write job summary
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        {
+          echo "## OpenContinue checks"
+          if [ -f opencontinue-check.json ]; then
+            echo '```json'
+            cat opencontinue-check.json
+            echo '```'
+          else
+            echo "No result file produced."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Post PR comment
+      if: ${{ inputs.comment == 'true' && github.event.pull_request }}
+      uses: actions/github-script@v7
+      env:
+        CHECK_RESULT_PATH: ${{ github.workspace }}/opencontinue-check.json
+        INCLUDE_PATCHES: ${{ inputs.patch }}
+      with:
+        script: |
+          const fs = require("fs");
+          const marker = "<!-- opencontinue-check -->";
+          const prNumber = context.payload.pull_request?.number;
+          if (!prNumber) return;
+
+          let data;
+          try {
+            data = JSON.parse(fs.readFileSync(process.env.CHECK_RESULT_PATH, "utf8"));
+          } catch {
+            data = { checks: [], summary: { total: 0, passed: 0, failed: 0, errored: 0 } };
+          }
+
+          const icon = (status) => status === "pass" ? "✅" : status === "fail" ? "❌" : "⚠️";
+          const rows = (data.checks || []).map((check) =>
+            `| ${check.name} | ${icon(check.status)} ${check.status} | ${(check.durationMs / 1000).toFixed(1)}s |`
+          );
+          const sections = [];
+          for (const check of data.checks || []) {
+            if (check.status === "pass") continue;
+            sections.push(`### ${check.name}`);
+            if (check.error) sections.push(`**Error:** ${check.error}`);
+            if (check.output) sections.push(check.output);
+            if (process.env.INCLUDE_PATCHES === "true" && check.patch) {
+              sections.push("````diff\n" + check.patch.trimEnd() + "\n````");
+            }
+          }
+
+          const body = [
+            marker,
+            "## OpenContinue checks",
+            "",
+            `Summary: ${data.summary?.passed ?? 0} passed, ${data.summary?.failed ?? 0} failed, ${data.summary?.errored ?? 0} errored.`,
+            "",
+            "| Check | Status | Time |",
+            "|---|---|---|",
+            ...rows,
+            "",
+            ...sections,
+            "",
+            `[Workflow run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+          ].join("\n").slice(0, 65000);
+
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: prNumber,
+            per_page: 100,
+          });
+          const existing = comments.find((comment) => comment.body?.includes(marker));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+          }
+
+    - name: Fail on check errors
+      if: ${{ inputs.fail-on-error == 'true' && steps.run.outputs.exit-code != '0' }}
+      shell: bash
+      run: exit 1
