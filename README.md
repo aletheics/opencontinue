@@ -1,8 +1,25 @@
-# OpenContinue
+<h1 align="center">OpenContinue</h1>
 
-> The open continuum for AI-assisted engineering.
+<p align="center">The open continuum for AI-assisted engineering.</p>
 
-Open-source terminal coding agent with durable sessions, streaming, tools, and capability permissions.
+<div align="center">
+
+[![GitHub stars](https://img.shields.io/github/stars/aletheics/opencontinue?style=flat-square)](https://github.com/aletheics/opencontinue/stargazers)
+[![CI](https://github.com/aletheics/opencontinue/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aletheics/opencontinue/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Blueprint](https://img.shields.io/badge/Blueprint-opencontinue-BE1B55.svg)](BLUEPRINT.md)
+
+</div>
+
+<p align="center">
+  <img src="image/github-readme.png" alt="OpenContinue banner" />
+</p>
+
+## What is OpenContinue?
+
+OpenContinue is an open-source terminal coding agent with durable sessions, streaming, tools, and source-controlled checks. Work continues across your terminal, CI, and future clients.
+
+It is not affiliated with Continue Dev or OpenCode.
 
 ## Installation
 
@@ -24,7 +41,7 @@ OPENCONTINUE_API_KEY=sk-...
 OPENCONTINUE_MODEL=gpt-4o-mini
 ```
 
-DeepSeek, Ollama, vLLM, and LM Studio work through the same interface. See [`.env.example`](.env.example). Without a key, OpenContinue runs in `echo` mode so sessions and streaming still work.
+DeepSeek, Ollama, vLLM, and LM Studio use the same interface. Without a key, `echo` mode keeps sessions and streaming testable.
 
 ## Usage
 
@@ -34,16 +51,25 @@ npm run dev -- --auto "fix tests"    # headless, write/shell allowed
 npm run dev -- --readonly "review"   # headless, read-only
 npm run dev -- serve --port 8787     # server only
 npm run dev -- sessions              # list sessions
-npm run check -- --base main         # run source-controlled checks
 ```
 
 Flags: `--auto`, `--readonly`, `--resume <id>`, `--url <url>`, `--port <port>`.
 
-Sessions persist in `.opencontinue/sessions/sessions.db` (WAL). Set `OPENCONTINUE_DB` to use another path. Interrupted runs are marked failed on the next start.
+Sessions persist in `.opencontinue/sessions/sessions.db` (WAL). Set `OPENCONTINUE_DB` to override. Interrupted runs are marked failed on the next start.
 
 Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
 
-Permissions: read-only tools are always allowed. `write` and `bash` ask in interactive mode, are denied in headless read-only mode, and are allowed with `--auto`.
+Permissions: read-only tools are always allowed. `write` and `bash` ask interactively, are denied in headless read-only mode, and are allowed with `--auto`.
+
+## Checks
+
+```bash
+npm run check -- --base main
+npm run check -- --base main --format json --patch
+npm run check -- --base main --fix
+```
+
+Checks run each agent in an isolated git worktree. A non-empty patch is a failure; an empty patch is a pass. Agents come from `.opencontinue/agent`, `.continue/agents`, and `.continue/checks`.
 
 ## GitHub Actions
 
@@ -51,9 +77,9 @@ Use [`actions/check`](actions/check) on pull requests. Checkout with `fetch-dept
 
 ## Documentation
 
-- [BLUEPRINT.md](BLUEPRINT.md) — product direction, milestones, and the spiral development process
+- [BLUEPRINT.md](BLUEPRINT.md) — direction, milestones, and the spiral development process
 - [AGENTS.md](AGENTS.md) — rules for AI agents and contributors
-- [docs/](docs) — architecture, license, roadmap, ADRs
+- [docs/](docs) — architecture, roadmap, and ADRs
 - [.opencontinue/](.opencontinue) — project constraints, agents, commands, and skills
 
 ## Contributing
