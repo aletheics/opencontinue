@@ -26,6 +26,12 @@ export type ChatMessage =
 export type ChatStreamEvent =
   | { type: "text"; text: string }
   | { type: "tool_call"; call: ToolCall }
+  | {
+      type: "usage"
+      inputTokens?: number
+      outputTokens?: number
+      totalTokens?: number
+    }
 
 export type ChatRequest = {
   model: string
@@ -117,6 +123,11 @@ type OpenAIChunk = {
     }
     finish_reason?: string | null
   }>
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
   error?: { message?: string }
 }
 
@@ -196,6 +207,9 @@ export class OpenAICompatibleProvider implements ChatProvider {
       model: request.model || this.model,
       messages: request.messages.map(toOpenAIMessage),
       stream: true,
+      ...(this.baseUrl.includes("api.openai.com") || this.baseUrl.includes("api.deepseek.com")
+        ? { stream_options: { include_usage: true } }
+        : {}),
     }
     if (request.tools?.length) {
       body.tools = request.tools.map((tool) => ({
@@ -230,10 +244,12 @@ export class OpenAICompatibleProvider implements ChatProvider {
     const decoder = new TextDecoder()
     const parser = new SseParser()
     const pendingCalls = new Map<number, { id?: string; name: string; arguments: string }>()
+    let usage: OpenAIChunk["usage"]
 
     const consume = (data: string): string | undefined => {
       const chunk = JSON.parse(data) as OpenAIChunk
       if (chunk.error?.message) throw new Error(`Provider error: ${chunk.error.message}`)
+      if (chunk.usage) usage = chunk.usage
 
       const delta = chunk.choices?.[0]?.delta
       for (const call of delta?.tool_calls ?? []) {
@@ -281,6 +297,15 @@ export class OpenAICompatibleProvider implements ChatProvider {
           name: call.name,
           arguments: call.arguments,
         },
+      }
+    }
+
+    if (usage) {
+      yield {
+        type: "usage",
+        inputTokens: usage.prompt_tokens,
+        outputTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens,
       }
     }
   }

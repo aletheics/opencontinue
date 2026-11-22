@@ -10,6 +10,7 @@ import {
   globTool,
   grepTool,
   readTool,
+  writeTool,
   type ToolContext,
 } from "./index.js"
 
@@ -35,12 +36,20 @@ describe("tools", () => {
     await writeFile(path.join(workspace, "a.ts"), "const x = 1\nconst y = 2\n")
 
     expect(await readTool.execute({ path: "a.ts" }, context(workspace))).toContain("1: const x = 1")
-    expect(
-      await editTool.execute(
-        { path: "a.ts", oldString: "const y = 2", newString: "const y = 3" },
-        context(workspace),
-      ),
-    ).toContain("Replaced 1")
+
+    const edited = await editTool.execute(
+      { path: "a.ts", oldString: "const y = 2", newString: "const y = 3" },
+      context(workspace),
+    )
+    expect(typeof edited === "string" ? edited : edited.output).toContain("Replaced 1")
+    if (typeof edited !== "string") expect(edited.diff).toContain("-const y = 2")
+
+    const written = await writeTool.execute(
+      { path: "b.ts", content: "hello\n" },
+      context(workspace),
+    )
+    if (typeof written !== "string") expect(written.diff).toContain("+hello")
+
     expect(await readTool.execute({ path: "a.ts" }, context(workspace))).toContain("const y = 3")
   })
 

@@ -43,6 +43,47 @@ describe("timeline", () => {
     expect(timeline[3]).toMatchObject({ text: "All green." })
   })
 
+  it("keeps tool diffs and token usage", () => {
+    const events: SessionEvent[] = [
+      { ...base, seq: 1, type: "run.started", runId: "r1" },
+      {
+        ...base,
+        seq: 2,
+        type: "tool.started",
+        runId: "r1",
+        callId: "c1",
+        name: "edit",
+        input: { path: "a.ts" },
+      },
+      {
+        ...base,
+        seq: 3,
+        type: "tool.completed",
+        runId: "r1",
+        callId: "c1",
+        output: "Replaced 1",
+        diff: "+const a = 2",
+      },
+      {
+        ...base,
+        seq: 4,
+        type: "usage",
+        runId: "r1",
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+      },
+    ]
+
+    const timeline = timelineFromEvents(events)
+    expect(timeline.find((item) => item.kind === "tool")).toMatchObject({
+      diff: "+const a = 2",
+    })
+    expect(timeline.find((item) => item.kind === "usage")).toMatchObject({
+      totalTokens: 15,
+    })
+  })
+
   it("labels common tools with their arguments", () => {
     const item: ToolTimelineItem = {
       kind: "tool",

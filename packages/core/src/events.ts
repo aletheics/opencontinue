@@ -21,6 +21,15 @@ export function buildEvent(
       return { ...base, type: draft.type, runId: draft.runId }
     case "run.failed":
       return { ...base, type: draft.type, runId: draft.runId, error: draft.error }
+    case "usage":
+      return {
+        ...base,
+        type: draft.type,
+        runId: draft.runId,
+        ...(draft.inputTokens === undefined ? {} : { inputTokens: draft.inputTokens }),
+        ...(draft.outputTokens === undefined ? {} : { outputTokens: draft.outputTokens }),
+        ...(draft.totalTokens === undefined ? {} : { totalTokens: draft.totalTokens }),
+      }
     case "tool.started":
       return {
         ...base,
@@ -37,6 +46,7 @@ export function buildEvent(
         runId: draft.runId,
         callId: draft.callId,
         output: draft.output,
+        ...(draft.diff === undefined ? {} : { diff: draft.diff }),
       }
     case "tool.failed":
       return {

@@ -47,6 +47,14 @@ export const SessionEvent = z.discriminatedUnion("type", [
   }),
   z.object({
     ...eventBase,
+    type: z.literal("usage"),
+    runId: z.string(),
+    inputTokens: z.number().int().nonnegative().optional(),
+    outputTokens: z.number().int().nonnegative().optional(),
+    totalTokens: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    ...eventBase,
     type: z.literal("tool.started"),
     runId: z.string(),
     callId: z.string(),
@@ -59,6 +67,7 @@ export const SessionEvent = z.discriminatedUnion("type", [
     runId: z.string(),
     callId: z.string(),
     output: z.string(),
+    diff: z.string().optional(),
   }),
   z.object({
     ...eventBase,

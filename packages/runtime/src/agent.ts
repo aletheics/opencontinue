@@ -54,8 +54,16 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
         if (event.type === "text") {
           text += event.text
           store.append(sessionId, { type: "message.assistant.delta", runId, text: event.text })
-        } else {
+        } else if (event.type === "tool_call") {
           calls.push(event.call)
+        } else {
+          store.append(sessionId, {
+            type: "usage",
+            runId,
+            inputTokens: event.inputTokens,
+            outputTokens: event.outputTokens,
+            totalTokens: event.totalTokens,
+          })
         }
       }
 
@@ -99,6 +107,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
             runId,
             callId: call.id,
             output: result.output,
+            ...(result.diff === undefined ? {} : { diff: result.diff }),
           })
           history.push({ role: "tool", toolCallId: call.id, content: result.output })
         } else {

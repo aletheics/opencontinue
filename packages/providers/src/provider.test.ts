@@ -163,6 +163,38 @@ describe("OpenAICompatibleProvider", () => {
     await expect(provider.listModels()).resolves.toEqual(["gpt-6.2", "gpt-6.2-mini"])
   })
 
+  it("emits usage when the provider reports it", async () => {
+    const body = sseBody([
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}\n\n',
+      "data: [DONE]\n\n",
+    ])
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(body, { status: 200 }),
+    )
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "https://example.test/v1",
+      model: "test-model",
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    const events: ChatStreamEvent[] = []
+    for await (const event of provider.streamChat({
+      model: "test-model",
+      messages: [{ role: "user", content: "hi" }],
+    })) {
+      events.push(event)
+    }
+
+    expect(events).toContainEqual({
+      type: "usage",
+      inputTokens: 10,
+      outputTokens: 5,
+      totalTokens: 15,
+    })
+  })
+
   it("throws on non-2xx responses", async () => {
     const fetchMock = vi.fn(async () => new Response("unauthorized", { status: 401 }))
     const provider = new OpenAICompatibleProvider({

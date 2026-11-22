@@ -22,9 +22,22 @@ export type ToolTimelineItem = {
   status: "running" | "done" | "failed"
   output?: string
   error?: string
+  diff?: string
 }
 
-export type TimelineItem = UserTimelineItem | AssistantTimelineItem | ToolTimelineItem
+export type UsageTimelineItem = {
+  kind: "usage"
+  id: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
+
+export type TimelineItem =
+  | UserTimelineItem
+  | AssistantTimelineItem
+  | ToolTimelineItem
+  | UsageTimelineItem
 
 export function reduceTimeline(items: TimelineItem[], event: SessionEvent): TimelineItem[] {
   if (event.type === "message.user") {
@@ -76,7 +89,7 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
   if (event.type === "tool.completed") {
     return items.map((item) =>
       item.kind === "tool" && item.id === `tool:${event.callId}`
-        ? { ...item, status: "done", output: event.output }
+        ? { ...item, status: "done", output: event.output, diff: event.diff }
         : item,
     )
   }
@@ -97,6 +110,20 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
         id: `assistant:${event.runId}:error:${event.seq}`,
         runId: event.runId,
         text: `Run failed: ${event.error}`,
+      },
+    ]
+  }
+
+  if (event.type === "usage") {
+    return [
+      ...items,
+      {
+        kind: "usage",
+        id: `usage:${event.seq}`,
+        inputTokens: event.inputTokens ?? 0,
+        outputTokens: event.outputTokens ?? 0,
+        totalTokens:
+          event.totalTokens ?? (event.inputTokens ?? 0) + (event.outputTokens ?? 0),
       },
     ]
   }

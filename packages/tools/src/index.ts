@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 
 import type { ToolDefinition } from "@opencontinue/providers"
+import { createTwoFilesPatch } from "diff"
 import { z } from "zod"
 import { zodToJsonSchema } from "zod-to-json-schema"
 
@@ -14,16 +15,23 @@ export type ToolContext = {
   signal?: AbortSignal
 }
 
+export type ToolOutput =
+  | string
+  | {
+      output: string
+      diff?: string
+    }
+
 export type Tool = {
   name: string
   description: string
   capability: ToolCapability
   input: z.ZodTypeAny
-  execute(raw: unknown, context: ToolContext): Promise<string>
+  execute(raw: unknown, context: ToolContext): Promise<ToolOutput>
 }
 
 export type ToolExecution =
-  | { ok: true; output: string }
+  | { ok: true; output: string; diff?: string }
   | { ok: false; error: string }
 
 export interface PermissionGate {
@@ -103,9 +111,14 @@ export const writeTool: Tool = {
   async execute(raw, context) {
     const { path: inputPath, content } = writeInput.parse(raw)
     const target = resolveInside(context.workspace, inputPath)
+    const before = await fs.readFile(target, "utf8").catch(() => "")
     await fs.mkdir(path.dirname(target), { recursive: true })
     await fs.writeFile(target, content, "utf8")
-    return `Wrote ${content.length} characters to ${inputPath}`
+    const diff = createTwoFilesPatch(inputPath, inputPath, before, content, "", "")
+    return {
+      output: `Wrote ${content.length} characters to ${inputPath}`,
+      diff: diff.trim() ? diff : undefined,
+    }
   },
 }
 
@@ -137,7 +150,11 @@ export const editTool: Tool = {
 
     const updated = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
     await fs.writeFile(target, updated, "utf8")
-    return `Replaced ${replaceAll ? count : 1} occurrence(s) in ${inputPath}`
+    const diff = createTwoFilesPatch(inputPath, inputPath, content, updated, "", "")
+    return {
+      output: `Replaced ${replaceAll ? count : 1} occurrence(s) in ${inputPath}`,
+      diff: diff.trim() ? diff : undefined,
+    }
   },
 }
 
@@ -351,7 +368,10 @@ export class ToolRegistry {
     }
 
     try {
-      return { ok: true, output: await tool.execute(parsed.data, context) }
+      const result = await tool.execute(parsed.data, context)
+      return typeof result === "string"
+        ? { ok: true, output: result }
+        : { ok: true, output: result.output, diff: result.diff }
     } catch (error) {
       return { ok: false, error: messageOf(error) }
     }

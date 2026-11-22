@@ -77,14 +77,63 @@ class TuiPermissionGate implements PermissionGate {
   }
 }
 
-function formatToolOutput(text: string, columns: number): string {
+function formatToolOutput(text: string, columns: number, expanded: boolean): string {
   const width = Math.max(20, columns - 8)
   const lines = text.trim().split(/\r?\n/)
+  const maxLines = expanded ? 12 : 2
   const shown = lines
-    .slice(0, 3)
+    .slice(0, maxLines)
     .map((line, index) => `${index === 0 ? "  ⎿ " : "    "}${line.slice(0, width)}`)
-  if (lines.length > 3) shown.push(`    … ${lines.length - 3} more lines`)
+  if (lines.length > maxLines) {
+    shown.push(`    … ${lines.length - maxLines} more lines · ctrl+o`)
+  }
   return shown.join("\n")
+}
+
+function formatDiff(
+  diff: string,
+  columns: number,
+  expanded: boolean,
+): { line: string; color: "green" | "red" | "cyan" | undefined }[] {
+  const width = Math.max(20, columns - 4)
+  const all = diff
+    .split(/\r?\n/)
+    .filter(
+      (line) =>
+        !line.startsWith("Index: ") &&
+        !line.startsWith("===================================================================") &&
+        !line.startsWith("--- ") &&
+        !line.startsWith("+++ "),
+    )
+  const maxLines = expanded ? 20 : 4
+  const shown = all.slice(0, maxLines).map((line) => ({
+    line: line.slice(0, width),
+    color: line.startsWith("+")
+      ? ("green" as const)
+      : line.startsWith("-")
+        ? ("red" as const)
+        : line.startsWith("@@")
+          ? ("cyan" as const)
+          : undefined,
+  }))
+  if (all.length > maxLines) {
+    shown.push({ line: `… ${all.length - maxLines} more diff lines · ctrl+o`, color: undefined })
+  }
+  return shown
+}
+
+function diffStats(diff: string): { added: number; removed: number } {
+  let added = 0
+  let removed = 0
+  for (const line of diff.split(/\r?\n/)) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added++
+    else if (line.startsWith("-") && !line.startsWith("---")) removed++
+  }
+  return { added, removed }
+}
+
+function formatTokens(value: number): string {
+  return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
 }
 
 function initialProviderIndex(provider: string | undefined): number {
@@ -101,10 +150,12 @@ function Header({
   provider,
   model,
   mode,
+  stats,
 }: {
   provider: string
   model: string
   mode: string
+  stats?: string
 }) {
   return (
     <Box
@@ -119,6 +170,7 @@ function Header({
       </Text>
       <Text dimColor>
         {provider} · model: {model} · {mode}
+        {stats ? ` · ${stats}` : ""}
       </Text>
     </Box>
   )
@@ -147,12 +199,16 @@ export function App({ options }: { options: TuiOptions }) {
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(0)
+  const [expandAll, setExpandAll] = useState(false)
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
+  const [lastDurationMs, setLastDurationMs] = useState<number | null>(null)
   const [permission, setPermission] = useState<PermissionRequest | null>(null)
 
   const storeRef = useRef<SessionStore | null>(null)
   const sessionRef = useRef<string | null>(null)
   const providerRef = useRef<ChatProvider | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
+  const runStartedRef = useRef<number | null>(null)
   const gateRef = useRef<TuiPermissionGate | null>(null)
   if (!gateRef.current) {
     gateRef.current = new TuiPermissionGate(Boolean(options.auto), Boolean(options.readonly))
@@ -294,7 +350,13 @@ export function App({ options }: { options: TuiOptions }) {
       unsubscribeRef.current?.()
       unsubscribeRef.current = store.subscribe(session.id, (event) => {
         setTimeline((items) => reduceTimeline(items, event))
-        if (event.type === "run.completed" || event.type === "run.failed") setBusy(false)
+        if (event.type === "run.completed" || event.type === "run.failed") {
+          const started = runStartedRef.current
+          if (started !== null) setLastDurationMs(Date.now() - started)
+          runStartedRef.current = null
+          setRunStartedAt(null)
+          setBusy(false)
+        }
       })
 
       setScreen("chat")
@@ -319,6 +381,10 @@ export function App({ options }: { options: TuiOptions }) {
 
     setInput("")
     setBusy(true)
+    setLastDurationMs(null)
+    const started = Date.now()
+    setRunStartedAt(started)
+    runStartedRef.current = started
     store.append(sessionId, { type: "message.user", text })
 
     void runAgent({
@@ -338,6 +404,11 @@ export function App({ options }: { options: TuiOptions }) {
   useInput((character, key) => {
     if (key.ctrl && character === "c") {
       exit()
+      return
+    }
+
+    if (key.ctrl && character === "o") {
+      setExpandAll((value) => !value)
       return
     }
 
@@ -379,7 +450,7 @@ export function App({ options }: { options: TuiOptions }) {
       : screen === "key" || screen === "baseurl"
         ? "Enter submit · Ctrl+C exit"
         : screen === "chat"
-          ? "/exit to quit · Ctrl+C exit"
+          ? "/exit to quit · Ctrl+C exit · ctrl+o expand"
           : screen === "loading"
             ? "Loading models…"
             : "Ctrl+C exit"
@@ -486,9 +557,10 @@ export function App({ options }: { options: TuiOptions }) {
       )
     }
 
+    const contentItems = timeline.filter((item) => item.kind !== "usage")
     const maxItems = Math.max(1, Math.floor((bodyHeight - 4) / 2))
-    const visibleItems = timeline.slice(-maxItems)
-    const hidden = timeline.length - visibleItems.length
+    const visibleItems = contentItems.slice(-maxItems)
+    const hidden = contentItems.length - visibleItems.length
 
     return (
       <>
@@ -510,6 +582,8 @@ export function App({ options }: { options: TuiOptions }) {
               return item.text ? <Text key={item.id}>{item.text}</Text> : null
             }
 
+            const stats = item.diff ? diffStats(item.diff) : undefined
+
             return (
               <Box key={item.id} flexDirection="column">
                 <Text
@@ -523,12 +597,33 @@ export function App({ options }: { options: TuiOptions }) {
                 >
                   {item.status === "failed" ? "✗" : "●"}{" "}
                   {toolLabel(item).slice(0, Math.max(20, columns - 8))}
+                  {stats ? (
+                    <Text dimColor>
+                      {"  "}+{stats.added} -{stats.removed}
+                    </Text>
+                  ) : null}
                 </Text>
-                {item.output ? (
-                  <Text dimColor>{formatToolOutput(item.output, columns)}</Text>
-                ) : null}
+                {item.diff
+                  ? formatDiff(item.diff, columns, expandAll).map((line, index) => (
+                      <Text
+                        key={`${item.id}-diff-${index}`}
+                        color={line.color}
+                        dimColor={line.color === undefined}
+                      >
+                        {line.line}
+                      </Text>
+                    ))
+                  : item.output
+                    ? (
+                        <Text dimColor>
+                          {formatToolOutput(item.output, columns, expandAll)}
+                        </Text>
+                      )
+                    : null}
                 {item.error ? (
-                  <Text color="red">{formatToolOutput(item.error, columns)}</Text>
+                  <Text color="red">
+                    {formatToolOutput(item.error, columns, expandAll)}
+                  </Text>
                 ) : null}
               </Box>
             )
@@ -538,9 +633,21 @@ export function App({ options }: { options: TuiOptions }) {
     )
   })()
 
+  const totalTokens = timeline.reduce(
+    (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
+    0,
+  )
+  const elapsedMs = runStartedAt !== null ? Date.now() - runStartedAt : lastDurationMs
+  const stats = [
+    elapsedMs !== null ? `${(elapsedMs / 1000).toFixed(1)}s` : undefined,
+    totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
   return (
     <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
-      <Header provider={headerProvider} model={headerModel} mode={mode} />
+      <Header provider={headerProvider} model={headerModel} mode={mode} stats={stats} />
       <Box
         flexDirection="column"
         flexShrink={0}

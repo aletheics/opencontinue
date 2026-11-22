@@ -19,8 +19,15 @@ export type EventDraft =
   | { type: "message.assistant.delta"; runId: string; text: string }
   | { type: "run.completed"; runId: string }
   | { type: "run.failed"; runId: string; error: string }
+  | {
+      type: "usage"
+      runId: string
+      inputTokens?: number
+      outputTokens?: number
+      totalTokens?: number
+    }
   | { type: "tool.started"; runId: string; callId: string; name: string; input: unknown }
-  | { type: "tool.completed"; runId: string; callId: string; output: string }
+  | { type: "tool.completed"; runId: string; callId: string; output: string; diff?: string }
   | { type: "tool.failed"; runId: string; callId: string; error: string }
   | {
       type: "permission.requested"

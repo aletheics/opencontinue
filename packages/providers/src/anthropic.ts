@@ -138,8 +138,20 @@ export class AnthropicProvider implements ChatProvider {
     )
 
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>()
+    let inputTokens = 0
+    let outputTokens = 0
 
     for await (const event of stream) {
+      if (event.type === "message_start") {
+        inputTokens = event.message.usage.input_tokens
+        continue
+      }
+
+      if (event.type === "message_delta") {
+        outputTokens = event.usage.output_tokens
+        continue
+      }
+
       if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
         toolBlocks.set(event.index, {
           id: event.content_block.id,
@@ -167,6 +179,15 @@ export class AnthropicProvider implements ChatProvider {
           name: block.name,
           arguments: block.json || "{}",
         },
+      }
+    }
+
+    if (inputTokens > 0 || outputTokens > 0) {
+      yield {
+        type: "usage",
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
       }
     }
   }
