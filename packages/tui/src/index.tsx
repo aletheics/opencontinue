@@ -1,4 +1,4 @@
-import { Box, Text, render, useApp, useInput } from "ink"
+import { Box, Text, render, useApp, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -85,8 +85,39 @@ function initialProviderIndex(provider: string | undefined): number {
   return index >= 0 ? index : 0
 }
 
+function Header({
+  provider,
+  model,
+  mode,
+}: {
+  provider: string
+  model: string
+  mode: string
+}) {
+  return (
+    <Box
+      borderStyle="round"
+      borderColor="gray"
+      paddingX={1}
+      justifyContent="space-between"
+    >
+      <Text bold color="cyan">
+        OpenContinue
+      </Text>
+      <Text dimColor>
+        {provider} · model: {model} · {mode}
+      </Text>
+    </Box>
+  )
+}
+
 export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
+  const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
+  const columns = Math.max(40, (stdout.columns ?? 80) - 1)
+  const rows = Math.max(12, (stdout.rows ?? 24) - 1)
+  const mode = options.auto ? "auto" : options.readonly ? "readonly" : "ask"
+
   const initial = useMemo(() => resolveProviderSettings(), [])
   const [screen, setScreen] = useState<Screen>("provider")
   const [providerIndex, setProviderIndex] = useState(() => initialProviderIndex(initial.provider))
@@ -340,148 +371,189 @@ export function App({ options }: { options: TuiOptions }) {
     }
   })
 
-  if (screen === "provider") {
-    const windowSize = 12
-    const start = Math.max(
-      0,
-      Math.min(
-        providerIndex - Math.floor(windowSize / 2),
-        Math.max(0, PROVIDER_PRESETS.length - windowSize),
-      ),
-    )
-    const visible = PROVIDER_PRESETS.slice(start, start + windowSize)
+  const headerProvider =
+    screen === "provider"
+      ? "select provider"
+      : preset?.label ?? initial.provider ?? "OpenContinue"
+  const headerModel =
+    screen === "chat" ? model : screen === "models" ? "select model" : "—"
+  const footer =
+    screen === "provider" || screen === "models"
+      ? "↑/↓ select · Enter confirm · Ctrl+C exit"
+      : screen === "key" || screen === "baseurl"
+        ? "Enter submit · Ctrl+C exit"
+        : screen === "chat"
+          ? "/exit to quit · Ctrl+C exit"
+          : screen === "loading"
+            ? "Loading models…"
+            : "Ctrl+C exit"
+
+  const body = (() => {
+    if (screen === "provider") {
+      const windowSize = Math.max(4, Math.min(12, rows - 6))
+      const start = Math.max(
+        0,
+        Math.min(
+          providerIndex - Math.floor(windowSize / 2),
+          Math.max(0, PROVIDER_PRESETS.length - windowSize),
+        ),
+      )
+      const visible = PROVIDER_PRESETS.slice(start, start + windowSize)
+
+      return (
+        <>
+          <Text dimColor>
+            Select a provider ({providerIndex + 1}/{PROVIDER_PRESETS.length})
+          </Text>
+          {visible.map((item, offset) => {
+            const index = start + offset
+            return (
+              <Text key={item.id} color={index === providerIndex ? "cyan" : undefined}>
+                {index === providerIndex ? "› " : "  "}
+                {item.label}
+                {item.note ? ` — ${item.note}` : ""}
+              </Text>
+            )
+          })}
+        </>
+      )
+    }
+
+    if (screen === "key") {
+      return (
+        <>
+          <Text bold>{preset?.label} API key</Text>
+          <Box marginTop={1}>
+            <TextInput value={keyInput} onChange={setKeyInput} mask="*" onSubmit={submitKey} />
+          </Box>
+          <Text dimColor>Stored in ~/.opencontinue/auth.json</Text>
+        </>
+      )
+    }
+
+    if (screen === "baseurl") {
+      return (
+        <>
+          <Text bold>{preset?.label} base URL</Text>
+          <Box marginTop={1}>
+            <TextInput
+              value={baseInput}
+              onChange={setBaseInput}
+              onSubmit={submitBaseUrl}
+              placeholder="https://example.com/v1"
+            />
+          </Box>
+          <Text dimColor>Use an OpenAI-compatible endpoint.</Text>
+        </>
+      )
+    }
+
+    if (screen === "loading") {
+      return <Text>Loading {preset?.label ?? "provider"} models…</Text>
+    }
+
+    if (screen === "error") {
+      return (
+        <>
+          <Text color="red">{error}</Text>
+          <Text dimColor>Ctrl+C to exit.</Text>
+        </>
+      )
+    }
+
+    if (screen === "models") {
+      const windowSize = Math.max(4, Math.min(12, rows - 6))
+      const start = Math.max(
+        0,
+        Math.min(modelIndex - Math.floor(windowSize / 2), Math.max(0, models.length - windowSize)),
+      )
+      const visible = models.slice(start, start + windowSize)
+
+      return (
+        <>
+          <Text dimColor>
+            Select a model · {preset?.label} ({modelIndex + 1}/{models.length})
+          </Text>
+          {visible.map((item, offset) => {
+            const index = start + offset
+            return (
+              <Text key={item} color={index === modelIndex ? "cyan" : undefined}>
+                {index === modelIndex ? "› " : "  "}
+                {item}
+              </Text>
+            )
+          })}
+        </>
+      )
+    }
+
+    const maxMessages = Math.max(2, Math.floor((rows - 8) / 2))
+    const visibleMessages = messages.slice(-maxMessages)
+    const hidden = messages.length - visibleMessages.length
 
     return (
-      <Box flexDirection="column">
-        <Text bold color="cyan">
-          OpenContinue
-        </Text>
-        <Text>
-          Select a provider ({providerIndex + 1}/{PROVIDER_PRESETS.length})
-        </Text>
-        {visible.map((item, offset) => {
-          const index = start + offset
-          return (
-            <Text key={item.id} color={index === providerIndex ? "cyan" : undefined}>
-              {index === providerIndex ? "› " : "  "}
-              {item.label}
-              {item.note ? ` — ${item.note}` : ""}
+      <>
+        {hidden > 0 ? <Text dimColor>… {hidden} earlier messages hidden</Text> : null}
+        {visibleMessages.length === 0 ? (
+          <Text dimColor>Type a message to start.</Text>
+        ) : (
+          visibleMessages.map((message, index) => (
+            <Box key={`${index}-${message.role}`} flexDirection="column">
+              <Text color={message.role === "user" ? "green" : "white"}>
+                {message.role === "user" ? "you> " : "ai> "}
+              </Text>
+              <Text>{message.text}</Text>
+            </Box>
+          ))
+        )}
+        {activity ? <Text color="yellow">{activity}</Text> : null}
+        {permission ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text color="yellow">
+              permission: {permission.tool} {permission.input}
             </Text>
-          )
-        })}
-        <Text dimColor>↑/↓ select · Enter confirm · Ctrl+C exit</Text>
-      </Box>
+            <Text>Allow? [y/N]</Text>
+          </Box>
+        ) : busy ? (
+          <Text dimColor>thinking…</Text>
+        ) : (
+          <Box marginTop={1}>
+            <Text color="green">{"you> "}</Text>
+            <TextInput value={input} onChange={setInput} onSubmit={send} />
+          </Box>
+        )}
+      </>
     )
-  }
-
-  if (screen === "key") {
-    return (
-      <Box flexDirection="column">
-        <Text bold color="cyan">
-          OpenContinue
-        </Text>
-        <Text>{preset?.label} API key</Text>
-        <TextInput value={keyInput} onChange={setKeyInput} mask="*" onSubmit={submitKey} />
-        <Text dimColor>Saved to ~/.opencontinue/auth.json</Text>
-      </Box>
-    )
-  }
-
-  if (screen === "baseurl") {
-    return (
-      <Box flexDirection="column">
-        <Text bold color="cyan">
-          OpenContinue
-        </Text>
-        <Text>{preset?.label} base URL</Text>
-        <TextInput
-          value={baseInput}
-          onChange={setBaseInput}
-          onSubmit={submitBaseUrl}
-          placeholder="https://example.com/v1"
-        />
-      </Box>
-    )
-  }
-
-  if (screen === "loading") {
-    return <Text>Loading {preset?.label ?? "provider"} models…</Text>
-  }
-
-  if (screen === "error") {
-    return (
-      <Box flexDirection="column">
-        <Text color="red">{error}</Text>
-        <Text dimColor>Ctrl+C to exit.</Text>
-      </Box>
-    )
-  }
-
-  if (screen === "models") {
-    const windowSize = 12
-    const start = Math.max(
-      0,
-      Math.min(modelIndex - Math.floor(windowSize / 2), Math.max(0, models.length - windowSize)),
-    )
-    const visible = models.slice(start, start + windowSize)
-
-    return (
-      <Box flexDirection="column">
-        <Text bold color="cyan">
-          OpenContinue
-        </Text>
-        <Text>Select a model · {preset?.label}</Text>
-        {visible.map((item, offset) => {
-          const index = start + offset
-          return (
-            <Text key={item} color={index === modelIndex ? "cyan" : undefined}>
-              {index === modelIndex ? "› " : "  "}
-              {item}
-            </Text>
-          )
-        })}
-        <Text dimColor>↑/↓ select · Enter confirm</Text>
-      </Box>
-    )
-  }
+  })()
 
   return (
-    <Box flexDirection="column">
-      <Text bold color="cyan">
-        OpenContinue
-      </Text>
-      <Text dimColor>
-        {preset?.label} · model: {model} · /exit to quit
-      </Text>
-      {messages.map((message, index) => (
-        <Box key={`${index}-${message.role}`}>
-          <Text color={message.role === "user" ? "green" : "white"}>
-            {message.role === "user" ? "you> " : "ai> "}
-          </Text>
-          <Text>{message.text}</Text>
-        </Box>
-      ))}
-      {activity ? <Text color="yellow">{activity}</Text> : null}
-      {permission ? (
-        <Box flexDirection="column">
-          <Text color="yellow">
-            permission: {permission.tool} {permission.input}
-          </Text>
-          <Text>Allow? [y/N]</Text>
-        </Box>
-      ) : busy ? (
-        <Text dimColor>thinking…</Text>
-      ) : (
-        <Box>
-          <Text color="green">{"you> "}</Text>
-          <TextInput value={input} onChange={setInput} onSubmit={send} />
-        </Box>
-      )}
+    <Box flexDirection="column" width={columns} height={rows} paddingX={0}>
+      <Header provider={headerProvider} model={headerModel} mode={mode} />
+      <Box
+        flexDirection="column"
+        flexGrow={1}
+        borderStyle="round"
+        borderColor="gray"
+        paddingX={1}
+        marginTop={0}
+      >
+        {body}
+      </Box>
+      <Box paddingX={1}>
+        <Text dimColor>{footer}</Text>
+      </Box>
     </Box>
   )
 }
 
 export async function runTui(options: TuiOptions = {}): Promise<void> {
-  const instance = render(<App options={options} />)
-  await instance.waitUntilExit()
+  const fullscreen = Boolean(process.stdout.isTTY)
+  if (fullscreen) process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H")
+
+  try {
+    const instance = render(<App options={options} />)
+    await instance.waitUntilExit()
+  } finally {
+    if (fullscreen) process.stdout.write("\x1b[?1049l")
+  }
 }
