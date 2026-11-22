@@ -35,7 +35,7 @@ export async function setupCommand(): Promise<void> {
       current.baseUrl ||
       defaultBase
 
-    const defaultModel = ollama ? "qwen2.5-coder:7b" : "gpt-4o-mini"
+    const defaultModel = ollama ? "qwen2.5-coder:7b" : "gpt-6.2"
     const model =
       (await rl.question(`Model (${current.model ?? defaultModel}): `)).trim() ||
       current.model ||

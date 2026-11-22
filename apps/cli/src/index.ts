@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync } from "node:fs"
-import { loadEnvFile } from "node:process"
 import { createInterface } from "node:readline/promises"
-import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
@@ -22,9 +19,6 @@ import {
 } from "./checks.js"
 import { importCommand } from "./import.js"
 import { configCommand, setupCommand } from "./setup.js"
-
-const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
-if (existsSync(envPath)) loadEnvFile(envPath)
 
 type PermissionMode = "ask" | "auto" | "readonly"
 type PermissionRequestEvent = Extract<SessionEvent, { type: "permission.requested" }>
@@ -390,6 +384,19 @@ async function checkCommand(options: CheckCommandOptions): Promise<void> {
   if (summary.failed > 0 || summary.errored > 0) process.exitCode = 1
 }
 
+async function startTui(options: {
+  auto?: boolean
+  readonly?: boolean
+  resume?: string
+}): Promise<void> {
+  if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
+  if (!process.stdin.isTTY) {
+    throw new Error("TUI requires a TTY. Use `opencontinue -p \"...\"` or `--url` in non-interactive environments.")
+  }
+  const { runTui } = await import("./tui.js")
+  await runTui(options)
+}
+
 async function sessionsCommand(options: { url?: string }): Promise<void> {
   const baseUrl = (options.url ?? "http://127.0.0.1:8787").replace(/\/$/, "")
   const sessions = await request<SessionSummary[]>(baseUrl, "/v1/sessions")
@@ -419,7 +426,9 @@ program
   .action(async (prompt: string | undefined, options: ChatOptions) => {
     if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
     if (options.print || prompt) await printOnce(prompt ?? "", options)
-    else await chat(options)
+    else if (process.stdin.isTTY && !options.url) {
+      await startTui({ auto: options.auto, readonly: options.readonly, resume: options.resume })
+    } else await chat(options)
   })
 
 program
@@ -431,6 +440,17 @@ program
       port: String(program.opts().port ?? "8787"),
       auto: Boolean(program.opts().auto),
       readonly: Boolean(program.opts().readonly),
+    }),
+  )
+
+program
+  .command("tui")
+  .description("Start the terminal UI")
+  .action(() =>
+    startTui({
+      auto: Boolean(program.opts().auto),
+      readonly: Boolean(program.opts().readonly),
+      resume: program.opts().resume as string | undefined,
     }),
   )
 

@@ -78,7 +78,7 @@ Rules:
 | M2 | done | Tools and capability permissions | Model edits files, shell is gated |
 | M3 | done | SQLite persistence and recovery | Kill the server mid-run, restart, resume |
 | M4 | done | Checks, worktree, GitHub Action | One check runs locally and in CI identically |
-| M5 | next | TUI and web client | Same session continues in two clients |
+| M5 | in progress | TUI and web client | Same session continues in two clients |
 | M6 | planned | Desktop and VS Code | Thin clients over the same API |
 | M7 | planned | Plugin API and sandbox | Third-party tool without core changes |
 | M8 | planned | Team and commercial features | Paid design partners |
@@ -100,10 +100,10 @@ Rules:
 - Pull-request workflow and repo-hosted action that posts a comment and gates the job.
 - Out of scope: hosted dashboard and automatic PR comments.
 
-### M5 — clients
+### M5 — clients (in progress)
 
-- TUI on top of the existing session API.
-- Minimal web client over the same SSE stream.
+- [x] TUI: API key entry, model selection, streaming chat, permission prompts.
+- [ ] Minimal web client over the same SSE stream.
 - Out of scope: full IDE features.
 
 ## 5. Updating this blueprint

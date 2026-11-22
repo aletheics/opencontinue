@@ -76,7 +76,7 @@ runs:
         OPENCONTINUE_PROVIDER: openai-compatible
         OPENCONTINUE_API_KEY: ${{ inputs.api-key }}
         OPENCONTINUE_BASE_URL: ${{ inputs.base-url || 'https://api.openai.com/v1' }}
-        OPENCONTINUE_MODEL: ${{ inputs.model || 'gpt-4o-mini' }}
+        OPENCONTINUE_MODEL: ${{ inputs.model || 'gpt-6.2' }}
       run: |
         set +e
         ACTION_PATH="${GITHUB_ACTION_PATH//\\//}"

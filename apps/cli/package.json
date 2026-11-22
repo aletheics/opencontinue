@@ -5,6 +5,10 @@
   "type": "module",
   "description": "OpenContinue command line client.",
   "license": "Apache-2.0",
+  "bin": {
+    "opencontinue": "./bin/opencontinue.mjs",
+    "onc": "./bin/opencontinue.mjs"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts"
@@ -17,7 +21,13 @@
     "@opencontinue/server": "0.0.1",
     "@opencontinue/tools": "0.0.1",
     "commander": "^12.1.0",
+    "ink": "^8.0.0",
+    "ink-text-input": "^6.0.0",
     "jsonc-parser": "^3.3.1",
+    "react": "^19.3.1",
     "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0"
   }
 }

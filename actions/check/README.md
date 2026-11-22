@@ -39,7 +39,7 @@ Inputs:
 | `base` | `origin/main` | Base git ref |
 | `api-key` | required | Provider key |
 | `base-url` | `https://api.openai.com/v1` | Provider URL |
-| `model` | `gpt-4o-mini` | Model |
+| `model` | `gpt-6.2` | Model |
 | `patch` | `true` | Include patches in the comment |
 | `comment` | `true` | Post or update a PR comment |
 | `fail-on-error` | `true` | Fail the job on check failures |

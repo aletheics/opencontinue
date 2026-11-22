@@ -29,45 +29,45 @@ Requires Node.js 22+.
 git clone https://github.com/aletheics/opencontinue.git
 cd opencontinue
 npm install
-npm run dev -- setup
+npm run link
+opencontinue
 ```
 
-`setup` writes `~/.opencontinue/config.json` and `~/.opencontinue/auth.json` (mode `0600`). It supports OpenAI, DeepSeek, Ollama, vLLM, LM Studio, or `echo`.
+On first launch, enter your API key. OpenContinue fetches the provider's model list, then saves the chosen model to `~/.opencontinue/config.json`. The key is stored in `~/.opencontinue/auth.json` (mode `0600`).
 
-Show the current configuration:
+Use `opencontinue` as the primary command. `onc` is the short alias; `oc` would collide with OpenCode.
 
-```bash
-npm run dev -- config
-```
-
-Import existing provider settings:
+Optional commands:
 
 ```bash
-npm run dev -- import continue
-npm run dev -- import opencode
+opencontinue setup              # interactive provider setup
+opencontinue config             # show current config
+opencontinue import continue    # import ~/.continue/config.yaml
+opencontinue import opencode    # import opencode.json(c)
 ```
 
 Imports map to OpenContinue's OpenAI-compatible provider. Anthropic-native endpoints need an OpenAI-compatible proxy.
 
-For CI and containers, environment variables override the files:
+For CI and containers, set environment variables directly:
 
-```dotenv
+```bash
 OPENCONTINUE_PROVIDER=openai-compatible
 OPENCONTINUE_BASE_URL=https://api.openai.com/v1
 OPENCONTINUE_API_KEY=sk-...
-OPENCONTINUE_MODEL=gpt-4o-mini
+OPENCONTINUE_MODEL=gpt-6.2
 ```
-
-See [`.env.example`](.env.example). Without a key, `echo` mode keeps sessions and streaming testable.
 
 ## Usage
 
+`opencontinue` starts the TUI: enter your API key, choose a model, and chat.
+
 ```bash
-npm run dev                          # interactive
-npm run dev -- --auto "fix tests"    # headless, write/shell allowed
-npm run dev -- --readonly "review"   # headless, read-only
-npm run dev -- serve --port 8787     # server only
-npm run dev -- sessions              # list sessions
+opencontinue                    # TUI
+onc                             # same, shorter
+opencontinue --auto -p "fix tests"
+opencontinue --readonly -p "review"
+opencontinue check --base main
+opencontinue serve --port 8787
 ```
 
 Flags: `--auto`, `--readonly`, `--resume <id>`, `--url <url>`, `--port <port>`.
@@ -81,9 +81,9 @@ Permissions: read-only tools are always allowed. `write` and `bash` ask interact
 ## Checks
 
 ```bash
-npm run check -- --base main
-npm run check -- --base main --format json --patch
-npm run check -- --base main --fix
+opencontinue check --base main
+opencontinue check --base main --format json --patch
+opencontinue check --base main --fix
 ```
 
 Checks run each agent in an isolated git worktree. A non-empty patch is a failure; an empty patch is a pass. Agents come from `.opencontinue/agent`, `.continue/agents`, and `.continue/checks`.

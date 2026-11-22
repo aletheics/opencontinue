@@ -21,7 +21,7 @@
 5. [x] SQLite persistence and crash recovery (store-level export/import included).
 6. [x] Global config and auth files; import from Continue and OpenCode. Claude and Codex pending.
 7. MCP client.
-8. Minimal TUI on top of the same session API.
+8. [x] Minimal TUI on top of the same session API.
 
 ## 0.2 — checks (done)
 

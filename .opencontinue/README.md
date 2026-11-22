@@ -13,9 +13,9 @@ Project-level constraints for OpenContinue itself.
 CLI flags override `permissions.mode`:
 
 ```bash
-npm run dev                    # project default (ask)
-npm run dev -- --auto "..."
-npm run dev -- --readonly "..."
+opencontinue                   # project default (ask)
+opencontinue --auto "..."
+opencontinue --readonly "..."
 ```
 
 Headless runs default to `readonly` regardless of project config unless `--auto` is passed.

@@ -1,11 +1,4 @@
-import { existsSync } from "node:fs"
-import { loadEnvFile } from "node:process"
-import { fileURLToPath } from "node:url"
-
 import { closeServer, startServer } from "./index.js"
-
-const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
-if (existsSync(envPath)) loadEnvFile(envPath)
 
 const running = startServer()
 console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)

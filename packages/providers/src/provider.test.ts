@@ -100,6 +100,24 @@ describe("OpenAICompatibleProvider", () => {
     ])
   })
 
+  it("lists models from an OpenAI-compatible endpoint", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [{ id: "gpt-6.2" }, { id: "gpt-6.2-mini" }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    )
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      model: "gpt-6.2",
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    await expect(provider.listModels()).resolves.toEqual(["gpt-6.2", "gpt-6.2-mini"])
+  })
+
   it("throws on non-2xx responses", async () => {
     const fetchMock = vi.fn(async () => new Response("unauthorized", { status: 401 }))
     const provider = new OpenAICompatibleProvider({

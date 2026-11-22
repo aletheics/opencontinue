@@ -32,6 +32,7 @@ export interface ChatProvider {
   readonly id: string
   readonly model: string
   streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown>
+  listModels?(): Promise<string[]>
 }
 
 /**
@@ -40,6 +41,10 @@ export interface ChatProvider {
 export class EchoProvider implements ChatProvider {
   readonly id = "echo"
   readonly model = "echo"
+
+  async listModels(): Promise<string[]> {
+    return ["echo"]
+  }
 
   async *streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown> {
     const user = [...request.messages].reverse().find((message) => message.role === "user")
@@ -163,6 +168,23 @@ export class OpenAICompatibleProvider implements ChatProvider {
     this.fetchImpl = options.fetch ?? fetch
   }
 
+  async listModels(): Promise<string[]> {
+    const response = await this.fetchImpl(`${this.baseUrl}/models`, {
+      headers: {
+        ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
+        ...this.headers,
+      },
+    })
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Model list failed (${response.status}): ${text.slice(0, 500)}`)
+    }
+    const data = (await response.json()) as { data?: Array<{ id?: string }> }
+    return (data.data ?? [])
+      .map((model) => model.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0)
+  }
+
   async *streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown> {
     const body: Record<string, unknown> = {
       model: request.model || this.model,
@@ -271,6 +293,13 @@ export type ProviderSettings = {
   model?: string
 }
 
+export async function listModels(settings: ProviderSettings): Promise<string[]> {
+  const selection = createProvider(settings)
+  const provider = selection.provider
+  if (provider.listModels) return provider.listModels()
+  return [provider.model]
+}
+
 export function createProvider(settings: ProviderSettings = {}): ProviderSelection {
   const kind = (settings.provider ?? "").toLowerCase()
 
@@ -294,7 +323,7 @@ export function createProvider(settings: ProviderSettings = {}): ProviderSelecti
   const baseUrl =
     settings.baseUrl ??
     (ollama ? "http://127.0.0.1:11434/v1" : "https://api.openai.com/v1")
-  const model = settings.model ?? (ollama ? "qwen2.5-coder:7b" : "gpt-4o-mini")
+  const model = settings.model ?? (ollama ? "qwen2.5-coder:7b" : "gpt-6.2")
 
   if (!settings.apiKey && baseUrl.includes("api.openai.com")) {
     return {
