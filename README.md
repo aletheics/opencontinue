@@ -4,7 +4,7 @@
 
 Open-source terminal coding agent with durable sessions, streaming, tools, and capability permissions.
 
-## Install
+## Installation
 
 Requires Node.js 22+.
 
@@ -12,15 +12,10 @@ Requires Node.js 22+.
 git clone https://github.com/aletheics/opencontinue.git
 cd opencontinue
 npm install
-```
-
-## Configure
-
-```bash
 cp .env.example .env
 ```
 
-OpenAI:
+Configure an OpenAI-compatible provider in `.env`:
 
 ```dotenv
 OPENCONTINUE_PROVIDER=openai-compatible
@@ -29,56 +24,33 @@ OPENCONTINUE_API_KEY=sk-...
 OPENCONTINUE_MODEL=gpt-4o-mini
 ```
 
-DeepSeek:
-
-```dotenv
-OPENCONTINUE_PROVIDER=openai-compatible
-OPENCONTINUE_BASE_URL=https://api.deepseek.com/v1
-OPENCONTINUE_API_KEY=sk-...
-OPENCONTINUE_MODEL=deepseek-chat
-```
-
-Ollama:
-
-```dotenv
-OPENCONTINUE_PROVIDER=ollama
-OPENCONTINUE_MODEL=qwen2.5-coder:7b
-```
-
-Without a key, `opencontinue` falls back to `echo` so the session and streaming paths still work.
+DeepSeek, Ollama, vLLM, and LM Studio work through the same interface. See [`.env.example`](.env.example). Without a key, OpenContinue runs in `echo` mode so sessions and streaming still work.
 
 ## Usage
 
 ```bash
-npm run dev                       # interactive
-npm run dev -- "explain this repo" # headless, readonly by default
-npm run dev -- --auto "fix tests"  # headless with write/shell tools
-npm run dev -- serve --port 8787   # server only
-npm run dev -- sessions            # list sessions on a running server
+npm run dev                          # interactive
+npm run dev -- --auto "fix tests"    # headless, write/shell allowed
+npm run dev -- --readonly "review"   # headless, read-only
+npm run dev -- serve --port 8787     # server only
+npm run dev -- sessions              # list sessions
 ```
 
-Flags:
-
-| Flag | Effect |
-|---|---|
-| `--auto` | Allow write and shell tools without approval |
-| `--readonly` | Deny write and shell tools |
-| `--resume <id>` | Resume a session |
-| `--url <url>` | Connect to a running server |
-| `--port <port>` | Embedded server port (default `8787`) |
+Flags: `--auto`, `--readonly`, `--resume <id>`, `--url <url>`, `--port <port>`.
 
 Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
 
-Permissions: read-only tools are always allowed. `write` and `bash` ask in interactive mode, are denied in headless readonly mode, and are allowed with `--auto`.
+Permissions: read-only tools are always allowed. `write` and `bash` ask in interactive mode, are denied in headless read-only mode, and are allowed with `--auto`.
 
-## Development
+## Documentation
 
-```bash
-npm test
-npm run typecheck
-```
+- [BLUEPRINT.md](BLUEPRINT.md) — product direction, milestones, and the spiral development process
+- [AGENTS.md](AGENTS.md) — rules for AI agents and contributors
+- [docs/](docs) — architecture, license, roadmap, ADRs
 
-Architecture and roadmap: [`docs/`](docs).
+## Contributing
+
+Read [BLUEPRINT.md](BLUEPRINT.md) and [AGENTS.md](AGENTS.md) first. One vertical slice per pull request. CI runs typecheck and tests.
 
 ## License
 

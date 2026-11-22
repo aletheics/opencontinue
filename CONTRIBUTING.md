@@ -1,6 +1,6 @@
 # Contributing to OpenContinue
 
-Thanks for taking the time to contribute.
+Read [BLUEPRINT.md](BLUEPRINT.md) and [AGENTS.md](AGENTS.md) first.
 
 ## Development
 
@@ -11,15 +11,25 @@ npm test
 npm run typecheck
 ```
 
+## Workflow
+
+1. Pick one milestone in [BLUEPRINT.md](BLUEPRINT.md) and open or claim an issue with acceptance criteria.
+2. If the decision changes the event contract, architecture, or license, add an ADR under [`docs/adr`](docs/adr).
+3. Implement one vertical slice. Include tests and docs.
+4. Run `npm run typecheck` and `npm test`.
+5. Open a PR. CI must pass on Linux and Windows.
+
+Keep PRs small. One feature per PR, no feature-parity races.
+
 ## Scope
 
-The 0.1 milestone is deliberately narrow:
+0.1 is deliberately narrow:
 
 - session continuity
 - local-first execution
-- source-controlled checks that can run in CI
+- source-controlled checks that run in CI
 
-Please open an issue before starting a large feature. Small fixes and tests are always welcome.
+Open an issue before starting a large feature.
 
 ## DCO
 

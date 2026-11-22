@@ -1,0 +1,9 @@
+# Documentation
+
+- [BLUEPRINT.md](../BLUEPRINT.md) — canonical plan and milestones
+- [AGENTS.md](../AGENTS.md) — rules for AI agents and contributors
+- [0001-product-thesis.md](0001-product-thesis.md)
+- [0002-architecture.md](0002-architecture.md)
+- [0003-license-and-governance.md](0003-license-and-governance.md)
+- [0004-roadmap.md](0004-roadmap.md)
+- [adr/](adr) — architecture decision records

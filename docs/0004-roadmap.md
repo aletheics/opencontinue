@@ -1,5 +1,7 @@
 # 0004 — Roadmap
 
+> Canonical plan: [BLUEPRINT.md](../BLUEPRINT.md). This file keeps implementation notes.
+
 ## 0.0.1 — scaffold (current)
 
 - event-sourced in-memory sessions
