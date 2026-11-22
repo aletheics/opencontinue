@@ -127,6 +127,12 @@ describe("TUI", () => {
         },
         { timeout: 5000 },
       )
+
+      const frame = lastFrame() ?? ""
+      expect(frame.match(/OpenContinue/g)?.length ?? 0).toBe(1)
+      expect(frame).toContain("Type a message…")
+      expect(frame).toContain("/exit to quit · Ctrl+C exit")
+      expect(frame.split("\n").length).toBeLessThanOrEqual(24)
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

@@ -96,6 +96,7 @@ function Header({
 }) {
   return (
     <Box
+      flexShrink={0}
       borderStyle="round"
       borderColor="gray"
       paddingX={1}
@@ -388,9 +389,12 @@ export function App({ options }: { options: TuiOptions }) {
             ? "Loading models…"
             : "Ctrl+C exit"
 
+  const inputHeight = screen === "chat" ? 3 : 0
+  const bodyHeight = Math.max(4, rows - 3 - inputHeight - 1)
+
   const body = (() => {
     if (screen === "provider") {
-      const windowSize = Math.max(4, Math.min(12, rows - 6))
+      const windowSize = Math.max(4, Math.min(12, bodyHeight - 4))
       const start = Math.max(
         0,
         Math.min(
@@ -462,7 +466,7 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (screen === "models") {
-      const windowSize = Math.max(4, Math.min(12, rows - 6))
+      const windowSize = Math.max(4, Math.min(12, bodyHeight - 4))
       const start = Math.max(
         0,
         Math.min(modelIndex - Math.floor(windowSize / 2), Math.max(0, models.length - windowSize)),
@@ -487,7 +491,7 @@ export function App({ options }: { options: TuiOptions }) {
       )
     }
 
-    const maxMessages = Math.max(2, Math.floor((rows - 8) / 2))
+    const maxMessages = Math.max(1, Math.floor((bodyHeight - 4) / 3))
     const visibleMessages = messages.slice(-maxMessages)
     const hidden = messages.length - visibleMessages.length
 
@@ -498,7 +502,7 @@ export function App({ options }: { options: TuiOptions }) {
           <Text dimColor>Type a message to start.</Text>
         ) : (
           visibleMessages.map((message, index) => (
-            <Box key={`${index}-${message.role}`} flexDirection="column">
+            <Box key={`${index}-${message.role}`}>
               <Text color={message.role === "user" ? "green" : "white"}>
                 {message.role === "user" ? "you> " : "ai> "}
               </Text>
@@ -507,39 +511,53 @@ export function App({ options }: { options: TuiOptions }) {
           ))
         )}
         {activity ? <Text color="yellow">{activity}</Text> : null}
-        {permission ? (
-          <Box flexDirection="column" marginTop={1}>
-            <Text color="yellow">
-              permission: {permission.tool} {permission.input}
-            </Text>
-            <Text>Allow? [y/N]</Text>
-          </Box>
-        ) : busy ? (
-          <Text dimColor>thinking…</Text>
-        ) : (
-          <Box marginTop={1}>
-            <Text color="green">{"you> "}</Text>
-            <TextInput value={input} onChange={setInput} onSubmit={send} />
-          </Box>
-        )}
       </>
     )
   })()
 
   return (
-    <Box flexDirection="column" width={columns} height={rows} paddingX={0}>
+    <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
       <Header provider={headerProvider} model={headerModel} mode={mode} />
       <Box
         flexDirection="column"
-        flexGrow={1}
+        flexShrink={0}
+        height={bodyHeight}
         borderStyle="round"
         borderColor="gray"
         paddingX={1}
-        marginTop={0}
+        overflow="hidden"
       >
         {body}
       </Box>
-      <Box paddingX={1}>
+      {screen === "chat" ? (
+        <Box
+          flexShrink={0}
+          height={3}
+          borderStyle="round"
+          borderColor="cyan"
+          paddingX={1}
+          overflow="hidden"
+        >
+          {permission ? (
+            <Text color="yellow">
+              permission: {permission.tool} · Allow? [y/N]
+            </Text>
+          ) : busy ? (
+            <Text dimColor>thinking…</Text>
+          ) : (
+            <Box>
+              <Text color="green">{"you> "}</Text>
+              <TextInput
+                value={input}
+                onChange={setInput}
+                onSubmit={send}
+                placeholder="Type a message…"
+              />
+            </Box>
+          )}
+        </Box>
+      ) : null}
+      <Box paddingX={1} flexShrink={0}>
         <Text dimColor>{footer}</Text>
       </Box>
     </Box>
