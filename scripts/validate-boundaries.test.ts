@@ -13,7 +13,7 @@ const RULES: Record<string, ReadonlySet<string>> = {
   providers: new Set(),
   tools: new Set(["providers"]),
   runtime: new Set(["protocol", "core", "providers", "tools"]),
-  tui: new Set(["config", "core", "providers", "runtime", "tools"]),
+  tui: new Set(["config", "core", "protocol", "providers", "runtime", "tools"]),
   server: new Set(["config", "core", "protocol", "providers", "runtime", "tools"]),
   cli: new Set(["config", "core", "protocol", "providers", "runtime", "server", "tools", "tui"]),
 }

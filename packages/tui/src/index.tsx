@@ -19,6 +19,13 @@ import {
 import { runAgent } from "@opencontinue/runtime"
 import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
 
+import {
+  reduceTimeline,
+  timelineFromEvents,
+  toolLabel,
+  type TimelineItem,
+} from "./timeline.js"
+
 export type TuiOptions = {
   auto?: boolean
   readonly?: boolean
@@ -26,11 +33,6 @@ export type TuiOptions = {
 }
 
 type Screen = "provider" | "key" | "baseurl" | "loading" | "models" | "chat" | "error"
-
-type Message = {
-  role: "user" | "assistant"
-  text: string
-}
 
 type PermissionRequest = {
   tool: string
@@ -73,6 +75,16 @@ class TuiPermissionGate implements PermissionGate {
     pending.resolve(approved)
     this.listener?.()
   }
+}
+
+function formatToolOutput(text: string, columns: number): string {
+  const width = Math.max(20, columns - 8)
+  const lines = text.trim().split(/\r?\n/)
+  const shown = lines
+    .slice(0, 3)
+    .map((line, index) => `${index === 0 ? "  ⎿ " : "    "}${line.slice(0, width)}`)
+  if (lines.length > 3) shown.push(`    … ${lines.length - 3} more lines`)
+  return shown.join("\n")
 }
 
 function initialProviderIndex(provider: string | undefined): number {
@@ -131,10 +143,10 @@ export function App({ options }: { options: TuiOptions }) {
   const [modelIndex, setModelIndex] = useState(0)
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
-  const [messages, setMessages] = useState<Message[]>([])
+  const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
-  const [activity, setActivity] = useState("")
+  const [tick, setTick] = useState(0)
   const [permission, setPermission] = useState<PermissionRequest | null>(null)
 
   const storeRef = useRef<SessionStore | null>(null)
@@ -150,6 +162,14 @@ export function App({ options }: { options: TuiOptions }) {
   useEffect(() => {
     gate.onChange(() => setPermission(gate.pending))
   }, [gate])
+
+  useEffect(() => {
+    if (!busy) return
+    const timer = setInterval(() => setTick((value) => value + 1), 100)
+    return () => clearInterval(timer)
+  }, [busy])
+
+  const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10]
 
   useEffect(() => {
     return () => {
@@ -269,35 +289,12 @@ export function App({ options }: { options: TuiOptions }) {
       sessionRef.current = session.id
       providerRef.current = provider
       setModel(chosen)
-      setMessages(
-        (store.snapshot(session.id)?.messages ?? []).map((message) => ({
-          role: message.role,
-          text: message.text,
-        })),
-      )
+      setTimeline(timelineFromEvents(store.events(session.id)))
 
       unsubscribeRef.current?.()
       unsubscribeRef.current = store.subscribe(session.id, (event) => {
-        const snapshot = store.snapshot(session.id)
-        if (snapshot) {
-          setMessages(
-            snapshot.messages.map((message) => ({
-              role: message.role,
-              text: message.text,
-            })),
-          )
-        }
-
-        if (event.type === "tool.started") setActivity(`tool: ${event.name}`)
-        else if (event.type === "tool.completed") setActivity("")
-        else if (event.type === "tool.failed") setActivity(`tool failed: ${event.error}`)
-        else if (event.type === "run.completed") {
-          setBusy(false)
-          setActivity("")
-        } else if (event.type === "run.failed") {
-          setBusy(false)
-          setActivity(`error: ${event.error}`)
-        }
+        setTimeline((items) => reduceTimeline(items, event))
+        if (event.type === "run.completed" || event.type === "run.failed") setBusy(false)
       })
 
       setScreen("chat")
@@ -322,7 +319,6 @@ export function App({ options }: { options: TuiOptions }) {
 
     setInput("")
     setBusy(true)
-    setActivity("")
     store.append(sessionId, { type: "message.user", text })
 
     void runAgent({
@@ -334,9 +330,8 @@ export function App({ options }: { options: TuiOptions }) {
       workspace: process.env.INIT_CWD ?? process.cwd(),
       systemPrompt:
         "You are OpenContinue, a concise coding assistant. Be concrete. Answer in the user's language.",
-    }).catch((cause) => {
+    }).catch(() => {
       setBusy(false)
-      setActivity(cause instanceof Error ? cause.message : String(cause))
     })
   }
 
@@ -491,26 +486,54 @@ export function App({ options }: { options: TuiOptions }) {
       )
     }
 
-    const maxMessages = Math.max(1, Math.floor((bodyHeight - 4) / 3))
-    const visibleMessages = messages.slice(-maxMessages)
-    const hidden = messages.length - visibleMessages.length
+    const maxItems = Math.max(1, Math.floor((bodyHeight - 4) / 2))
+    const visibleItems = timeline.slice(-maxItems)
+    const hidden = timeline.length - visibleItems.length
 
     return (
       <>
-        {hidden > 0 ? <Text dimColor>… {hidden} earlier messages hidden</Text> : null}
-        {visibleMessages.length === 0 ? (
+        {hidden > 0 ? <Text dimColor>… {hidden} earlier items hidden</Text> : null}
+        {visibleItems.length === 0 ? (
           <Text dimColor>Type a message to start.</Text>
         ) : (
-          visibleMessages.map((message, index) => (
-            <Box key={`${index}-${message.role}`}>
-              <Text color={message.role === "user" ? "green" : "white"}>
-                {message.role === "user" ? "you> " : "ai> "}
-              </Text>
-              <Text>{message.text}</Text>
-            </Box>
-          ))
+          visibleItems.map((item) => {
+            if (item.kind === "user") {
+              return (
+                <Box key={item.id}>
+                  <Text color="green">{"you> "}</Text>
+                  <Text>{item.text}</Text>
+                </Box>
+              )
+            }
+
+            if (item.kind === "assistant") {
+              return item.text ? <Text key={item.id}>{item.text}</Text> : null
+            }
+
+            return (
+              <Box key={item.id} flexDirection="column">
+                <Text
+                  color={
+                    item.status === "failed"
+                      ? "red"
+                      : item.status === "running"
+                        ? "yellow"
+                        : "green"
+                  }
+                >
+                  {item.status === "failed" ? "✗" : "●"}{" "}
+                  {toolLabel(item).slice(0, Math.max(20, columns - 8))}
+                </Text>
+                {item.output ? (
+                  <Text dimColor>{formatToolOutput(item.output, columns)}</Text>
+                ) : null}
+                {item.error ? (
+                  <Text color="red">{formatToolOutput(item.error, columns)}</Text>
+                ) : null}
+              </Box>
+            )
+          })
         )}
-        {activity ? <Text color="yellow">{activity}</Text> : null}
       </>
     )
   })()
@@ -543,7 +566,9 @@ export function App({ options }: { options: TuiOptions }) {
               permission: {permission.tool} · Allow? [y/N]
             </Text>
           ) : busy ? (
-            <Text dimColor>thinking…</Text>
+            <Text dimColor>
+              {spinner} Thinking…
+            </Text>
           ) : (
             <Box>
               <Text color="green">{"you> "}</Text>

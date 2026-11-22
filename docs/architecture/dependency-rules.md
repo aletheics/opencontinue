@@ -12,7 +12,7 @@ The boundary is enforced by [`scripts/validate-boundaries.test.ts`](../../script
 | `providers` | external only | core, runtime, clients |
 | `tools` | `providers` | core runtime, clients |
 | `runtime` | `protocol`, `core`, `providers`, `tools` | server, CLI, TUI |
-| `tui` | `config`, `core`, `providers`, `runtime`, `tools` | server, CLI |
+| `tui` | `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | server, CLI |
 | `server` | `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | CLI, TUI |
 | `cli` | any package and `apps/server` | none (entrypoint) |
 

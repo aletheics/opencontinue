@@ -37,7 +37,7 @@ Apps can compose packages. Packages never import apps. The boundary test enforce
 | `packages/providers` | Model transport and provider catalog | provider presets, OpenAI-compatible SSE, native Anthropic | `createProvider`, `listModels`, `PROVIDER_PRESETS` | external only | core, runtime, clients | `provider.test.ts`, `catalog.test.ts`, `sse.test.ts` |
 | `packages/tools` | Local capabilities and policy gate | read/write/edit/glob/grep/bash, tool registry | tools, `ToolRegistry`, `PermissionGate` | providers | core runtime, clients | `index.test.ts` |
 | `packages/runtime` | The agent loop, independent of transport | `runAgent`, history projection, permissions, project context | `runAgent`, `PermissionBroker`, `loadProjectConfig` | protocol, core, providers, tools | server, CLI, TUI | `agent.test.ts`, `permissions.test.ts`, `project.test.ts` |
-| `packages/tui` | A client that happens to render in a terminal | Ink screens, model picker, permission prompt | `runTui`, `App` | config, core, providers, runtime, tools | `apps/cli`, `apps/server` | `index.test.tsx` |
+| `packages/tui` | A client that happens to render in a terminal | Ink screens, model picker, permission prompt | `runTui`, `App` | config, core, protocol, providers, runtime, tools | `apps/cli`, `apps/server` | `index.test.tsx`, `timeline.test.ts` |
 
 ## Repository-level folders
 
