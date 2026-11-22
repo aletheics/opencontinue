@@ -2,9 +2,20 @@ import { Box, Text, render, useApp, useInput } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import { resolveProviderSettings, saveAuthConfig, saveProviderConfig } from "@opencontinue/config"
+import {
+  loadAuthConfig,
+  resolveProviderSettings,
+  saveAuthConfig,
+  saveProviderConfig,
+} from "@opencontinue/config"
 import { createSessionStore, type SessionStore } from "@opencontinue/core"
-import { createProvider, listModels, type ChatProvider } from "@opencontinue/providers"
+import {
+  createProvider,
+  listModels,
+  PROVIDER_PRESETS,
+  type ChatProvider,
+  type ProviderPreset,
+} from "@opencontinue/providers"
 import { runAgent } from "@opencontinue/server"
 import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
 
@@ -14,7 +25,7 @@ export type TuiOptions = {
   resume?: string
 }
 
-type Screen = "key" | "loading" | "models" | "chat" | "error"
+type Screen = "provider" | "key" | "baseurl" | "loading" | "models" | "chat" | "error"
 
 type Message = {
   role: "user" | "assistant"
@@ -64,13 +75,26 @@ class TuiPermissionGate implements PermissionGate {
   }
 }
 
-function App({ options }: { options: TuiOptions }) {
+function initialProviderIndex(provider: string | undefined): number {
+  const index = PROVIDER_PRESETS.findIndex(
+    (item) =>
+      item.id === provider ||
+      (provider === "openai-compatible" && item.id === "openai") ||
+      (provider === "anthropic" && item.id === "claude"),
+  )
+  return index >= 0 ? index : 0
+}
+
+export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
   const initial = useMemo(() => resolveProviderSettings(), [])
-  const needsKey = !initial.apiKey && initial.provider !== "ollama" && initial.provider !== "echo"
-  const [screen, setScreen] = useState<Screen>(needsKey ? "key" : "loading")
+  const [screen, setScreen] = useState<Screen>("provider")
+  const [providerIndex, setProviderIndex] = useState(() => initialProviderIndex(initial.provider))
+  const [preset, setPreset] = useState<ProviderPreset | null>(null)
   const [apiKey, setApiKey] = useState(initial.apiKey ?? "")
+  const [baseUrl, setBaseUrl] = useState("")
   const [keyInput, setKeyInput] = useState("")
+  const [baseInput, setBaseInput] = useState("")
   const [models, setModels] = useState<string[]>([])
   const [modelIndex, setModelIndex] = useState(0)
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
@@ -103,22 +127,28 @@ function App({ options }: { options: TuiOptions }) {
   }, [])
 
   useEffect(() => {
-    if (screen !== "loading") return
+    if (screen !== "loading" || !preset) return
     let cancelled = false
 
     void (async () => {
       try {
-        const settings = resolveProviderSettings()
-        const listed = await listModels({
-          ...settings,
-          apiKey: apiKey || settings.apiKey,
-        })
+        const resolvedBase = baseUrl || preset.baseUrl
+        if (!resolvedBase) throw new Error("Base URL is required.")
+
+        const settings = {
+          provider: preset.id,
+          baseUrl: resolvedBase,
+          apiKey,
+          model: preset.defaultModel ?? initial.model,
+        }
+        const listed = await listModels(settings)
         if (cancelled) return
         if (listed.length === 0) throw new Error("The provider returned no models.")
 
         const sorted = [...listed].sort((left, right) => left.localeCompare(right))
+        const preferredModel = preset.defaultModel ?? initial.model
         const preferred =
-          settings.model && sorted.includes(settings.model) ? sorted.indexOf(settings.model) : 0
+          preferredModel && sorted.includes(preferredModel) ? sorted.indexOf(preferredModel) : 0
         setModels(sorted)
         setModelIndex(preferred)
         setModel(sorted[preferred]!)
@@ -133,17 +163,68 @@ function App({ options }: { options: TuiOptions }) {
     return () => {
       cancelled = true
     }
-  }, [screen, apiKey])
+  }, [screen, preset, baseUrl, apiKey, initial.model])
+
+  const chooseProvider = () => {
+    const selected = PROVIDER_PRESETS[providerIndex]
+    if (!selected) return
+
+    const sameProvider =
+      selected.id === initial.provider ||
+      (initial.provider === "openai-compatible" && selected.id === "openai") ||
+      (initial.provider === "anthropic" && selected.id === "claude")
+    const auth = loadAuthConfig()
+    const savedKey =
+      auth.keys?.[selected.id] ??
+      (sameProvider ? (initial.apiKey ?? "") : "")
+    const savedBaseUrl = sameProvider ? initial.baseUrl : undefined
+    const nextBaseUrl = savedBaseUrl ?? selected.baseUrl ?? ""
+
+    setPreset(selected)
+    setApiKey(savedKey)
+    setBaseUrl(nextBaseUrl)
+    setKeyInput("")
+    setBaseInput(nextBaseUrl)
+
+    if (selected.needsKey && !savedKey) setScreen("key")
+    else if (selected.askBaseUrl) setScreen("baseurl")
+    else setScreen("loading")
+  }
+
+  const submitKey = () => {
+    if (!preset) return
+    const key = keyInput.trim()
+    if (!key) return
+    saveAuthConfig({ keys: { [preset.id]: key } })
+    setApiKey(key)
+    setScreen(preset.askBaseUrl ? "baseurl" : "loading")
+  }
+
+  const submitBaseUrl = () => {
+    const value = baseInput.trim()
+    if (!value) return
+    setBaseUrl(value)
+    setScreen("loading")
+  }
 
   const chooseModel = () => {
+    if (!preset) return
     const chosen = models[modelIndex]
     if (!chosen) return
 
     try {
-      saveProviderConfig({ model: chosen })
+      const resolvedBase = baseUrl || preset.baseUrl
+      saveProviderConfig({
+        provider: preset.id,
+        baseUrl: resolvedBase,
+        model: chosen,
+      })
+
       const settings = resolveProviderSettings()
       const provider = createProvider({
         ...settings,
+        provider: preset.id,
+        baseUrl: resolvedBase,
         apiKey: apiKey || settings.apiKey,
         model: chosen,
       }).provider
@@ -233,6 +314,14 @@ function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (screen === "provider") {
+      if (key.upArrow) setProviderIndex((index) => Math.max(0, index - 1))
+      else if (key.downArrow) {
+        setProviderIndex((index) => Math.min(PROVIDER_PRESETS.length - 1, index + 1))
+      } else if (key.return) chooseProvider()
+      return
+    }
+
     if (screen === "models") {
       if (key.upArrow) setModelIndex((index) => Math.max(0, index - 1))
       else if (key.downArrow) setModelIndex((index) => Math.min(models.length - 1, index + 1))
@@ -251,39 +340,57 @@ function App({ options }: { options: TuiOptions }) {
     }
   })
 
+  if (screen === "provider") {
+    return (
+      <Box flexDirection="column">
+        <Text bold color="cyan">
+          OpenContinue
+        </Text>
+        <Text>Select a provider</Text>
+        {PROVIDER_PRESETS.map((item, index) => (
+          <Text key={item.id} color={index === providerIndex ? "cyan" : undefined}>
+            {index === providerIndex ? "› " : "  "}
+            {item.label}
+            {item.note ? ` — ${item.note}` : ""}
+          </Text>
+        ))}
+        <Text dimColor>↑/↓ select · Enter confirm · Ctrl+C exit</Text>
+      </Box>
+    )
+  }
+
   if (screen === "key") {
     return (
       <Box flexDirection="column">
         <Text bold color="cyan">
           OpenContinue
         </Text>
-        <Text>Enter your OpenAI-compatible API key:</Text>
-        <TextInput
-          value={keyInput}
-          onChange={setKeyInput}
-          mask="*"
-          onSubmit={(value) => {
-            const key = value.trim()
-            if (!key) return
-            saveAuthConfig({ apiKey: key })
-            const current = resolveProviderSettings()
-            if (!current.provider) {
-              saveProviderConfig({
-                provider: "openai-compatible",
-                baseUrl: "https://api.openai.com/v1",
-              })
-            }
-            setApiKey(key)
-            setScreen("loading")
-          }}
-        />
+        <Text>{preset?.label} API key</Text>
+        <TextInput value={keyInput} onChange={setKeyInput} mask="*" onSubmit={submitKey} />
         <Text dimColor>Saved to ~/.opencontinue/auth.json</Text>
       </Box>
     )
   }
 
+  if (screen === "baseurl") {
+    return (
+      <Box flexDirection="column">
+        <Text bold color="cyan">
+          OpenContinue
+        </Text>
+        <Text>{preset?.label} base URL</Text>
+        <TextInput
+          value={baseInput}
+          onChange={setBaseInput}
+          onSubmit={submitBaseUrl}
+          placeholder="https://example.com/v1"
+        />
+      </Box>
+    )
+  }
+
   if (screen === "loading") {
-    return <Text>Loading models…</Text>
+    return <Text>Loading {preset?.label ?? "provider"} models…</Text>
   }
 
   if (screen === "error") {
@@ -308,7 +415,7 @@ function App({ options }: { options: TuiOptions }) {
         <Text bold color="cyan">
           OpenContinue
         </Text>
-        <Text>Select a model</Text>
+        <Text>Select a model · {preset?.label}</Text>
         {visible.map((item, offset) => {
           const index = start + offset
           return (
@@ -328,7 +435,9 @@ function App({ options }: { options: TuiOptions }) {
       <Text bold color="cyan">
         OpenContinue
       </Text>
-      <Text dimColor>model: {model} · /exit to quit</Text>
+      <Text dimColor>
+        {preset?.label} · model: {model} · /exit to quit
+      </Text>
       {messages.map((message, index) => (
         <Box key={`${index}-${message.role}`}>
           <Text color={message.role === "user" ? "green" : "white"}>

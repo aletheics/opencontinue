@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
+import { toAnthropicMessages } from "./anthropic.js"
 import { createProvider, OpenAICompatibleProvider, type ChatStreamEvent } from "./index.js"
 
 function sseBody(events: string[]): ReadableStream<Uint8Array> {
@@ -23,6 +24,50 @@ describe("createProvider", () => {
     const selection = createProvider({ baseUrl: "http://127.0.0.1:11434/v1", model: "m" })
     expect(selection.provider.id).toBe("openai-compatible")
     expect(selection.fallback).toBe(false)
+  })
+
+  it("maps provider presets", () => {
+    expect(createProvider({ provider: "deepseek", apiKey: "k" }).provider).toMatchObject({
+      id: "openai-compatible",
+      model: "deepseek-chat",
+    })
+    expect(createProvider({ provider: "claude", apiKey: "k" }).provider).toMatchObject({
+      id: "anthropic",
+      model: "claude-sonnet-5-5",
+    })
+    expect(createProvider({ provider: "custom" }).provider.id).toBe("echo")
+  })
+})
+
+describe("Anthropic messages", () => {
+  it("converts assistant tool calls and tool results", () => {
+    const converted = toAnthropicMessages([
+      { role: "system", content: "rules" },
+      { role: "user", content: "hi" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{ id: "c1", name: "read", arguments: '{"path":"a"}' }],
+      },
+      { role: "tool", toolCallId: "c1", content: "file" },
+      { role: "user", content: "next" },
+    ])
+
+    expect(converted.system).toBe("rules")
+    expect(converted.messages).toEqual([
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+      {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "c1", name: "read", input: { path: "a" } }],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "c1", content: "file" },
+          { type: "text", text: "next" },
+        ],
+      },
+    ])
   })
 })
 

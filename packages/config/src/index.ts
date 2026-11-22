@@ -10,6 +10,7 @@ export type ProviderConfig = {
 
 export type AuthConfig = {
   apiKey?: string
+  keys?: Record<string, string>
 }
 
 export type ProviderSettings = {
@@ -63,7 +64,12 @@ export function saveProviderConfig(config: ProviderConfig): void {
 }
 
 export function saveAuthConfig(auth: AuthConfig): void {
-  writeJson(authPath(), { ...loadAuthConfig(), ...auth })
+  const current = loadAuthConfig()
+  const merged: AuthConfig = { ...current, ...auth }
+  if (current.keys || auth.keys) {
+    merged.keys = { ...current.keys, ...auth.keys }
+  }
+  writeJson(authPath(), merged)
 }
 
 /**
@@ -73,10 +79,13 @@ export function saveAuthConfig(auth: AuthConfig): void {
 export function resolveProviderSettings(env: NodeJS.ProcessEnv = process.env): ProviderSettings {
   const config = loadProviderConfig()
   const auth = loadAuthConfig()
+  const provider = env.OPENCONTINUE_PROVIDER ?? env.OPENAI_PROVIDER ?? config.provider
+  const providerKey = provider ? auth.keys?.[provider] : undefined
+
   return {
-    provider: env.OPENCONTINUE_PROVIDER ?? env.OPENAI_PROVIDER ?? config.provider,
+    provider,
     baseUrl: env.OPENCONTINUE_BASE_URL ?? env.OPENAI_BASE_URL ?? config.baseUrl,
-    apiKey: env.OPENCONTINUE_API_KEY ?? env.OPENAI_API_KEY ?? auth.apiKey,
+    apiKey: env.OPENCONTINUE_API_KEY ?? env.OPENAI_API_KEY ?? providerKey ?? auth.apiKey,
     model: env.OPENCONTINUE_MODEL ?? env.OPENAI_MODEL ?? config.model,
   }
 }

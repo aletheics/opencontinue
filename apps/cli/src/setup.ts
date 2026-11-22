@@ -46,7 +46,7 @@ export async function setupCommand(): Promise<void> {
     ).trim()
 
     saveProviderConfig({ provider, baseUrl, model })
-    if (apiKey) saveAuthConfig({ apiKey })
+    if (apiKey) saveAuthConfig({ apiKey, keys: { [provider]: apiKey } })
 
     console.log(`\nconfig: ${configPath()}`)
     console.log(`auth:   ${authPath()}`)
@@ -59,7 +59,7 @@ export async function setupCommand(): Promise<void> {
 export function configCommand(): void {
   const config = loadProviderConfig()
   const auth = loadAuthConfig()
-  const key = auth.apiKey
+  const key = (config.provider ? auth.keys?.[config.provider] : undefined) ?? auth.apiKey
   const masked = !key
     ? "(unset)"
     : key.length <= 8

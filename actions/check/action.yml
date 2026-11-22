@@ -8,10 +8,14 @@ inputs:
     required: false
     default: origin/main
   api-key:
-    description: OpenAI-compatible API key
+    description: Provider API key
     required: true
+  provider:
+    description: "Provider preset: openai, deepseek, kimi, claude, openrouter, ollama, custom"
+    required: false
+    default: openai
   base-url:
-    description: OpenAI-compatible base URL
+    description: Provider base URL (optional for presets)
     required: false
   model:
     description: Model name
@@ -73,10 +77,10 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       env:
-        OPENCONTINUE_PROVIDER: openai-compatible
+        OPENCONTINUE_PROVIDER: ${{ inputs.provider }}
         OPENCONTINUE_API_KEY: ${{ inputs.api-key }}
-        OPENCONTINUE_BASE_URL: ${{ inputs.base-url || 'https://api.openai.com/v1' }}
-        OPENCONTINUE_MODEL: ${{ inputs.model || 'gpt-6.2' }}
+        OPENCONTINUE_BASE_URL: ${{ inputs.base-url }}
+        OPENCONTINUE_MODEL: ${{ inputs.model }}
       run: |
         set +e
         ACTION_PATH="${GITHUB_ACTION_PATH//\\//}"

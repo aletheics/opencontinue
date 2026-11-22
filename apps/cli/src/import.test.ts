@@ -36,7 +36,7 @@ describe("import", () => {
 
     const result = readContinueConfig(file)
     expect(result.settings).toMatchObject({
-      provider: "openai-compatible",
+      provider: "deepseek",
       baseUrl: "https://api.deepseek.com/v1",
       model: "deepseek-chat",
       apiKey: "test-key",
@@ -63,10 +63,28 @@ describe("import", () => {
 
     const result = readOpenCodeConfig(file)
     expect(result.settings).toMatchObject({
-      provider: "openai-compatible",
+      provider: "openai",
       baseUrl: "https://example.test/v1",
       model: "gpt-4o",
       apiKey: "env-key",
+    })
+  })
+
+  it("imports Claude as a native provider", async () => {
+    const file = await makeFile(
+      "config.yaml",
+      `models:
+  - provider: anthropic
+    model: claude-sonnet-5-5
+    roles: [chat]
+`,
+    )
+
+    const result = readContinueConfig(file)
+    expect(result.settings).toMatchObject({
+      provider: "claude",
+      baseUrl: "https://api.anthropic.com",
+      model: "claude-sonnet-5-5",
     })
   })
 
@@ -74,8 +92,8 @@ describe("import", () => {
     const file = await makeFile(
       "config.yaml",
       `models:
-  - provider: anthropic
-    model: claude-sonnet
+  - provider: mystery
+    model: unknown
     roles: [chat]
 `,
     )

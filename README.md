@@ -33,7 +33,7 @@ npm run link
 opencontinue
 ```
 
-On first launch, enter your API key. OpenContinue fetches the provider's model list, then saves the chosen model to `~/.opencontinue/config.json`. The key is stored in `~/.opencontinue/auth.json` (mode `0600`).
+On first launch, choose a provider inside the TUI: OpenAI (GPT), DeepSeek, Kimi (Moonshot), Claude (Anthropic), OpenRouter, Ollama, Custom, or Echo. Enter that provider's key, then choose a model. The model is saved to `~/.opencontinue/config.json`; the key is stored per provider in `~/.opencontinue/auth.json` (mode `0600`).
 
 Use `opencontinue` as the primary command. `onc` is the short alias; `oc` would collide with OpenCode.
 
@@ -46,13 +46,12 @@ opencontinue import continue    # import ~/.continue/config.yaml
 opencontinue import opencode    # import opencode.json(c)
 ```
 
-Imports map to OpenContinue's OpenAI-compatible provider. Anthropic-native endpoints need an OpenAI-compatible proxy.
+OpenContinue supports OpenAI-compatible providers and native Anthropic Claude. Imports map to the matching provider preset.
 
 For CI and containers, set environment variables directly:
 
 ```bash
-OPENCONTINUE_PROVIDER=openai-compatible
-OPENCONTINUE_BASE_URL=https://api.openai.com/v1
+OPENCONTINUE_PROVIDER=openai
 OPENCONTINUE_API_KEY=sk-...
 OPENCONTINUE_MODEL=gpt-6.2
 ```

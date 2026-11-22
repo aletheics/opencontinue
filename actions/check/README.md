@@ -38,8 +38,9 @@ Inputs:
 |---|---|---|
 | `base` | `origin/main` | Base git ref |
 | `api-key` | required | Provider key |
-| `base-url` | `https://api.openai.com/v1` | Provider URL |
-| `model` | `gpt-6.2` | Model |
+| `provider` | `openai` | `openai`, `deepseek`, `kimi`, `claude`, `openrouter`, `ollama`, `custom` |
+| `base-url` | preset default | Provider URL |
+| `model` | preset default | Model |
 | `patch` | `true` | Include patches in the comment |
 | `comment` | `true` | Post or update a PR comment |
 | `fail-on-error` | `true` | Fail the job on check failures |

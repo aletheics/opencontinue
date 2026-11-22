@@ -75,6 +75,8 @@ function resolveTemplate(
   return value
 }
 
+const PRESET_PROVIDERS = new Set(["openai", "deepseek", "openrouter"])
+
 function mapProvider(
   provider: string,
   apiBase: string | undefined,
@@ -89,16 +91,30 @@ function mapProvider(
     }
   }
 
+  if (id === "anthropic" || id === "claude") {
+    return {
+      provider: "claude",
+      baseUrl: apiBase ?? "https://api.anthropic.com",
+    }
+  }
+
+  if (id === "kimi" || id === "moonshot") {
+    return {
+      provider: "kimi",
+      baseUrl: apiBase ?? "https://api.moonshot.cn/v1",
+    }
+  }
+
   if (COMPATIBLE_BASE_URLS[id]) {
     return {
-      provider: "openai-compatible",
+      provider: PRESET_PROVIDERS.has(id) ? id : "openai-compatible",
       baseUrl: apiBase ?? COMPATIBLE_BASE_URLS[id],
     }
   }
 
   if (apiBase) {
     notes.push(`Provider "${provider}" is not native; using apiBase as an OpenAI-compatible endpoint.`)
-    return { provider: "openai-compatible", baseUrl: apiBase }
+    return { provider: "custom", baseUrl: apiBase }
   }
 
   notes.push(`Provider "${provider}" has no OpenAI-compatible endpoint; configure it manually.`)
@@ -235,7 +251,12 @@ export async function importCommand(
     baseUrl: result.settings.baseUrl,
     model: result.settings.model,
   })
-  if (result.settings.apiKey) saveAuthConfig({ apiKey: result.settings.apiKey })
+  if (result.settings.apiKey) {
+    saveAuthConfig({
+      apiKey: result.settings.apiKey,
+      keys: { [result.settings.provider]: result.settings.apiKey },
+    })
+  }
 
   console.log(`\nSaved to ${configPath()}`)
   if (!result.settings.apiKey) {

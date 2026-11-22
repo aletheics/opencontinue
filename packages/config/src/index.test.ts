@@ -39,9 +39,16 @@ describe("config", () => {
       baseUrl: "https://api.example.test/v1",
       model: "test",
     })
-    expect(loadAuthConfig()).toEqual({ apiKey: "secret" })
+    expect(loadAuthConfig()).toMatchObject({ apiKey: "secret" })
     expect(configPath()).toBe(path.join(home, "config.json"))
     expect(authPath()).toBe(path.join(home, "auth.json"))
+  })
+
+  it("uses the key for the selected provider", () => {
+    saveProviderConfig({ provider: "deepseek" })
+    saveAuthConfig({ keys: { deepseek: "deep-key", openai: "open-key" } })
+
+    expect(resolveProviderSettings({}).apiKey).toBe("deep-key")
   })
 
   it("lets environment variables override files", () => {
