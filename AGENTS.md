@@ -34,13 +34,14 @@ Do not copy wholesale. If code is adapted, keep attribution in [NOTICE](NOTICE).
 | `packages/protocol` | Wire schemas and the public event contract |
 | `packages/config` | Global provider config and auth files |
 | `packages/core` | Event-sourced session store and projections |
-| `packages/providers` | OpenAI-compatible streaming, tool calls, echo fallback |
+| `packages/providers` | Provider catalog, OpenAI-compatible transport, native Anthropic |
 | `packages/tools` | read / write / edit / glob / grep / bash + permission gate |
-| `apps/server` | HTTP/SSE server, agent loop, permission broker |
-| `apps/cli` | Interactive and headless CLI |
+| `packages/runtime` | Agent loop, history projection, permissions, project context |
+| `packages/tui` | Ink TUI, independent from the CLI |
+| `apps/server` | HTTP/SSE transport over the runtime |
+| `apps/cli` | Command entrypoint and headless paths |
 | `apps/cli/src/checks.ts` | Worktree-isolated checks and patch capture |
 | `apps/cli/src/import.ts` | Continue and OpenCode config import |
-| `apps/cli/src/tui.tsx` | Ink TUI with model selection and streaming |
 | `actions/check` | Reusable GitHub Action for checks |
 
 ## Rules

@@ -5,7 +5,7 @@ import path from "node:path"
 
 import { MemorySessionStore } from "@opencontinue/core"
 import type { ChatProvider } from "@opencontinue/providers"
-import { runAgent } from "@opencontinue/server"
+import { runAgent } from "@opencontinue/runtime"
 import { ToolRegistry, type PermissionGate } from "@opencontinue/tools"
 
 const MAX_DIFF_CHARS = 120_000

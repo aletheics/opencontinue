@@ -16,7 +16,7 @@ import {
   type ChatProvider,
   type ProviderPreset,
 } from "@opencontinue/providers"
-import { runAgent } from "@opencontinue/server"
+import { runAgent } from "@opencontinue/runtime"
 import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
 
 export type TuiOptions = {
@@ -341,19 +341,34 @@ export function App({ options }: { options: TuiOptions }) {
   })
 
   if (screen === "provider") {
+    const windowSize = 12
+    const start = Math.max(
+      0,
+      Math.min(
+        providerIndex - Math.floor(windowSize / 2),
+        Math.max(0, PROVIDER_PRESETS.length - windowSize),
+      ),
+    )
+    const visible = PROVIDER_PRESETS.slice(start, start + windowSize)
+
     return (
       <Box flexDirection="column">
         <Text bold color="cyan">
           OpenContinue
         </Text>
-        <Text>Select a provider</Text>
-        {PROVIDER_PRESETS.map((item, index) => (
-          <Text key={item.id} color={index === providerIndex ? "cyan" : undefined}>
-            {index === providerIndex ? "› " : "  "}
-            {item.label}
-            {item.note ? ` — ${item.note}` : ""}
-          </Text>
-        ))}
+        <Text>
+          Select a provider ({providerIndex + 1}/{PROVIDER_PRESETS.length})
+        </Text>
+        {visible.map((item, offset) => {
+          const index = start + offset
+          return (
+            <Text key={item.id} color={index === providerIndex ? "cyan" : undefined}>
+              {index === providerIndex ? "› " : "  "}
+              {item.label}
+              {item.note ? ` — ${item.note}` : ""}
+            </Text>
+          )
+        })}
         <Text dimColor>↑/↓ select · Enter confirm · Ctrl+C exit</Text>
       </Box>
     )

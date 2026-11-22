@@ -9,7 +9,7 @@ import { saveAuthConfig, saveProviderConfig } from "@opencontinue/config"
 import { render } from "ink-testing-library"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { App } from "./tui.js"
+import { App } from "./index.js"
 
 let home = ""
 let previousHome: string | undefined
@@ -75,9 +75,8 @@ describe("TUI", () => {
   })
 
   it("asks for the selected provider's key", async () => {
+    saveProviderConfig({ provider: "deepseek" })
     const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
-
-    stdin.write("\u001B[B")
 
     await vi.waitFor(() => {
       expect(lastFrame()).toContain("› DeepSeek")

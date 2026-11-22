@@ -33,6 +33,28 @@ Reads are projections. This gives replay, resume, multi-client sync, and auditab
 
 SQLite is the default store (`node:sqlite`, WAL mode). An in-memory store remains for tests and embedders. Both implement the same interface, so the server and clients do not change.
 
+### Package boundaries
+
+Applications compose libraries; libraries do not import applications.
+
+```
+apps/cli ──> packages/tui
+    │             │
+    └──> apps/server ──> packages/runtime ──> packages/core
+                              │                    │
+                              ├──> packages/providers
+                              └──> packages/tools
+```
+
+- `packages/runtime` owns the agent loop, history projection, permissions, and project context.
+- `packages/tui` depends on `config`, `core`, `providers`, `runtime`, and `tools`; it never imports `apps/cli` or `apps/server`.
+- `apps/server` is an HTTP/SSE adapter over `runtime`.
+- `apps/cli` is an entrypoint that composes commands, checks, the server, and the TUI.
+
+### Provider catalog
+
+`packages/providers/src/catalog.ts` is the single source of provider ids, labels, base URLs, and transport. OpenAI-compatible providers share one adapter; Anthropic Claude uses a native adapter. See [providers.md](providers.md).
+
 ### One server, many clients
 
 The server owns state. Clients are thin. CLI, web, desktop, IDE, and CI all speak the same HTTP/SSE contract. A client never owns the canonical transcript.

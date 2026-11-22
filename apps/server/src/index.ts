@@ -12,11 +12,14 @@ import {
 } from "@opencontinue/protocol"
 import { resolveProviderSettings } from "@opencontinue/config"
 import { createProvider, type ChatProvider } from "@opencontinue/providers"
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  loadProjectConfig,
+  PermissionBroker,
+  runAgent,
+  type PermissionMode,
+} from "@opencontinue/runtime"
 import { ToolRegistry } from "@opencontinue/tools"
-
-import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
-import { PermissionBroker, type PermissionMode } from "./permissions.js"
-import { loadProjectConfig } from "./project.js"
 
 export type StartServerOptions = {
   store?: SessionStore
@@ -184,9 +187,13 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
   }
 }
 
-export { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
-export { PermissionBroker, type PermissionMode } from "./permissions.js"
-export { loadProjectConfig } from "./project.js"
+export {
+  DEFAULT_SYSTEM_PROMPT,
+  runAgent,
+  PermissionBroker,
+  loadProjectConfig,
+  type PermissionMode,
+} from "@opencontinue/runtime"
 
 export async function closeServer(server: ServerType): Promise<void> {
   await new Promise<void>((resolve, reject) => {

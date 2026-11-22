@@ -393,7 +393,7 @@ async function startTui(options: {
   if (!process.stdin.isTTY) {
     throw new Error("TUI requires a TTY. Use `opencontinue -p \"...\"` or `--url` in non-interactive environments.")
   }
-  const { runTui } = await import("./tui.js")
+  const { runTui } = await import("@opencontinue/tui")
   await runTui(options)
 }
 

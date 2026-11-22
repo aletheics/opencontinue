@@ -46,7 +46,7 @@ opencontinue import continue    # import ~/.continue/config.yaml
 opencontinue import opencode    # import opencode.json(c)
 ```
 
-OpenContinue supports OpenAI-compatible providers and native Anthropic Claude. Imports map to the matching provider preset.
+OpenContinue supports 30+ providers, including OpenAI, DeepSeek, Kimi, Claude, OpenRouter, Groq, Mistral, xAI, Qwen, GLM, Gemini, local Ollama/LM Studio/vLLM, and more. See [docs/providers.md](docs/providers.md). Imports map to the matching provider preset.
 
 For CI and containers, set environment variables directly:
 

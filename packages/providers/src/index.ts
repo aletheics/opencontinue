@@ -1,6 +1,8 @@
 import { AnthropicProvider } from "./anthropic.js"
+import { findProviderPreset } from "./catalog.js"
 
 export { AnthropicProvider } from "./anthropic.js"
+export { PROVIDER_PRESETS, type ProviderPreset } from "./catalog.js"
 
 export type ChatRole = "system" | "user" | "assistant" | "tool"
 
@@ -297,83 +299,6 @@ export type ProviderSettings = {
   model?: string
 }
 
-export type ProviderPreset = {
-  id: string
-  label: string
-  transport: "openai-compatible" | "anthropic" | "ollama" | "echo"
-  baseUrl?: string
-  defaultModel?: string
-  needsKey: boolean
-  askBaseUrl?: boolean
-  note?: string
-}
-
-export const PROVIDER_PRESETS: ProviderPreset[] = [
-  {
-    id: "openai",
-    label: "OpenAI (GPT)",
-    transport: "openai-compatible",
-    baseUrl: "https://api.openai.com/v1",
-    defaultModel: "gpt-6.2",
-    needsKey: true,
-  },
-  {
-    id: "deepseek",
-    label: "DeepSeek",
-    transport: "openai-compatible",
-    baseUrl: "https://api.deepseek.com/v1",
-    defaultModel: "deepseek-chat",
-    needsKey: true,
-  },
-  {
-    id: "kimi",
-    label: "Kimi (Moonshot)",
-    transport: "openai-compatible",
-    baseUrl: "https://api.moonshot.cn/v1",
-    defaultModel: "kimi-k2.5",
-    needsKey: true,
-    note: "China endpoint",
-  },
-  {
-    id: "claude",
-    label: "Claude (Anthropic)",
-    transport: "anthropic",
-    baseUrl: "https://api.anthropic.com",
-    defaultModel: "claude-sonnet-5-5",
-    needsKey: true,
-  },
-  {
-    id: "openrouter",
-    label: "OpenRouter",
-    transport: "openai-compatible",
-    baseUrl: "https://openrouter.ai/api/v1",
-    needsKey: true,
-    note: "GPT, Claude, Kimi, DeepSeek",
-  },
-  {
-    id: "ollama",
-    label: "Ollama (local)",
-    transport: "ollama",
-    baseUrl: "http://127.0.0.1:11434/v1",
-    defaultModel: "qwen2.5-coder:7b",
-    needsKey: false,
-  },
-  {
-    id: "custom",
-    label: "Custom OpenAI-compatible",
-    transport: "openai-compatible",
-    needsKey: true,
-    askBaseUrl: true,
-  },
-  {
-    id: "echo",
-    label: "Echo (offline)",
-    transport: "echo",
-    defaultModel: "echo",
-    needsKey: false,
-  },
-]
-
 export async function listModels(settings: ProviderSettings): Promise<string[]> {
   const selection = createProvider(settings)
   const provider = selection.provider
@@ -383,7 +308,7 @@ export async function listModels(settings: ProviderSettings): Promise<string[]> 
 
 export function createProvider(settings: ProviderSettings = {}): ProviderSelection {
   const kind = (settings.provider ?? "").toLowerCase()
-  const preset = PROVIDER_PRESETS.find((item) => item.id === kind)
+  const preset = findProviderPreset(kind)
   const transport =
     preset?.transport ??
     (kind === "anthropic"

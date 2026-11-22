@@ -38,9 +38,12 @@ Boundaries:
 
 - `packages/protocol` owns the public event and wire contract.
 - `packages/core` owns durable sessions and projections.
-- `packages/providers` owns model transport.
+- `packages/providers` owns the provider catalog and model transport.
 - `packages/tools` owns local capabilities and the permission gate.
-- `apps/server` owns orchestration and HTTP/SSE.
+- `packages/runtime` owns the agent loop, permissions, and project context.
+- `packages/tui` is an independent Ink client; it does not depend on the CLI.
+- `apps/server` owns HTTP/SSE over the runtime.
+- `apps/cli` is an entrypoint that composes the runtime, server, checks, and TUI.
 - Clients are thin. The server owns state.
 
 The event contract is append-only. New behavior adds events; it does not rename or reuse them.
