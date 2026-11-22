@@ -13,9 +13,9 @@
 ## 0.1 — usable local agent (target: 6–10 weeks)
 
 1. [x] Provider adapter: OpenAI-compatible first (covers OpenAI, DeepSeek, Ollama, vLLM).
-2. [x] Agent loop with streaming; cancellation and retry next.
-3. Tools: read, write, edit, grep, glob, bash, fetch.
-4. Capability-based permissions with an audit event per call.
+2. [x] Agent loop with streaming and tool calls; cancellation and retry next.
+3. [x] Tools: read, write, edit, glob, grep, bash.
+4. [x] Capability-based permissions with an audit event per call.
 5. SQLite persistence and crash recovery.
 6. Config file plus import from Continue, Claude, and Codex configs.
 7. MCP client.

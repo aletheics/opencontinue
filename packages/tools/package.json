@@ -1,0 +1,17 @@
+{
+  "name": "@opencontinue/tools",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Filesystem and shell tools for OpenContinue.",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@opencontinue/providers": "0.0.1",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  }
+}

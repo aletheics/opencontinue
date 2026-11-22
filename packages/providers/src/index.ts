@@ -1,20 +1,37 @@
-export type ChatRole = "system" | "user" | "assistant"
+export type ChatRole = "system" | "user" | "assistant" | "tool"
 
-export type ChatMessage = {
-  role: ChatRole
-  content: string
+export type ToolCall = {
+  id: string
+  name: string
+  arguments: string
 }
+
+export type ToolDefinition = {
+  name: string
+  description: string
+  parameters: unknown
+}
+
+export type ChatMessage =
+  | { role: "system" | "user"; content: string }
+  | { role: "assistant"; content: string; toolCalls?: ToolCall[] }
+  | { role: "tool"; content: string; toolCallId: string; name?: string }
+
+export type ChatStreamEvent =
+  | { type: "text"; text: string }
+  | { type: "tool_call"; call: ToolCall }
 
 export type ChatRequest = {
   model: string
   messages: ChatMessage[]
+  tools?: ToolDefinition[]
   signal?: AbortSignal
 }
 
 export interface ChatProvider {
   readonly id: string
   readonly model: string
-  streamChat(request: ChatRequest): AsyncGenerator<string, void, unknown>
+  streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown>
 }
 
 /**
@@ -24,7 +41,7 @@ export class EchoProvider implements ChatProvider {
   readonly id = "echo"
   readonly model = "echo"
 
-  async *streamChat(request: ChatRequest): AsyncGenerator<string, void, unknown> {
+  async *streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown> {
     const user = [...request.messages].reverse().find((message) => message.role === "user")
     const reply = `Echo: ${user?.content ?? ""}`
     for (let index = 0; index < reply.length; index += 8) {
@@ -33,7 +50,7 @@ export class EchoProvider implements ChatProvider {
         error.name = "AbortError"
         throw error
       }
-      yield reply.slice(index, index + 8)
+      yield { type: "text", text: reply.slice(index, index + 8) }
     }
   }
 }
@@ -78,7 +95,17 @@ export class SseParser {
 }
 
 type OpenAIChunk = {
-  choices?: Array<{ delta?: { content?: string | null } }>
+  choices?: Array<{
+    delta?: {
+      content?: string | null
+      tool_calls?: Array<{
+        index?: number
+        id?: string
+        function?: { name?: string; arguments?: string }
+      }>
+    }
+    finish_reason?: string | null
+  }>
   error?: { message?: string }
 }
 
@@ -88,6 +115,32 @@ export type OpenAICompatibleOptions = {
   apiKey?: string
   headers?: Record<string, string>
   fetch?: typeof fetch
+}
+
+function toOpenAIMessage(message: ChatMessage): Record<string, unknown> {
+  if (message.role === "tool") {
+    return {
+      role: "tool",
+      tool_call_id: message.toolCallId,
+      content: message.content,
+    }
+  }
+  if (message.role === "assistant") {
+    return {
+      role: "assistant",
+      content: message.content || null,
+      ...(message.toolCalls?.length
+        ? {
+            tool_calls: message.toolCalls.map((call) => ({
+              id: call.id,
+              type: "function",
+              function: { name: call.name, arguments: call.arguments },
+            })),
+          }
+        : {}),
+    }
+  }
+  return { role: message.role, content: message.content }
 }
 
 /**
@@ -110,7 +163,24 @@ export class OpenAICompatibleProvider implements ChatProvider {
     this.fetchImpl = options.fetch ?? fetch
   }
 
-  async *streamChat(request: ChatRequest): AsyncGenerator<string, void, unknown> {
+  async *streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown> {
+    const body: Record<string, unknown> = {
+      model: request.model || this.model,
+      messages: request.messages.map(toOpenAIMessage),
+      stream: true,
+    }
+    if (request.tools?.length) {
+      body.tools = request.tools.map((tool) => ({
+        type: "function",
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        },
+      }))
+      body.tool_choice = "auto"
+    }
+
     const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -118,45 +188,72 @@ export class OpenAICompatibleProvider implements ChatProvider {
         ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
         ...this.headers,
       },
-      body: JSON.stringify({
-        model: request.model || this.model,
-        messages: request.messages,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
       signal: request.signal,
     })
 
     if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`Provider request failed (${response.status}): ${body.slice(0, 500)}`)
+      const text = await response.text()
+      throw new Error(`Provider request failed (${response.status}): ${text.slice(0, 500)}`)
     }
     if (!response.body) throw new Error("Provider returned an empty response body")
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     const parser = new SseParser()
+    const pendingCalls = new Map<number, { id?: string; name: string; arguments: string }>()
 
-    const extract = (data: string): string | undefined => {
+    const consume = (data: string): string | undefined => {
       const chunk = JSON.parse(data) as OpenAIChunk
       if (chunk.error?.message) throw new Error(`Provider error: ${chunk.error.message}`)
-      const content = chunk.choices?.[0]?.delta?.content
+
+      const delta = chunk.choices?.[0]?.delta
+      for (const call of delta?.tool_calls ?? []) {
+        const index = call.index ?? 0
+        const current = pendingCalls.get(index) ?? { name: "", arguments: "" }
+        if (call.id) current.id = call.id
+        if (call.function?.name) current.name += call.function.name
+        if (call.function?.arguments) current.arguments += call.function.arguments
+        pendingCalls.set(index, current)
+      }
+
+      const content = delta?.content
       return typeof content === "string" && content.length > 0 ? content : undefined
     }
 
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
+    let done = false
+    while (!done) {
+      const { value, done: streamDone } = await reader.read()
+      if (streamDone) break
       for (const data of parser.push(decoder.decode(value, { stream: true }))) {
-        if (data === "[DONE]") return
-        const content = extract(data)
-        if (content) yield content
+        if (data === "[DONE]") {
+          done = true
+          break
+        }
+        const text = consume(data)
+        if (text) yield { type: "text", text }
       }
     }
 
-    for (const data of parser.flush()) {
-      if (data === "[DONE]") return
-      const content = extract(data)
-      if (content) yield content
+    if (!done) {
+      for (const data of parser.flush()) {
+        if (data === "[DONE]") break
+        const text = consume(data)
+        if (text) yield { type: "text", text }
+      }
+    }
+
+    const calls = [...pendingCalls.entries()].sort((left, right) => left[0] - right[0])
+    for (const [index, call] of calls) {
+      if (!call.name) continue
+      yield {
+        type: "tool_call",
+        call: {
+          id: call.id ?? `call_${index}`,
+          name: call.name,
+          arguments: call.arguments,
+        },
+      }
     }
   }
 }
@@ -174,9 +271,6 @@ export type ProviderSelection = {
  *   OPENCONTINUE_BASE_URL=https://api.deepseek.com/v1
  *   OPENCONTINUE_API_KEY=...
  *   OPENCONTINUE_MODEL=deepseek-chat
- *
- * With no configuration, the server falls back to echo so a fresh checkout
- * can still exercise the event stream and clients.
  */
 export function createProviderFromEnv(env: NodeJS.ProcessEnv = process.env): ProviderSelection {
   const kind = (env.OPENCONTINUE_PROVIDER ?? "").toLowerCase()

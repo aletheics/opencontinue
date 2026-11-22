@@ -22,6 +22,17 @@ export type EventDraft =
   | { type: "message.assistant.delta"; runId: string; text: string }
   | { type: "run.completed"; runId: string }
   | { type: "run.failed"; runId: string; error: string }
+  | { type: "tool.started"; runId: string; callId: string; name: string; input: unknown }
+  | { type: "tool.completed"; runId: string; callId: string; output: string }
+  | { type: "tool.failed"; runId: string; callId: string; error: string }
+  | {
+      type: "permission.requested"
+      requestId: string
+      tool: string
+      capability: "read" | "write" | "execute"
+      input: unknown
+    }
+  | { type: "permission.resolved"; requestId: string; approved: boolean }
 
 export type SessionListener = (event: SessionEvent) => void
 
@@ -97,6 +108,52 @@ export class SessionStore {
         break
       case "run.failed":
         event = { ...base, type: draft.type, runId: draft.runId, error: draft.error }
+        break
+      case "tool.started":
+        event = {
+          ...base,
+          type: draft.type,
+          runId: draft.runId,
+          callId: draft.callId,
+          name: draft.name,
+          input: draft.input,
+        }
+        break
+      case "tool.completed":
+        event = {
+          ...base,
+          type: draft.type,
+          runId: draft.runId,
+          callId: draft.callId,
+          output: draft.output,
+        }
+        break
+      case "tool.failed":
+        event = {
+          ...base,
+          type: draft.type,
+          runId: draft.runId,
+          callId: draft.callId,
+          error: draft.error,
+        }
+        break
+      case "permission.requested":
+        event = {
+          ...base,
+          type: draft.type,
+          requestId: draft.requestId,
+          tool: draft.tool,
+          capability: draft.capability,
+          input: draft.input,
+        }
+        break
+      case "permission.resolved":
+        event = {
+          ...base,
+          type: draft.type,
+          requestId: draft.requestId,
+          approved: draft.approved,
+        }
         break
     }
 

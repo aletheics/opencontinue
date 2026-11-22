@@ -2,26 +2,19 @@
 
 > The open continuum for AI-assisted engineering.
 
-OpenContinue is an open-source coding agent built around one idea: **your work should continue, not restart.** The same session should follow you from the terminal to the browser, from your machine to CI, and from an agent back to a human.
+Open-source terminal coding agent with durable sessions, streaming, tools, and capability permissions.
 
-This repository is the **0.0.1 scaffold**. The architecture and contracts are in place; the agent currently echoes messages so the event stream, session recovery, and multi-client flow can be exercised end to end.
+## Install
 
-## Status
+Requires Node.js 22+.
 
-- [x] Monorepo, Apache-2.0, TypeScript
-- [x] Event-sourced session kernel
-- [x] HTTP server with SSE event stream
-- [x] CLI with interactive and headless modes
-- [x] Session list / resume primitives
-- [x] Provider adapter (OpenAI-compatible + `echo` fallback)
-- [x] Streaming agent loop (no tools yet)
-- [ ] Tool loop (read / write / edit / grep / bash) with capability permissions
-- [ ] Worktree-isolated checks and GitHub Action
-- [ ] Web client, TUI, desktop shell
+```bash
+git clone https://github.com/aletheics/opencontinue.git
+cd opencontinue
+npm install
+```
 
-## Configure a provider
-
-Provider settings are read from environment variables and from a `.env` file at the repository root:
+## Configure
 
 ```bash
 cp .env.example .env
@@ -36,7 +29,7 @@ OPENCONTINUE_API_KEY=sk-...
 OPENCONTINUE_MODEL=gpt-4o-mini
 ```
 
-DeepSeek (or any OpenAI-compatible endpoint):
+DeepSeek:
 
 ```dotenv
 OPENCONTINUE_PROVIDER=openai-compatible
@@ -52,60 +45,40 @@ OPENCONTINUE_PROVIDER=ollama
 OPENCONTINUE_MODEL=qwen2.5-coder:7b
 ```
 
-With no key configured, OpenContinue falls back to an `echo` provider so a fresh checkout can still exercise sessions, streaming, and resume:
+Without a key, `opencontinue` falls back to `echo` so the session and streaming paths still work.
 
-```dotenv
-OPENCONTINUE_PROVIDER=echo
-```
-
-## Quickstart
-
-Requires Node.js 22+.
+## Usage
 
 ```bash
-cd D:/soft/vscodefiles/opencontinue
-npm install
-
-# Interactive chat (starts an embedded server)
-npm run dev
-
-# Headless
-npm run dev -- "explain this repository"
-
-# Server only
-npm run dev:server
-
-# Talk to a running server
-npm run dev -- --url http://127.0.0.1:8787
+npm run dev                       # interactive
+npm run dev -- "explain this repo" # headless, readonly by default
+npm run dev -- --auto "fix tests"  # headless with write/shell tools
+npm run dev -- serve --port 8787   # server only
+npm run dev -- sessions            # list sessions on a running server
 ```
 
-Run checks:
+Flags:
+
+| Flag | Effect |
+|---|---|
+| `--auto` | Allow write and shell tools without approval |
+| `--readonly` | Deny write and shell tools |
+| `--resume <id>` | Resume a session |
+| `--url <url>` | Connect to a running server |
+| `--port <port>` | Embedded server port (default `8787`) |
+
+Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
+
+Permissions: read-only tools are always allowed. `write` and `bash` ask in interactive mode, are denied in headless readonly mode, and are allowed with `--auto`.
+
+## Development
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-## How it works
-
-```
-clients (CLI / Web / Desktop / CI)
-        │  OpenAPI + SSE
-        ▼
-server (Hono) ── sessions, permissions, checks
-        │
-        ▼
-core (event-sourced kernel) ── SQLite-backed store later
-```
-
-Every session is an append-only event stream. Clients can replay from any sequence number, which is what makes resume, multi-client continuity, and crash recovery possible without special cases.
-
-See:
-
-- [`docs/0001-product-thesis.md`](docs/0001-product-thesis.md)
-- [`docs/0002-architecture.md`](docs/0002-architecture.md)
-- [`docs/0003-license-and-governance.md`](docs/0003-license-and-governance.md)
-- [`docs/0004-roadmap.md`](docs/0004-roadmap.md)
+Architecture and roadmap: [`docs/`](docs).
 
 ## License
 

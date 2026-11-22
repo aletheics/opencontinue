@@ -45,6 +45,42 @@ export const SessionEvent = z.discriminatedUnion("type", [
     runId: z.string(),
     error: z.string(),
   }),
+  z.object({
+    ...eventBase,
+    type: z.literal("tool.started"),
+    runId: z.string(),
+    callId: z.string(),
+    name: z.string(),
+    input: z.unknown(),
+  }),
+  z.object({
+    ...eventBase,
+    type: z.literal("tool.completed"),
+    runId: z.string(),
+    callId: z.string(),
+    output: z.string(),
+  }),
+  z.object({
+    ...eventBase,
+    type: z.literal("tool.failed"),
+    runId: z.string(),
+    callId: z.string(),
+    error: z.string(),
+  }),
+  z.object({
+    ...eventBase,
+    type: z.literal("permission.requested"),
+    requestId: z.string(),
+    tool: z.string(),
+    capability: z.enum(["read", "write", "execute"]),
+    input: z.unknown(),
+  }),
+  z.object({
+    ...eventBase,
+    type: z.literal("permission.resolved"),
+    requestId: z.string(),
+    approved: z.boolean(),
+  }),
 ])
 export type SessionEvent = z.infer<typeof SessionEvent>
 
@@ -57,6 +93,11 @@ export const SendMessageRequest = z.object({
   text: z.string().min(1),
 })
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>
+
+export const PermissionDecisionRequest = z.object({
+  approved: z.boolean(),
+})
+export type PermissionDecisionRequest = z.infer<typeof PermissionDecisionRequest>
 
 export const SessionSummary = z.object({
   id: SessionId,

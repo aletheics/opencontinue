@@ -18,6 +18,7 @@
     "@opencontinue/core": "0.0.1",
     "@opencontinue/protocol": "0.0.1",
     "@opencontinue/providers": "0.0.1",
+    "@opencontinue/tools": "0.0.1",
     "hono": "^4.6.14"
   }
 }

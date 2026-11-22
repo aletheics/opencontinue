@@ -6,12 +6,15 @@ import { streamSSE } from "hono/streaming"
 import { SessionStore } from "@opencontinue/core"
 import {
   CreateSessionRequest,
+  PermissionDecisionRequest,
   SendMessageRequest,
   type SessionEvent,
 } from "@opencontinue/protocol"
 import { createProviderFromEnv, type ChatProvider } from "@opencontinue/providers"
+import { ToolRegistry } from "@opencontinue/tools"
 
 import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
+import { PermissionBroker, type PermissionMode } from "./permissions.js"
 
 export type StartServerOptions = {
   store?: SessionStore
@@ -19,6 +22,9 @@ export type StartServerOptions = {
   hostname?: string
   provider?: ChatProvider
   systemPrompt?: string
+  tools?: ToolRegistry
+  permissionMode?: PermissionMode
+  workspace?: string
 }
 
 export type RunningServer = {
@@ -27,6 +33,8 @@ export type RunningServer = {
   server: ServerType
   port: number
   provider: ChatProvider
+  permissionMode: PermissionMode
+  workspace: string
   warning?: string
 }
 
@@ -34,6 +42,9 @@ export function createApp(
   store: SessionStore,
   provider: ChatProvider,
   systemPrompt: string,
+  tools: ToolRegistry,
+  permissions: PermissionBroker,
+  workspace: string,
 ): Hono {
   const app = new Hono()
 
@@ -67,8 +78,30 @@ export function createApp(
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
 
     store.append(sessionId, { type: "message.user", text: parsed.data.text })
-    void runAgent({ store, sessionId, provider, systemPrompt })
+    void runAgent({
+      store,
+      sessionId,
+      provider,
+      systemPrompt,
+      tools,
+      permissions,
+      workspace,
+    })
     return c.json({ accepted: true }, 202)
+  })
+
+  app.post("/v1/sessions/:id/permissions/:requestId", async (c) => {
+    const body = await c.req.json().catch(() => ({}))
+    const parsed = PermissionDecisionRequest.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+
+    const resolved = permissions.resolve(
+      c.req.param("requestId"),
+      parsed.data.approved,
+      c.req.param("id"),
+    )
+    if (!resolved) return c.json({ error: "permission request not found" }, 404)
+    return c.json({ ok: true })
   })
 
   app.get("/v1/sessions/:id/events", async (c) => {
@@ -120,8 +153,12 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     : createProviderFromEnv()
   const systemPrompt =
     options.systemPrompt ?? process.env.OPENCONTINUE_SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT
+  const tools = options.tools ?? new ToolRegistry()
+  const permissionMode = options.permissionMode ?? "ask"
+  const workspace = options.workspace ?? process.cwd()
+  const permissions = new PermissionBroker(store, permissionMode)
 
-  const app = createApp(store, selection.provider, systemPrompt)
+  const app = createApp(store, selection.provider, systemPrompt, tools, permissions, workspace)
   const port = options.port ?? Number(process.env.OPENCONTINUE_PORT ?? 8787)
   const server = serve({
     fetch: app.fetch,
@@ -135,6 +172,8 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     server,
     port,
     provider: selection.provider,
+    permissionMode,
+    workspace,
     warning: selection.warning,
   }
 }

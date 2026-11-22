@@ -1,55 +1,119 @@
 import { randomUUID } from "node:crypto"
 
 import type { SessionStore } from "@opencontinue/core"
-import type { ChatMessage, ChatProvider } from "@opencontinue/providers"
+import type { ChatMessage, ChatProvider, ToolCall } from "@opencontinue/providers"
+import type { PermissionGate, ToolRegistry } from "@opencontinue/tools"
+
+import { projectHistory } from "./history.js"
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "You are OpenContinue, a concise coding assistant. Be concrete. Answer in the user's language."
+  "You are OpenContinue, a concise coding assistant. Be concrete. Use the available tools when they help. Answer in the user's language."
+
+const DEFAULT_MAX_STEPS = 12
 
 export type RunAgentOptions = {
   store: SessionStore
   sessionId: string
   provider: ChatProvider
+  tools: ToolRegistry
+  permissions: PermissionGate
+  workspace: string
   systemPrompt?: string
   signal?: AbortSignal
+  maxSteps?: number
 }
 
 /**
- * One run: take the current session projection, stream the provider response,
- * and append every delta as a durable event. Tool calls will join this loop in
- * the next milestone.
+ * One run: rebuild history, stream the model, execute tool calls, repeat until
+ * the model answers without tools. Every step is durable in the event log.
  */
 export async function runAgent(options: RunAgentOptions): Promise<void> {
-  const { store, sessionId, provider, systemPrompt, signal } = options
+  const { store, sessionId, provider, tools, permissions, workspace, systemPrompt, signal } = options
 
-  const snapshot = store.snapshot(sessionId)
-  if (!snapshot) throw new Error(`Session not found: ${sessionId}`)
-
-  const messages: ChatMessage[] = []
-  if (systemPrompt) messages.push({ role: "system", content: systemPrompt })
-  for (const message of snapshot.messages) {
-    messages.push({ role: message.role, content: message.text })
-  }
+  const history = projectHistory(store.events(sessionId))
+  if (systemPrompt) history.unshift({ role: "system", content: systemPrompt })
 
   const runId = randomUUID()
 
   try {
     store.append(sessionId, { type: "run.started", runId })
 
-    let produced = false
-    for await (const chunk of provider.streamChat({
-      model: provider.model,
-      messages,
-      signal,
-    })) {
-      produced = true
-      store.append(sessionId, { type: "message.assistant.delta", runId, text: chunk })
+    const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
+    let finished = false
+
+    for (let step = 0; step < maxSteps; step++) {
+      let text = ""
+      const calls: ToolCall[] = []
+
+      for await (const event of provider.streamChat({
+        model: provider.model,
+        messages: history,
+        tools: tools.definitions(),
+        signal,
+      })) {
+        if (event.type === "text") {
+          text += event.text
+          store.append(sessionId, { type: "message.assistant.delta", runId, text: event.text })
+        } else {
+          calls.push(event.call)
+        }
+      }
+
+      if (text === "" && calls.length === 0) {
+        store.append(sessionId, { type: "message.assistant.delta", runId, text: "(empty response)" })
+      }
+
+      const assistant: ChatMessage = {
+        role: "assistant",
+        content: text,
+        ...(calls.length ? { toolCalls: calls } : {}),
+      }
+      history.push(assistant)
+
+      if (calls.length === 0) {
+        finished = true
+        break
+      }
+
+      for (const call of calls) {
+        store.append(sessionId, {
+          type: "tool.started",
+          runId,
+          callId: call.id,
+          name: call.name,
+          input: parseArguments(call.arguments),
+        })
+      }
+
+      for (const call of calls) {
+        const result = await tools.execute(
+          call.name,
+          call.arguments,
+          { workspace, sessionId, signal },
+          permissions,
+        )
+
+        if (result.ok) {
+          store.append(sessionId, {
+            type: "tool.completed",
+            runId,
+            callId: call.id,
+            output: result.output,
+          })
+          history.push({ role: "tool", toolCallId: call.id, content: result.output })
+        } else {
+          store.append(sessionId, {
+            type: "tool.failed",
+            runId,
+            callId: call.id,
+            error: result.error,
+          })
+          history.push({ role: "tool", toolCallId: call.id, content: `Error: ${result.error}` })
+        }
+      }
     }
 
-    if (!produced) {
-      store.append(sessionId, { type: "message.assistant.delta", runId, text: "(empty response)" })
-    }
-
+    if (!finished) throw new Error("Maximum tool steps reached")
     store.append(sessionId, { type: "run.completed", runId })
   } catch (error) {
     store.append(sessionId, {
@@ -57,5 +121,13 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
       runId,
       error: error instanceof Error ? error.message : String(error),
     })
+  }
+}
+
+function parseArguments(value: string): unknown {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
   }
 }

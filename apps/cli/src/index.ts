@@ -14,11 +14,16 @@ import { closeServer, startServer } from "@opencontinue/server"
 const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
 if (existsSync(envPath)) loadEnvFile(envPath)
 
+type PermissionMode = "ask" | "auto" | "readonly"
+type PermissionRequestEvent = Extract<SessionEvent, { type: "permission.requested" }>
+
 type ChatOptions = {
   print?: boolean
   url?: string
   port?: string
   resume?: string
+  auto?: boolean
+  readonly?: boolean
 }
 
 async function request<T>(baseUrl: string, path: string, init: RequestInit = {}): Promise<T> {
@@ -43,6 +48,7 @@ class SessionClient {
     private readonly baseUrl: string,
     private readonly sessionId: string,
     private readonly onDelta: (text: string) => void,
+    private readonly onPermission?: (event: PermissionRequestEvent) => void | Promise<void>,
   ) {
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve
@@ -115,6 +121,18 @@ class SessionClient {
       this.onDelta(event.text)
       return
     }
+    if (event.type === "tool.started") {
+      this.onDelta(`\n[tool] ${event.name}\n`)
+      return
+    }
+    if (event.type === "tool.failed") {
+      this.onDelta(`[tool failed] ${event.error}\n`)
+      return
+    }
+    if (event.type === "permission.requested") {
+      void this.onPermission?.(event)
+      return
+    }
     if (event.type === "run.completed") {
       this.onDelta("\n")
       this.pending?.resolve()
@@ -144,8 +162,15 @@ class SessionClient {
   }
 }
 
+function permissionMode(options: ChatOptions, headless = false): PermissionMode {
+  if (options.auto) return "auto"
+  if (options.readonly) return "readonly"
+  return headless ? "readonly" : "ask"
+}
+
 async function withServer(
   options: ChatOptions,
+  mode: PermissionMode,
   run: (baseUrl: string) => Promise<void>,
 ): Promise<void> {
   if (options.url) {
@@ -154,10 +179,12 @@ async function withServer(
   }
 
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
-  const running = startServer({ store: new SessionStore(), port })
+  const workspace = process.env.INIT_CWD ?? process.cwd()
+  const running = startServer({ store: new SessionStore(), port, permissionMode: mode, workspace })
   console.log(`embedded server on http://127.0.0.1:${running.port}`)
   if (running.warning) console.warn(`provider: ${running.warning}`)
   else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
+  console.log(`permissions: ${running.permissionMode}`)
   try {
     await run(`http://127.0.0.1:${running.port}`)
   } finally {
@@ -166,7 +193,7 @@ async function withServer(
 }
 
 async function chat(options: ChatOptions): Promise<void> {
-  await withServer(options, async (baseUrl) => {
+  await withServer(options, permissionMode(options), async (baseUrl) => {
     let sessionId = options.resume
     if (!sessionId) {
       const created = await request<SessionSnapshot>(baseUrl, "/v1/sessions", {
@@ -175,11 +202,33 @@ async function chat(options: ChatOptions): Promise<void> {
       })
       sessionId = created.id
     }
+    const activeSessionId = sessionId
 
-    const client = new SessionClient(baseUrl, sessionId, (text) => process.stdout.write(text))
     const rl = createInterface({ input: process.stdin, output: process.stdout })
+    const client = new SessionClient(
+      baseUrl,
+      activeSessionId,
+      (text) => process.stdout.write(text),
+      async (event) => {
+        const answer = await rl.question(
+          `\n[permission] ${event.tool} ${JSON.stringify(event.input)}\nAllow? [y/N] `,
+        )
+        try {
+          await request(
+            baseUrl,
+            `/v1/sessions/${activeSessionId}/permissions/${event.requestId}`,
+            {
+              method: "POST",
+              body: JSON.stringify({ approved: /^y/i.test(answer.trim()) }),
+            },
+          )
+        } catch {
+          // The run will fail closed if the decision cannot be delivered.
+        }
+      },
+    )
 
-    console.log(`OpenContinue session ${sessionId}`)
+    console.log(`OpenContinue session ${activeSessionId}`)
     console.log("Type /exit to quit.\n")
 
     try {
@@ -205,15 +254,25 @@ async function chat(options: ChatOptions): Promise<void> {
 async function printOnce(prompt: string, options: ChatOptions): Promise<void> {
   if (!prompt.trim()) throw new Error("A prompt is required with --print")
 
-  await withServer(options, async (baseUrl) => {
+  await withServer(options, permissionMode(options, true), async (baseUrl) => {
     const created = await request<SessionSnapshot>(baseUrl, "/v1/sessions", {
       method: "POST",
       body: "{}",
     })
     let output = ""
-    const client = new SessionClient(baseUrl, created.id, (text) => {
-      output += text
-    })
+    const client = new SessionClient(
+      baseUrl,
+      created.id,
+      (text) => {
+        output += text
+      },
+      async (event) => {
+        await request(baseUrl, `/v1/sessions/${created.id}/permissions/${event.requestId}`, {
+          method: "POST",
+          body: JSON.stringify({ approved: false }),
+        }).catch(() => {})
+      },
+    )
     try {
       await client.send(prompt)
     } finally {
@@ -223,12 +282,22 @@ async function printOnce(prompt: string, options: ChatOptions): Promise<void> {
   })
 }
 
-async function serveCommand(options: { port?: string }): Promise<void> {
+async function serveCommand(options: {
+  port?: string
+  auto?: boolean
+  readonly?: boolean
+}): Promise<void> {
+  if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
+
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
-  const running = startServer({ store: new SessionStore(), port })
+  const mode: PermissionMode = options.auto ? "auto" : options.readonly ? "readonly" : "ask"
+  const workspace = process.env.INIT_CWD ?? process.cwd()
+  const running = startServer({ store: new SessionStore(), port, permissionMode: mode, workspace })
   console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)
   if (running.warning) console.warn(`provider: ${running.warning}`)
   else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
+  console.log(`workspace: ${running.workspace}`)
+  console.log(`permissions: ${running.permissionMode}`)
 
   const shutdown = async () => {
     console.log("\nShutting down...")
@@ -265,7 +334,10 @@ program
   .option("--url <url>", "Connect to a running server")
   .option("--port <port>", "Port for the embedded server", "8787")
   .option("--resume <id>", "Resume an existing session")
+  .option("--auto", "Allow write and shell tools without approval")
+  .option("--readonly", "Deny write and shell tools")
   .action(async (prompt: string | undefined, options: ChatOptions) => {
+    if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
     if (options.print || prompt) await printOnce(prompt ?? "", options)
     else await chat(options)
   })
@@ -274,6 +346,8 @@ program
   .command("serve")
   .description("Start the HTTP/SSE server")
   .option("--port <port>", "Port to listen on", "8787")
+  .option("--auto", "Allow write and shell tools without approval")
+  .option("--readonly", "Deny write and shell tools")
   .action(serveCommand)
 
 program
