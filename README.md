@@ -40,6 +40,15 @@ Show the current configuration:
 npm run dev -- config
 ```
 
+Import existing provider settings:
+
+```bash
+npm run dev -- import continue
+npm run dev -- import opencode
+```
+
+Imports map to OpenContinue's OpenAI-compatible provider. Anthropic-native endpoints need an OpenAI-compatible proxy.
+
 For CI and containers, environment variables override the files:
 
 ```dotenv

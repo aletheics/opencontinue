@@ -16,6 +16,8 @@
     "@opencontinue/providers": "0.0.1",
     "@opencontinue/server": "0.0.1",
     "@opencontinue/tools": "0.0.1",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "jsonc-parser": "^3.3.1",
+    "yaml": "^2.6.0"
   }
 }

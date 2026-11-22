@@ -39,6 +39,7 @@ Do not copy wholesale. If code is adapted, keep attribution in [NOTICE](NOTICE).
 | `apps/server` | HTTP/SSE server, agent loop, permission broker |
 | `apps/cli` | Interactive and headless CLI |
 | `apps/cli/src/checks.ts` | Worktree-isolated checks and patch capture |
+| `apps/cli/src/import.ts` | Continue and OpenCode config import |
 | `actions/check` | Reusable GitHub Action for checks |
 
 ## Rules

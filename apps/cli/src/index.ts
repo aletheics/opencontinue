@@ -20,6 +20,7 @@ import {
   runChecks,
   summarizeResults,
 } from "./checks.js"
+import { importCommand } from "./import.js"
 import { configCommand, setupCommand } from "./setup.js"
 
 const envPath = fileURLToPath(new URL("../../../.env", import.meta.url))
@@ -442,6 +443,13 @@ program
   .command("config")
   .description("Show provider configuration")
   .action(configCommand)
+
+program
+  .command("import <source>")
+  .description("Import provider settings from Continue or OpenCode")
+  .option("--path <path>", "Config file path")
+  .option("--yes", "Apply without confirmation")
+  .action(importCommand)
 
 program
   .command("check")
