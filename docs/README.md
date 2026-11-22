@@ -8,5 +8,6 @@
 - [0003-license-and-governance.md](0003-license-and-governance.md)
 - [0004-roadmap.md](0004-roadmap.md)
 - [providers.md](providers.md) — supported providers and endpoints
+- [architecture/](architecture) — folder map and dependency rules
 - [adr/](adr) — architecture decision records
 - [actions/check](../actions/check) — reusable GitHub Action

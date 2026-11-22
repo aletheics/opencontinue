@@ -48,6 +48,8 @@ Boundaries:
 
 The event contract is append-only. New behavior adds events; it does not rename or reuse them.
 
+The boundary is explicit: [folder map](docs/architecture/folders.md) and [dependency rules](docs/architecture/dependency-rules.md). `scripts/validate-boundaries.test.ts` fails CI on a forbidden import. Adding a folder or changing a dependency direction requires a README and an ADR.
+
 Reference implementations (read-only):
 
 - OpenCode: `D:\soft\vscodefiles\continue\opencode` (MIT)

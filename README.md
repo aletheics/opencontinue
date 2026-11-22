@@ -95,7 +95,8 @@ Use [`actions/check`](actions/check) on pull requests. Checkout with `fetch-dept
 
 - [BLUEPRINT.md](BLUEPRINT.md) — direction, milestones, and the spiral development process
 - [AGENTS.md](AGENTS.md) — rules for AI agents and contributors
-- [docs/](docs) — architecture, roadmap, and ADRs
+- [docs/architecture/](docs/architecture) — folder map and dependency rules
+- [docs/](docs) — providers, roadmap, and ADRs
 - [.opencontinue/](.opencontinue) — project constraints, agents, commands, and skills
 
 ## Contributing

@@ -5,8 +5,10 @@ Guidance for AI coding agents and contributors.
 ## Read first
 
 1. [BLUEPRINT.md](BLUEPRINT.md) — canonical plan and milestone ladder.
-2. [docs/0002-architecture.md](docs/0002-architecture.md) — event model and boundaries.
-3. [docs/adr/](docs/adr) — accepted decisions.
+2. [docs/architecture/folders.md](docs/architecture/folders.md) — what every folder owns.
+3. [docs/architecture/dependency-rules.md](docs/architecture/dependency-rules.md) — allowed import directions.
+4. [docs/0002-architecture.md](docs/0002-architecture.md) — event model and boundaries.
+5. [docs/adr/](docs/adr) — accepted decisions.
 
 ## Project constraints
 
@@ -49,6 +51,8 @@ Do not copy wholesale. If code is adapted, keep attribution in [NOTICE](NOTICE).
 - TypeScript strict. No `any` unless there is no alternative.
 - One vertical slice per PR. Do not mix unrelated refactors.
 - Every behavior change needs a test. Update docs or an ADR when the contract or scope changes.
+- Add or change a folder only with a README, an update to [folders.md](docs/architecture/folders.md), and [dependency-rules.md](docs/architecture/dependency-rules.md).
+- Keep package boundaries: packages never import apps; clients never import the server. `scripts/validate-boundaries.test.ts` enforces this.
 - The public event contract is append-only. Add events; do not rename or reuse existing ones without a migration.
 - Keep the code smaller and more direct than the reference implementation. Readability beats cleverness.
 - Never commit `.env`, secrets, `node_modules`, or generated artifacts.
