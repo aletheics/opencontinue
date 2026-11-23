@@ -108,7 +108,7 @@ Rules:
 ### M5 — clients (in progress)
 
 - [x] TUI: API key entry, model selection, streaming chat, permission prompts.
-- [x] TUI: full-screen line-buffer frame, keybindings, slash commands with a filterable menu, diffs, usage, type-to-filter pickers, markdown-style assistant output, session resume picker, permission dialog with per-session tool memory.
+- [x] TUI: full-screen line-buffer frame, keybindings, slash commands with a filterable menu, diffs, usage, type-to-filter pickers, markdown-style assistant output, session resume picker, permission dialog with per-session tool memory, cursor-aware multi-line input.
 - [ ] Minimal web client over the same SSE stream.
 - Out of scope: full IDE features.
 

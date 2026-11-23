@@ -130,6 +130,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [input, setInput] = useState("")
+  const [cursor, setCursor] = useState(0)
   const [slashIndex, setSlashIndex] = useState(0)
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(0)
@@ -456,11 +457,16 @@ export function App({ options }: { options: TuiOptions }) {
     }
   }
 
+  const setDraft = (value: string, at = value.length) => {
+    setInput(value)
+    setCursor(Math.max(0, Math.min(at, value.length)))
+  }
+
   const send = (value: string) => {
     const text = value.trim()
     if (!text) return
     if (text.startsWith("/")) {
-      setInput("")
+      setDraft("")
       setHistory((items) => [...items, text])
       setHistoryIndex(-1)
       handleCommand(text)
@@ -472,7 +478,7 @@ export function App({ options }: { options: TuiOptions }) {
     const provider = providerRef.current
     if (!store || !sessionId || !provider || busy) return
 
-    setInput("")
+    setDraft("")
     setHistory((items) => [...items, text])
     setHistoryIndex(-1)
     setScrollOffset(0)
@@ -627,11 +633,11 @@ export function App({ options }: { options: TuiOptions }) {
         return
       }
       if (key.tab && !key.shift) {
-        setInput(slashMatches[activeSlashIndex]?.name ?? input)
+        setDraft(slashMatches[activeSlashIndex]?.name ?? input)
         return
       }
       if (key.escape) {
-        setInput("")
+        setDraft("")
         return
       }
     }
@@ -647,22 +653,24 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (key.upArrow) {
+      if (input.includes("\n")) return
       if (history.length === 0) return
       const next = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1)
       setHistoryIndex(next)
-      setInput(history[next] ?? "")
+      setDraft(history[next] ?? "")
       return
     }
 
     if (key.downArrow) {
+      if (input.includes("\n")) return
       if (historyIndex < 0) return
       const next = historyIndex + 1
       if (next >= history.length) {
         setHistoryIndex(-1)
-        setInput("")
+        setDraft("")
       } else {
         setHistoryIndex(next)
-        setInput(history[next] ?? "")
+        setDraft(history[next] ?? "")
       }
       return
     }
@@ -700,7 +708,7 @@ export function App({ options }: { options: TuiOptions }) {
             : "Ctrl+C exit"
 
   const slashQuery =
-    screen === "chat" && input.startsWith("/") && !input.includes(" ")
+    screen === "chat" && input.startsWith("/") && !/\s/.test(input)
       ? (input.split(/\s+/)[0] ?? "/")
       : ""
   const slashMatches = slashQuery
@@ -720,8 +728,12 @@ export function App({ options }: { options: TuiOptions }) {
   const footerLine = footerText.slice(0, Math.max(10, columns - 2))
 
   const maxInputHeight = Math.max(3, rows - 8 - menuHeight)
+  const inputLines = input.split("\n").length
+  const desiredInputHeight = permission
+    ? 5
+    : Math.min(6, Math.max(3, inputLines + 2))
   const inputHeight =
-    screen === "chat" ? Math.min(permission ? 5 : 3, maxInputHeight) : 0
+    screen === "chat" ? Math.min(desiredInputHeight, maxInputHeight) : 0
   const bodyHeight = Math.max(4, rows - 3 - inputHeight - menuHeight - 1)
 
   const submitInput = (value: string) => {
@@ -877,7 +889,9 @@ export function App({ options }: { options: TuiOptions }) {
           columns={columns}
           height={inputHeight}
           input={input}
-          onInput={setInput}
+          cursor={cursor}
+          menuOpen={menuOpen}
+          onInput={setDraft}
           onSubmit={submitInput}
           permission={permission}
           busy={busy}
@@ -894,13 +908,9 @@ export function App({ options }: { options: TuiOptions }) {
 }
 
 export async function runTui(options: TuiOptions = {}): Promise<void> {
-  const fullscreen = Boolean(process.stdout.isTTY)
-  if (fullscreen) process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H")
-
-  try {
-    const instance = render(<App options={options} />)
-    await instance.waitUntilExit()
-  } finally {
-    if (fullscreen) process.stdout.write("\x1b[?1049l")
-  }
+  const instance = render(<App options={options} />, {
+    alternateScreen: Boolean(process.stdout.isTTY),
+    kittyKeyboard: { mode: "auto" },
+  })
+  await instance.waitUntilExit()
 }

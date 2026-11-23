@@ -1,13 +1,15 @@
 import { Box, Text } from "ink"
-import TextInput from "ink-text-input"
 
 import { theme } from "../theme.js"
+import { Input } from "./Input.js"
 
 export type PromptProps = {
   columns: number
   height: number
   input: string
-  onInput: (value: string) => void
+  cursor: number
+  menuOpen: boolean
+  onInput: (value: string, cursor: number) => void
   onSubmit: (value: string) => void
   permission: { tool: string; detail: string } | null
   busy: boolean
@@ -18,6 +20,8 @@ export function Prompt({
   columns,
   height,
   input,
+  cursor,
+  menuOpen,
   onInput,
   onSubmit,
   permission,
@@ -49,16 +53,16 @@ export function Prompt({
           {spinner} Thinking…
         </Text>
       ) : (
-        <Box width={Math.max(10, columns - 8)} overflow="hidden">
-          <Text color={theme.user}>{"you> "}</Text>
-          <TextInput
-            value={input}
-            onChange={onInput}
-            onSubmit={onSubmit}
-            placeholder="Type a message…"
-            focus
-          />
-        </Box>
+        <Input
+          value={input}
+          cursor={cursor}
+          width={Math.max(8, columns - 9)}
+          rows={Math.max(1, height - 2)}
+          placeholder="Type a message…"
+          menuOpen={menuOpen}
+          onChange={onInput}
+          onSubmit={onSubmit}
+        />
       )}
     </Box>
   )
