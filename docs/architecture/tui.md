@@ -13,7 +13,8 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 
 ## What OpenContinue adopts
 
-- **Inline Claude Code-style transcript**, not a full-screen dashboard. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
+- **Inline Claude Code-style transcript**, not a full-screen dashboard. A startup banner shows an original block mark, version, model/provider, workspace, and a welcome line.
+- The mode line ends with `· ← 1 agent` while a session is attached. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
 - No header bar, no bordered transcript, no bordered input. The only box is the permission dialog.
 - Tool blocks: `● Tool(args)` with wrapped continuation aligned under the call, `⎿` output lines, colored diff lines, and `… +N lines (ctrl+o to expand)`.
 - User prompts: `❯ text` with two-space continuation. Assistant text: markdown-style headings, lists, quotes, and fenced code.

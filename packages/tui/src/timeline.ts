@@ -45,6 +45,15 @@ export type MetaTimelineItem = {
   text: string
 }
 
+export type BannerTimelineItem = {
+  kind: "banner"
+  id: string
+  version: string
+  model: string
+  provider: string
+  workspace: string
+}
+
 export type TimelineItem =
   | UserTimelineItem
   | AssistantTimelineItem
@@ -52,6 +61,7 @@ export type TimelineItem =
   | UsageTimelineItem
   | SystemTimelineItem
   | MetaTimelineItem
+  | BannerTimelineItem
 
 export function reduceTimeline(items: TimelineItem[], event: SessionEvent): TimelineItem[] {
   if (event.type === "message.user") {

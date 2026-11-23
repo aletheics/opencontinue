@@ -263,6 +263,14 @@ export function timelineLines(
   for (const item of items) {
     if (item.kind === "usage") continue
 
+    if (item.kind === "banner") {
+      lines.push({ text: `OpenContinue v${item.version}`, color: theme.brand, bold: true })
+      lines.push({ text: `${item.model} · ${item.provider}`, dim: true })
+      lines.push({ text: item.workspace, dim: true })
+      lines.push({ text: "", dim: true })
+      continue
+    }
+
     if (item.kind === "meta") {
       for (const line of wrapText(item.text, width)) lines.push({ text: line, dim: true })
       continue

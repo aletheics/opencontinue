@@ -599,6 +599,9 @@ describe("TUI", () => {
 
       stdin.write("\r")
       await ready(lastFrame)
+      expect(output(frames)).toContain("OpenContinue v0.0.1")
+      expect(output(frames)).toContain("gpt-6.2 · OpenAI (GPT)")
+      expect(lastFrame()).toContain("← 1 agent")
 
       stdin.write("hi")
       await vi.waitFor(() => {

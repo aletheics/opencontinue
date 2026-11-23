@@ -2,9 +2,9 @@
 
 **Why:** a terminal client should be a package, not a mode inside the CLI.
 
-**Owns:** an inline Claude Code-style terminal UI: completed transcript written to terminal scrollback through Ink `Static`, `❯` prompts, `● Tool(args)` blocks, `⎿` output, colored diffs, compact output hints, `✻` thinking/completion lines, `⏵⏵` permission-mode line, queued messages, provider/model/session pickers, permission dialogs with preview diffs, markdown-style assistant output, cursor-aware multi-line input, `ctrl+r` history search, `@file` completion, and a workspace/git status line. There is no alternate screen and no bordered body/input.
+**Owns:** an inline Claude Code-style terminal UI: a startup banner with logo, version, model/provider, workspace, and welcome line; completed transcript written to terminal scrollback through Ink `Static`, `❯` prompts, `● Tool(args)` blocks, `⎿` output, colored diffs, compact output hints, `✻` thinking/completion lines, `⏵⏵` permission-mode line, queued messages, provider/model/session pickers, permission dialogs with preview diffs, markdown-style assistant output, cursor-aware multi-line input, `ctrl+r` history search, `@file` completion, and a workspace/git status line. There is no alternate screen and no bordered body/input.
 
-**Files:** `index.tsx` owns state, screens, and event wiring; `components/` holds Transcript, Picker, Prompt, Input, SlashMenu, and PermissionPrompt; `input.ts` holds pure editing math; `render.ts` formats inline tool blocks and the `ctrl+o` transcript; `timeline.ts` reduces session events; `theme.ts` holds color tokens.
+**Files:** `index.tsx` owns state, screens, and event wiring; `components/` holds Welcome, Transcript, Picker, Prompt, Input, SlashMenu, and PermissionPrompt; `input.ts` holds pure editing math; `render.ts` formats inline tool blocks and the `ctrl+o` transcript; `timeline.ts` reduces session events; `theme.ts` holds color tokens.
 
 **Public API:** `runTui`, `App`.
 
@@ -16,6 +16,6 @@
 
 **Slash commands:** `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/status`, `/exit`.
 
-**Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, slash-menu filtering and completion, key entry, session resume labels, the permission dialog with a preview diff, `ctrl+r` history search, `@file` completion, the workspace/git status line, the full provider → model → chat loop, and repeated help output; `src/input.test.ts` covers cursor editing and viewport math; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, tool headers, diff colorization, and output collapsing.
+**Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, slash-menu filtering and completion, key entry, session resume labels, the permission dialog with a preview diff, `ctrl+r` history search, `@file` completion, the workspace/git status line, the welcome banner, the full provider → model → chat loop, and repeated help output; `src/input.test.ts` covers cursor editing and viewport math; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, tool headers, diff colorization, and output collapsing.
 
 **Transport:** the App uses `OpenContinueClient`. It defaults to `LocalSessionClient` from `@opencontinue/local-client`; `--url` selects `HttpSessionClient` and lets the server own provider/model/transcript state. It never calls `runAgent` or owns a permission gate.

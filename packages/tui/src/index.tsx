@@ -42,6 +42,8 @@ import { reduceTimeline, type TimelineItem } from "./timeline.js"
 
 type PermissionMode = "ask" | "auto" | "readonly"
 
+const VERSION = "0.0.1"
+
 type PermissionPromptState = {
   requestId: string
   tool: string
@@ -160,7 +162,14 @@ function isCommittedItem(
   busy: boolean,
 ): boolean {
   if (item.kind === "usage") return false
-  if (item.kind === "user" || item.kind === "system" || item.kind === "meta") return true
+  if (
+    item.kind === "user" ||
+    item.kind === "system" ||
+    item.kind === "meta" ||
+    item.kind === "banner"
+  ) {
+    return true
+  }
   if (item.kind === "tool") return item.status !== "running"
   if (item.kind === "assistant") {
     if (!busy) return true
@@ -520,13 +529,27 @@ export function App({ options }: { options: TuiOptions }) {
     })
   }
 
-  const attachSession = (client: OpenContinueClient, sessionId: string) => {
+  const attachSession = (
+    client: OpenContinueClient,
+    sessionId: string,
+    bannerModel: string,
+    bannerProvider: string,
+  ) => {
     clientRef.current = client
     sessionRef.current = sessionId
     subscriptionRef.current?.close()
     allowedToolsRef.current = new Set()
     setPermission(null)
-    setTimeline([])
+    setTimeline([
+      {
+        kind: "banner",
+        id: `banner:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        version: VERSION,
+        model: bannerModel,
+        provider: bannerProvider,
+        workspace,
+      },
+    ])
     setTranscriptKey((key) => key + 1)
     setTranscriptScroll(0)
     setTranscriptMode(false)
@@ -582,7 +605,7 @@ export function App({ options }: { options: TuiOptions }) {
       const session = sessionId
         ? { id: sessionId }
         : await client.createSession("OpenContinue TUI")
-      attachSession(client, session.id)
+      attachSession(client, session.id, "remote", "server")
       setModel("remote")
       setScreen("chat")
     })().catch((cause) => {
@@ -602,7 +625,12 @@ export function App({ options }: { options: TuiOptions }) {
 
     void (async () => {
       const session = await client.createSession("OpenContinue TUI")
-      attachSession(client, session.id)
+      attachSession(
+        client,
+        session.id,
+        options.url ? "remote" : model,
+        options.url ? "server" : (preset?.label ?? initial.provider ?? "configured provider"),
+      )
       appendSystem("Started a new session.")
     })().catch((error) => {
       appendSystem(`Could not create a session: ${error instanceof Error ? error.message : String(error)}`)
@@ -648,7 +676,12 @@ export function App({ options }: { options: TuiOptions }) {
     const client = clientRef.current
     const chosen = filteredSessions[sessionIndex]
     if (!client || !chosen) return
-    attachSession(client, chosen.id)
+    attachSession(
+      client,
+      chosen.id,
+      options.url ? "remote" : model,
+      options.url ? "server" : (preset?.label ?? initial.provider ?? "configured provider"),
+    )
     setSessionQuery("")
     setScreen("chat")
   }
@@ -771,7 +804,12 @@ export function App({ options }: { options: TuiOptions }) {
         const session = sessionId
           ? { id: sessionId }
           : await client.createSession("OpenContinue TUI")
-        attachSession(client, session.id)
+        attachSession(
+          client,
+          session.id,
+          chosen,
+          preset.label,
+        )
         setScreen("chat")
       })().catch((cause) => {
         setError(cause instanceof Error ? cause.message : String(cause))
@@ -834,7 +872,10 @@ export function App({ options }: { options: TuiOptions }) {
 
     const client = clientRef.current
     const sessionId = sessionRef.current
-    if (!client || !sessionId) return
+    if (!client || !sessionId) {
+      appendSystem("Not connected to a session yet.")
+      return
+    }
 
     if (busy) {
       queuedRef.current.push(text)
@@ -1154,13 +1195,14 @@ export function App({ options }: { options: TuiOptions }) {
         ? "↑/↓ select · Tab complete · Enter run · Esc close"
         : null
 
+  const agentHint = sessionRef.current ? " · ← 1 agent" : ""
   const footerLeft = transcriptMode
     ? "↑/↓ scroll · PgUp/PgDn page · ctrl+o close"
     : screen === "chat"
       ? (menuHint ??
         (permission
           ? "y allow · a allow for session · n deny"
-          : modeText))
+          : `${modeText}${agentHint}`))
       : screen === "provider" || screen === "models" || screen === "sessions"
         ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
         : screen === "key" || screen === "baseurl"

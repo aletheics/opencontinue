@@ -9,6 +9,7 @@ import {
 } from "../render.js"
 import { theme } from "../theme.js"
 import type { TimelineItem, ToolTimelineItem } from "../timeline.js"
+import { Welcome } from "./Welcome.js"
 
 type PermissionMode = "ask" | "auto" | "readonly"
 
@@ -110,6 +111,18 @@ export function TranscriptItem({
   const width = Math.max(20, columns - 2)
 
   if (item.kind === "usage") return null
+
+  if (item.kind === "banner") {
+    return (
+      <Welcome
+        version={item.version}
+        model={item.model}
+        provider={item.provider}
+        workspace={item.workspace}
+        columns={columns}
+      />
+    )
+  }
 
   if (item.kind === "user") {
     return (
