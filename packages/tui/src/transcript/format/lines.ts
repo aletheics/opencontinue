@@ -3,7 +3,7 @@ import type { TimelineItem } from "../../timeline.js"
 import { assistantBlock } from "./assistant.js"
 import { formatDiffLines } from "./diff.js"
 import type { Line } from "./line.js"
-import { formatToolOutputLines, toolHeaderLines } from "./tool.js"
+import { formatToolOutputLines, toolHeaderLines, toolNotes } from "./tool.js"
 import { wrapPrefixed, wrapText } from "./wrap.js"
 
 /**
@@ -13,6 +13,7 @@ export function timelineLines(
   items: TimelineItem[],
   columns: number,
   expanded: boolean,
+  workspace?: string,
 ): Line[] {
   const width = Math.max(20, columns)
   const lines: Line[] = []
@@ -83,13 +84,21 @@ export function timelineLines(
           text: `${index === 0 ? "  ⎿  " : "     "}${line.text}`,
         })
       })
-    } else if (item.output) {
+    } else if (item.output?.trim()) {
       lines.push(...formatToolOutputLines(item.output, width, expanded))
+    } else if (item.status === "done" && !item.error) {
+      lines.push({ text: "  ⎿  (No output)", dim: true })
     }
 
     if (item.error) {
       for (const line of formatToolOutputLines(item.error, width, expanded)) {
         lines.push({ ...line, color: theme.error, dim: false })
+      }
+    }
+
+    if (item.status !== "running") {
+      for (const note of toolNotes(item, workspace)) {
+        lines.push({ text: `  ⎿  ${note}`, dim: true })
       }
     }
   }

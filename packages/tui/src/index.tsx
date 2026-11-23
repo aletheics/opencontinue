@@ -1220,7 +1220,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   const transcriptWidth = Math.max(20, columns - 2)
   const transcriptLines = transcriptMode
-    ? timelineLines(timeline, transcriptWidth, true)
+    ? timelineLines(timeline, transcriptWidth, true, workspace)
     : []
   lineCountRef.current = transcriptLines.length
   const transcriptPage = Math.max(1, rows - 6)
@@ -1239,6 +1239,7 @@ export function App({ options }: { options: TuiOptions }) {
             expanded={false}
             leading={index > 0}
             permissionMode={permissionMode}
+            workspace={workspace}
           />
         )}
       </Static>
@@ -1267,6 +1268,7 @@ export function App({ options }: { options: TuiOptions }) {
               leading={committed.length > 0}
               permissionMode={permissionMode}
               maxLines={Math.max(2, rows - 14)}
+              workspace={workspace}
             />
           ) : null}
 

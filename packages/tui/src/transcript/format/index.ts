@@ -8,5 +8,6 @@ export {
   toolArgumentSummary,
   toolDisplayName,
   toolHeaderLines,
+  toolNotes,
 } from "./tool.js"
 export { wrapPrefixed, wrapText } from "./wrap.js"

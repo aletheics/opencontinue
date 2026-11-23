@@ -229,6 +229,28 @@ describe("TUI", () => {
     expect(assistantFrame).toContain("● first")
     expect(assistantFrame).toContain("  second")
     assistant.unmount()
+
+    const empty = render(
+      <TranscriptItem
+        item={{
+          kind: "tool",
+          id: "tool:2",
+          runId: "run:1",
+          name: "bash",
+          input: { command: "true" },
+          status: "done",
+        }}
+        columns={80}
+        expanded={false}
+        leading={false}
+        permissionMode="auto"
+        workspace={"D:\\work"}
+      />,
+    )
+    const emptyFrame = empty.lastFrame() ?? ""
+    expect(emptyFrame).toContain("(No output)")
+    expect(emptyFrame).toContain("(timeout 2m)")
+    empty.unmount()
   })
 
   it("clips a long live assistant response to the viewport", () => {

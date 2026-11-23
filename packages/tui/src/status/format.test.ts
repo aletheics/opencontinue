@@ -31,5 +31,10 @@ describe("status format", () => {
     expect(formatDuration(59_400)).toBe("59s")
     expect(formatDuration(61_000)).toBe("1m 1s")
     expect(formatDuration(3_600_000 + 120_000)).toBe("1h 2m 0s")
+    expect(formatDuration(120_000, { hideTrailingZeros: true })).toBe("2m")
+    expect(
+      formatDuration(3_600_000 + 120_000, { hideTrailingZeros: true }),
+    ).toBe("1h 2m")
+    expect(formatDuration(90_000, { hideTrailingZeros: true })).toBe("1m 30s")
   })
 })

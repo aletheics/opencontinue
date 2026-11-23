@@ -5,6 +5,7 @@ import {
   formatDiffLines,
   formatToolOutputLines,
   toolHeaderLines,
+  toolNotes,
   wrapText,
 } from "../transcript/format/index.js"
 import { theme } from "../theme.js"
@@ -21,6 +22,7 @@ type TranscriptItemProps = {
   leading: boolean
   permissionMode?: PermissionMode
   maxLines?: number
+  workspace?: string
 }
 
 function ToolBlock({
@@ -29,13 +31,16 @@ function ToolBlock({
   expanded,
   leading,
   permissionMode,
+  workspace,
 }: {
   item: ToolTimelineItem
   columns: number
   expanded: boolean
   leading: boolean
   permissionMode?: PermissionMode
+  workspace?: string
 }) {
+  const hasOutput = Boolean(item.output?.trim())
   const width = Math.max(20, columns - 2)
   const header = toolHeaderLines(item, width)
   const dot =
@@ -76,13 +81,17 @@ function ToolBlock({
               </Text>
             ),
           )
-        : item.output
-          ? formatToolOutputLines(item.output, width, expanded).map((line, index) => (
-              <Text key={`out-${index}`} dimColor wrap="truncate">
-                {line.text}
-              </Text>
-            ))
-          : null}
+        : hasOutput
+          ? formatToolOutputLines(item.output ?? "", width, expanded).map(
+              (line, index) => <LineText key={`out-${index}`} line={line} />,
+            )
+          : item.status === "done" && !item.error
+            ? (
+                <Text dimColor wrap="truncate">
+                  {"  ⎿  (No output)"}
+                </Text>
+              )
+            : null}
 
       {item.error
         ? formatToolOutputLines(item.error, width, expanded).map((line, index) => (
@@ -91,6 +100,13 @@ function ToolBlock({
             </Text>
           ))
         : null}
+
+      {(item.status === "running" ? [] : toolNotes(item, workspace)).map((note) => (
+        <Text key={note} dimColor wrap="truncate">
+          {"  ⎿  "}
+          {note}
+        </Text>
+      ))}
 
       {permissionMode === "auto" &&
       item.status === "done" &&
@@ -110,6 +126,7 @@ export function TranscriptItem({
   leading,
   permissionMode,
   maxLines,
+  workspace,
 }: TranscriptItemProps) {
   const width = Math.max(20, columns - 2)
 
@@ -175,6 +192,7 @@ export function TranscriptItem({
         expanded={expanded}
         leading={leading}
         permissionMode={permissionMode}
+        workspace={workspace}
       />
     )
   }
@@ -207,6 +225,7 @@ export function Transcript({
   leading,
   permissionMode,
   maxLines,
+  workspace,
 }: {
   items: TimelineItem[]
   columns: number
@@ -214,6 +233,7 @@ export function Transcript({
   leading: boolean
   permissionMode?: PermissionMode
   maxLines?: number
+  workspace?: string
 }) {
   if (items.length === 0) return null
   return (
@@ -227,6 +247,7 @@ export function Transcript({
           leading={leading || index > 0}
           permissionMode={permissionMode}
           maxLines={maxLines}
+          workspace={workspace}
         />
       ))}
     </Box>

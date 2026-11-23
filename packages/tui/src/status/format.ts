@@ -29,8 +29,12 @@ export function formatClock(date: Date = new Date()): string {
 
 /**
  * Claude Code's duration shape: `39s`, `15m 57s`, `1h 2m 0s`, `2d 3h 4m`.
+ * With `hideTrailingZeros`, empty lower units drop: `2m`, `1h 2m`, `3d`.
  */
-export function formatDuration(ms: number): string {
+export function formatDuration(
+  ms: number,
+  options?: { hideTrailingZeros?: boolean },
+): string {
   if (ms < 60_000) {
     if (ms === 0) return "0s"
     if (ms < 1_000) return `${(ms / 1000).toFixed(1)}s`
@@ -55,7 +59,17 @@ export function formatDuration(ms: number): string {
     days++
   }
 
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  const hide = options?.hideTrailingZeros
+  if (days > 0) {
+    if (hide && hours === 0 && minutes === 0) return `${days}d`
+    if (hide && minutes === 0) return `${days}d ${hours}h`
+    return `${days}d ${hours}h ${minutes}m`
+  }
+  if (hours > 0) {
+    if (hide && minutes === 0 && seconds === 0) return `${hours}h`
+    if (hide && seconds === 0) return `${hours}h ${minutes}m`
+    return `${hours}h ${minutes}m ${seconds}s`
+  }
+  if (hide && seconds === 0) return `${minutes}m`
   return `${minutes}m ${seconds}s`
 }

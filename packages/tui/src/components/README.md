@@ -5,7 +5,7 @@
 **Files:**
 
 - `Welcome.tsx` — condensed startup banner: a three-row coral block mark beside a bold name with dim version, dim model/provider, and dim workspace. No welcome line.
-- `Transcript.tsx` — Claude Code-style inline blocks: `›` prompts, white `●` assistant dots with a two-column indented markdown body, `● Tool(args)`, `⎿` output, colored diffs, collapsed output hints, and dim meta lines.
+- `Transcript.tsx` — Claude Code-style inline blocks: `›` prompts, white `●` assistant dots with a two-column indented markdown body, `● Tool(args)` with two-space header wraps, dim `⎿` gutters with normal output, colored diffs, collapsed output hints, `(No output)`, bash timeout/cwd notes, and dim meta lines.
 - `Picker.tsx` — generic type-to-filter list used by provider, model, session, history, and file selection.
 - `SpinnerLine.tsx` — live turn status: a 120ms glyph cycle, a shimmering coral verb, the coral-to-error-red stall fade, the 30-second timer/token gate, and the `  ⎿  Tip:` line.
 - `LineText.tsx` — renders a formatted line, including inline markdown spans (code, bold, italic, strikethrough, links).

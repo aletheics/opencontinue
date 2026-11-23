@@ -1,7 +1,11 @@
 import type { ToolTimelineItem } from "../../timeline.js"
 import { describe, expect, it } from "vitest"
 
-import { formatToolOutputLines, toolHeaderLines } from "./tool.js"
+import {
+  formatToolOutputLines,
+  toolHeaderLines,
+  toolNotes,
+} from "./tool.js"
 
 function tool(overrides: Partial<ToolTimelineItem> = {}): ToolTimelineItem {
   return {
@@ -33,5 +37,35 @@ describe("tool formatting", () => {
     expect(collapsed.some((line) => line.text.includes("ctrl+o to expand"))).toBe(
       true,
     )
+    expect(collapsed[0]?.spans?.[0]?.dim).toBe(true)
+    expect(collapsed[0]?.spans?.[1]?.dim).toBeUndefined()
+  })
+
+  it("indents wrapped tool headers by two spaces", () => {
+    const lines = toolHeaderLines(
+      tool({ name: "bash", input: { command: "x".repeat(120) } }),
+      40,
+    )
+    expect(lines.length).toBeGreaterThan(1)
+    expect(lines[1]?.startsWith("  ")).toBe(true)
+    expect(lines[1]?.startsWith("●")).toBe(false)
+  })
+
+  it("adds bash timeout and cwd reset notes", () => {
+    expect(
+      toolNotes(tool({ name: "bash", input: { command: "echo hi" } }), "/work"),
+    ).toEqual(["(timeout 2m)"])
+
+    expect(
+      toolNotes(
+        tool({
+          name: "bash",
+          input: { command: "cd /tmp && echo hi", timeoutMs: 180_000 },
+        }),
+        "D:\\work",
+      ),
+    ).toEqual(["Shell cwd was reset to D:\\work", "(timeout 3m)"])
+
+    expect(toolNotes(tool())).toEqual([])
   })
 })
