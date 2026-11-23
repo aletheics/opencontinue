@@ -33,6 +33,7 @@ export function Timeline({ lines, bodyHeight, scrollOffset }: TimelineProps) {
             key={`${start + index}`}
             color={line.color}
             dimColor={line.dim}
+            bold={line.bold}
             wrap="truncate"
           >
             {line.text}

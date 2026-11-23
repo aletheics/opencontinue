@@ -30,6 +30,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
 - A line-buffer renderer in `packages/tui/src/render.ts`: timeline items become styled lines, long text wraps to the content width, and the viewport slices by line so scrolling and clipping are exact.
 - Presentational components in `packages/tui/src/components/` (Header, Picker, Timeline, Prompt); `index.tsx` stays the state machine and event wiring.
+- Markdown-style assistant output: headings, lists, task boxes, blockquotes, rules, and fenced code with a gutter. Styling is line-level because the renderer is a line buffer.
 
 ## Rendering contract
 
@@ -53,6 +54,6 @@ The current TUI uses upstream Ink so the team can keep upgrading it. We copy the
 ## Next slices
 
 1. Multi-line input, input history search (`Ctrl+R`), `@file` completion.
-2. Markdown rendering and collapsible context.
+2. Inline code styling and syntax highlighting for fenced code.
 3. A typed `packages/client` so the TUI talks to the server instead of running the runtime in-process.
 4. Optional OpenTUI evaluation if Ink becomes the limiting factor.
