@@ -1,4 +1,5 @@
 import { isUtf8 } from "node:buffer"
+import { spawn, type ChildProcess } from "node:child_process"
 import { existsSync } from "node:fs"
 import path from "node:path"
 
@@ -136,6 +137,36 @@ export function resolveShell(
     findExecutable(env.SHELL ?? "bash", platform, env) ??
     (existsSync("/bin/bash") ? "/bin/bash" : "/bin/sh")
   return { file, name: shellFamily(file), args: shellArgs(file, command) }
+}
+
+/**
+ * Kill the whole process tree. Node's child.kill only reaches the shell on
+ * Windows; descendants keep running and hold the workspace directory.
+ */
+export function killProcessTree(
+  child: ChildProcess,
+  signal: NodeJS.Signals = "SIGTERM",
+): void {
+  const pid = child.pid
+  if (!pid) return
+
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      windowsHide: true,
+      stdio: "ignore",
+    })
+    return
+  }
+
+  try {
+    process.kill(-pid, signal)
+  } catch {
+    try {
+      child.kill(signal)
+    } catch {
+      // The process already exited.
+    }
+  }
 }
 
 /**

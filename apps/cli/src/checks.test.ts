@@ -12,6 +12,7 @@ import {
   parseAgentFile,
   runChecks,
   runGit,
+  runProcess,
 } from "./checks.js"
 
 const temporary: string[] = []
@@ -55,6 +56,26 @@ describe("checks", () => {
     expect(agents).toHaveLength(1)
     expect(agents[0]).toMatchObject({ name: "security", description: "Security review" })
   })
+
+  it("times out and aborts a hanging process", async () => {
+    const repo = await makeRepo()
+
+    await expect(
+      runProcess("node", ["-e", "setTimeout(()=>{}, 1000)"], {
+        cwd: repo,
+        timeoutMs: 30,
+      }),
+    ).rejects.toThrow(/timed out/)
+
+    const controller = new AbortController()
+    const pending = runProcess("node", ["-e", "setTimeout(()=>{}, 1000)"], {
+      cwd: repo,
+      signal: controller.signal,
+      timeoutMs: 5_000,
+    })
+    setTimeout(() => controller.abort(), 30)
+    await expect(pending).rejects.toThrow(/aborted/)
+  }, 10_000)
 
   it("creates an isolated worktree and captures agent edits", async () => {
     const repo = await makeRepo()

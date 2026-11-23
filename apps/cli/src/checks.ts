@@ -6,10 +6,16 @@ import path from "node:path"
 import { MemorySessionStore } from "@opencontinue/core"
 import type { ChatProvider } from "@opencontinue/providers"
 import { runAgent } from "@opencontinue/runtime"
-import { ToolRegistry, type PermissionGate } from "@opencontinue/tools"
+import {
+  decodeOutput,
+  killProcessTree,
+  ToolRegistry,
+  type PermissionGate,
+} from "@opencontinue/tools"
 
 const MAX_DIFF_CHARS = 120_000
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
+const DEFAULT_GIT_TIMEOUT_MS = 2 * 60_000
 const DEFAULT_CONCURRENCY = 4
 
 const allowAll: PermissionGate = {
@@ -54,27 +60,114 @@ export type RunChecksOptions = {
   timeoutMs?: number
 }
 
-export async function runGit(cwd: string, args: string[], input?: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("git", args, { cwd, stdio: ["pipe", "pipe", "pipe"] })
-    let stdout = ""
-    let stderr = ""
+export type ProcessResult = {
+  stdout: string
+  stderr: string
+  exitCode: number | null
+}
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString()
+export type ProcessOptions = {
+  cwd: string
+  input?: string
+  timeoutMs?: number
+  signal?: AbortSignal
+}
+
+/** Run a local command with a timeout, abort signal, and process-tree cleanup. */
+export async function runProcess(
+  file: string,
+  args: string[],
+  options: ProcessOptions,
+): Promise<ProcessResult> {
+  if (options.signal?.aborted) {
+    throw new Error(`${file} ${args.join(" ")} aborted`)
+  }
+
+  return await new Promise<ProcessResult>((resolve, reject) => {
+    const child = spawn(file, args, {
+      cwd: options.cwd,
+      windowsHide: true,
+      detached: process.platform !== "win32",
+      stdio: ["pipe", "pipe", "pipe"],
     })
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString()
+    const stdout: Buffer[] = []
+    const stderr: Buffer[] = []
+    const timeoutMs = options.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS
+
+    child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk))
+    child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk))
+
+    let timedOut = false
+    let aborted = false
+    let forceTimer: ReturnType<typeof setTimeout> | undefined
+
+    const stop = () => {
+      killProcessTree(child)
+      if (process.platform !== "win32") {
+        if (forceTimer) clearTimeout(forceTimer)
+        forceTimer = setTimeout(() => {
+          killProcessTree(child, "SIGKILL")
+        }, 2_000)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      timedOut = true
+      stop()
+    }, timeoutMs)
+    const onAbort = () => {
+      aborted = true
+      stop()
+    }
+    options.signal?.addEventListener("abort", onAbort, { once: true })
+
+    const cleanup = () => {
+      clearTimeout(timer)
+      if (forceTimer) clearTimeout(forceTimer)
+      options.signal?.removeEventListener("abort", onAbort)
+    }
+
+    child.on("error", (error) => {
+      cleanup()
+      reject(error)
     })
-    child.on("error", reject)
     child.on("close", (code) => {
-      if (code === 0) resolve(stdout)
-      else reject(new Error(`git ${args.join(" ")} failed (${code}): ${(stderr || stdout).trim()}`))
+      cleanup()
+      const out = decodeOutput(Buffer.concat(stdout))
+      const err = decodeOutput(Buffer.concat(stderr))
+
+      if (timedOut) {
+        reject(new Error(`${file} ${args.join(" ")} timed out after ${timeoutMs}ms`))
+        return
+      }
+      if (aborted) {
+        reject(new Error(`${file} ${args.join(" ")} aborted`))
+        return
+      }
+      resolve({ stdout: out, stderr: err, exitCode: code })
     })
 
-    if (input !== undefined) child.stdin.write(input)
-    child.stdin.end()
+    if (options.input !== undefined) child.stdin?.write(options.input)
+    child.stdin?.end()
   })
+}
+
+export async function runGit(
+  cwd: string,
+  args: string[],
+  input?: string,
+  options?: { timeoutMs?: number; signal?: AbortSignal },
+): Promise<string> {
+  const result = await runProcess("git", args, {
+    cwd,
+    input,
+    timeoutMs: options?.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS,
+    signal: options?.signal,
+  })
+  if (result.exitCode === 0) return result.stdout
+  throw new Error(
+    `git ${args.join(" ")} failed (${result.exitCode}): ${(result.stderr || result.stdout).trim()}`,
+  )
 }
 
 export function parseAgentFile(file: string, content: string): CheckAgent {
@@ -170,27 +263,56 @@ export type CheckWorkspace = {
   cleanup: () => Promise<void>
 }
 
-export async function createCheckWorkspace(repo: string, base: string): Promise<CheckWorkspace> {
-  const root = (await runGit(repo, ["rev-parse", "--show-toplevel"])).trim()
-  await runGit(root, ["rev-parse", "--verify", base])
+type GitOptions = { signal?: AbortSignal; timeoutMs?: number }
+
+export async function createCheckWorkspace(
+  repo: string,
+  base: string,
+  options: GitOptions = {},
+): Promise<CheckWorkspace> {
+  const root = (
+    await runGit(repo, ["rev-parse", "--show-toplevel"], undefined, options)
+  ).trim()
+  await runGit(root, ["rev-parse", "--verify", base], undefined, options)
 
   const parent = await fs.mkdtemp(path.join(os.tmpdir(), "opencontinue-check-"))
   const dir = path.join(parent, "worktree")
   let added = false
 
   const cleanup = async () => {
-    if (added) await runGit(root, ["worktree", "remove", "--force", dir]).catch(() => {})
+    if (added) {
+      await runGit(
+        root,
+        ["worktree", "remove", "--force", dir],
+        undefined,
+        options,
+      ).catch(() => {})
+    }
     await fs.rm(parent, { recursive: true, force: true })
   }
 
   try {
-    await runGit(root, ["worktree", "add", "--detach", dir, "HEAD"])
+    await runGit(root, ["worktree", "add", "--detach", dir, "HEAD"], undefined, options)
     added = true
 
-    const dirty = await runGit(root, ["diff", "HEAD", "--binary"])
-    if (dirty.trim()) await runGit(dir, ["apply", "--binary", "-"], dirty)
+    const dirty = await runGit(
+      root,
+      ["diff", "HEAD", "--binary"],
+      undefined,
+      options,
+    )
+    if (dirty.trim()) {
+      await runGit(dir, ["apply", "--binary", "-"], dirty, options)
+    }
 
-    const untracked = (await runGit(root, ["ls-files", "--others", "--exclude-standard"]))
+    const untracked = (
+      await runGit(
+        root,
+        ["ls-files", "--others", "--exclude-standard"],
+        undefined,
+        options,
+      )
+    )
       .split(/\r?\n/)
       .filter(Boolean)
 
@@ -204,19 +326,29 @@ export async function createCheckWorkspace(repo: string, base: string): Promise<
       await fs.copyFile(source, target)
     }
 
-    const status = await runGit(dir, ["status", "--porcelain"])
+    const status = await runGit(
+      dir,
+      ["status", "--porcelain"],
+      undefined,
+      options,
+    )
     if (status.trim()) {
-      await runGit(dir, ["add", "-A"])
-      await runGit(dir, [
-        "-c",
-        "user.name=opencontinue",
-        "-c",
-        "user.email=opencontinue@local",
-        "commit",
-        "-m",
-        "check baseline",
-        "--no-verify",
-      ])
+      await runGit(dir, ["add", "-A"], undefined, options)
+      await runGit(
+        dir,
+        [
+          "-c",
+          "user.name=opencontinue",
+          "-c",
+          "user.email=opencontinue@local",
+          "commit",
+          "-m",
+          "check baseline",
+          "--no-verify",
+        ],
+        undefined,
+        options,
+      )
     }
 
     return { dir, cleanup }
@@ -226,14 +358,21 @@ export async function createCheckWorkspace(repo: string, base: string): Promise<
   }
 }
 
-export async function capturePatch(dir: string): Promise<string> {
-  await runGit(dir, ["add", "-A"])
-  return runGit(dir, ["diff", "--cached", "--binary"])
+export async function capturePatch(
+  dir: string,
+  options: GitOptions = {},
+): Promise<string> {
+  await runGit(dir, ["add", "-A"], undefined, options)
+  return runGit(dir, ["diff", "--cached", "--binary"], undefined, options)
 }
 
-export async function applyPatch(repo: string, patch: string): Promise<void> {
+export async function applyPatch(
+  repo: string,
+  patch: string,
+  options: GitOptions = {},
+): Promise<void> {
   if (!patch.trim()) return
-  await runGit(repo, ["apply", "--binary", "-"], patch)
+  await runGit(repo, ["apply", "--binary", "-"], patch, options)
 }
 
 function buildPrompt(agent: CheckAgent, base: string, diff: string, files: string[]): string {
@@ -268,10 +407,12 @@ async function runOne(
   const started = Date.now()
   let workspace: CheckWorkspace | undefined
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const gitOptions = { signal: controller.signal, timeoutMs }
 
   try {
-    workspace = await createCheckWorkspace(options.repo, options.base)
+    workspace = await createCheckWorkspace(options.repo, options.base, gitOptions)
 
     const store = new MemorySessionStore()
     const session = store.create(agent.name)
@@ -298,7 +439,7 @@ async function runOne(
       .map((message) => message.text)
       .join("\n")
       .trim()
-    const patch = await capturePatch(workspace.dir)
+    const patch = await capturePatch(workspace.dir, gitOptions)
 
     if (failed?.type === "run.failed") {
       return {

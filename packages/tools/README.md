@@ -4,7 +4,7 @@
 
 **Owns:** read, write, edit, glob, grep, bash, todo; workspace confinement including symlink/junction targets; tool registry; permission gate; bounded workspace file listing for prompt completion; dry-run previews for write/edit; platform shell selection, UTF-8/legacy console decoding, and process-tree termination.
 
-**Public API:** `ToolRegistry`, `Tool`, `ToolPreview`, `PermissionGate`, individual tools, `listWorkspaceFiles`.
+**Public API:** `ToolRegistry`, `Tool`, `ToolPreview`, `PermissionGate`, individual tools, `listWorkspaceFiles`, `resolveShell`, `decodeOutput`, `killProcessTree`.
 
 **Allowed imports:** `@opencontinue/providers` for tool definitions.
 

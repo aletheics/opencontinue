@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process"
+import { spawn } from "node:child_process"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
@@ -7,10 +7,15 @@ import { createTwoFilesPatch } from "diff"
 import { z } from "zod"
 import { zodToJsonSchema } from "zod-to-json-schema"
 
-import { decodeOutput, resolveShell } from "./shell.js"
+import { decodeOutput, killProcessTree, resolveShell } from "./shell.js"
 
 export * from "./files.js"
-export { decodeOutput, resolveShell, shellArgs } from "./shell.js"
+export {
+  decodeOutput,
+  killProcessTree,
+  resolveShell,
+  shellArgs,
+} from "./shell.js"
 
 export type ToolCapability = "read" | "write" | "execute"
 
@@ -438,36 +443,6 @@ export const todoTool: Tool = {
     const done = todos.filter((todo) => todo.status === "completed").length
     return `${done}/${todos.length} complete`
   },
-}
-
-/**
- * Kill the whole process tree. Node's child.kill only reaches the shell on
- * Windows; descendants keep running and hold the workspace directory.
- */
-function killProcessTree(
-  child: ChildProcess,
-  signal: NodeJS.Signals = "SIGTERM",
-): void {
-  const pid = child.pid
-  if (!pid) return
-
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
-      windowsHide: true,
-      stdio: "ignore",
-    })
-    return
-  }
-
-  try {
-    process.kill(-pid, signal)
-  } catch {
-    try {
-      child.kill(signal)
-    } catch {
-      // The process already exited.
-    }
-  }
 }
 
 export const bashTool: Tool = {
