@@ -6,7 +6,12 @@ import { wrapText } from "./wrap.js"
 
 const DEFAULT_BASH_TIMEOUT_MS = 120_000
 
+const DISPLAY_NAMES: Record<string, string> = {
+  edit: "Update",
+}
+
 export function toolDisplayName(name: string): string {
+  if (DISPLAY_NAMES[name]) return DISPLAY_NAMES[name]
   return name.length > 0 ? `${name[0]?.toUpperCase() ?? ""}${name.slice(1)}` : name
 }
 
@@ -53,35 +58,25 @@ export function toolHeaderLines(item: ToolTimelineItem, width: number): string[]
  * `cd`, and the command timeout. The TUI owns the wording so the tool output
  * stays plain text.
  */
-export function toolNotes(
-  item: ToolTimelineItem,
-  workspace?: string,
-): string[] {
+export function toolNotes(item: ToolTimelineItem, workspace?: string): string[] {
   if (item.name !== "bash") return []
 
   const input =
     typeof item.input === "object" && item.input !== null
       ? (item.input as Record<string, unknown>)
       : {}
-  const timeoutMs =
-    typeof input.timeoutMs === "number" ? input.timeoutMs : DEFAULT_BASH_TIMEOUT_MS
+  const timeoutMs = typeof input.timeoutMs === "number" ? input.timeoutMs : DEFAULT_BASH_TIMEOUT_MS
   const command = typeof input.command === "string" ? input.command : ""
 
   const notes: string[] = []
   if (workspace && /(^|[\s;&|(])cd(\s|$)/m.test(command)) {
     notes.push(`Shell cwd was reset to ${workspace}`)
   }
-  notes.push(
-    `(timeout ${formatDuration(timeoutMs, { hideTrailingZeros: true })})`,
-  )
+  notes.push(`(timeout ${formatDuration(timeoutMs, { hideTrailingZeros: true })})`)
   return notes
 }
 
-export function formatToolOutputLines(
-  text: string,
-  width: number,
-  expanded: boolean,
-): Line[] {
+export function formatToolOutputLines(text: string, width: number, expanded: boolean): Line[] {
   const lines = text.replace(/\r\n/g, "\n").trimEnd().split("\n")
   if (lines.length === 1 && lines[0] === "") return []
 

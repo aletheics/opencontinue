@@ -4,7 +4,7 @@ import { headerMeta } from "../../header.js"
 import { theme } from "../../theme.js"
 import type { TimelineItem } from "../../timeline.js"
 import { assistantBlock } from "./assistant.js"
-import { formatDiffLines } from "./diff.js"
+import { diffSummary, formatDiffLines } from "./diff.js"
 import type { Line } from "./line.js"
 import { formatToolOutputLines, toolHeaderLines, toolNotes } from "./tool.js"
 import { wrapPrefixed, wrapText } from "./wrap.js"
@@ -36,13 +36,7 @@ export function timelineLines(
         ],
       })
       lines.push({
-        text: headerMeta(
-          item.model,
-          item.provider,
-          item.workspace,
-          item.branch,
-          width,
-        ),
+        text: headerMeta(item.model, item.provider, item.workspace, item.branch, width),
         color: theme.textSecondary,
       })
       lines.push({ text: "", dim: true })
@@ -95,11 +89,14 @@ export function timelineLines(
     })
 
     if (item.diff) {
+      const summary = diffSummary(item.diff)
+      if (summary) lines.push({ text: `  ⎿  ${summary}`, dim: true })
+
       const diff = formatDiffLines(item.diff, Math.max(10, width - 5), expanded)
       diff.forEach((line, index) => {
         lines.push({
           ...line,
-          text: `${index === 0 ? "  ⎿  " : "     "}${line.text}`,
+          text: `${index === 0 && !summary ? "  ⎿  " : "     "}${line.text}`,
         })
       })
     } else if (item.output?.trim()) {

@@ -8,7 +8,7 @@
 - `wrap.ts` — width wrapping and prefixed continuation.
 - `assistant.ts` — markdown-style assistant output and top-level block spacing.
 - `table.ts` — GFM tables with display-width column alignment.
-- `diff.ts` — unified diff colors, collapse hint, and stats.
+- `diff.ts` — line-numbered diff gutters, colors, summary, collapse hint, and stats.
 - `tool.ts` — `● Tool(args)` headers and `⎿` output lines.
 - `lines.ts` — flatten the timeline for the `ctrl+o` transcript.
 - `index.ts` — public barrel.

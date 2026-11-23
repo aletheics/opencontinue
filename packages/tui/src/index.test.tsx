@@ -471,6 +471,47 @@ describe("TUI", () => {
     empty.unmount()
   })
 
+  it("renders the update summary and line-numbered diff", () => {
+    const diff = [
+      "Index: src/app.ts",
+      "===================================================================",
+      "--- src/app.ts",
+      "+++ src/app.ts",
+      "@@ -1,2 +1,2 @@",
+      " context",
+      "-old",
+      "+new",
+    ].join("\n")
+
+    const view = render(
+      <TranscriptItem
+        item={{
+          kind: "tool",
+          id: "tool:update",
+          runId: "run:1",
+          name: "edit",
+          input: { path: "src/app.ts" },
+          status: "done",
+          diff,
+        }}
+        columns={80}
+        expanded={false}
+        leading={false}
+      />,
+    )
+    const frame = view.lastFrame() ?? ""
+
+    expect(frame).toContain("↳ Update(src/app.ts)")
+    expect(frame).toContain("Added 1 line, removed 1 line")
+    expect(frame).toContain("@@ -1,2 +1,2 @@")
+    expect(frame).toContain("1 1   context")
+    expect(frame).toContain("2    -old")
+    expect(frame).toContain("  2  +new")
+    expect(frame).not.toContain("--- src/app.ts")
+    expect(frame).not.toContain("+++ src/app.ts")
+    view.unmount()
+  })
+
   it("clips a long live assistant response to the viewport", () => {
     const text = Array.from({ length: 10 }, (_, index) => `line ${index}`).join(
       "\n",

@@ -1,5 +1,5 @@
 export { assistantBlock, formatAssistantLines } from "./assistant.js"
-export { diffStats, formatDiffLines } from "./diff.js"
+export { diffStats, diffSummary, formatDiffLines } from "./diff.js"
 export { highlightCode, highlightCodeLine } from "./highlight.js"
 export type { HighlightState } from "./highlight.js"
 export { lineFromSpans, parseInline, spanText, spanWidth, wrapSpans } from "./inline.js"

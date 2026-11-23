@@ -4,6 +4,7 @@ import { Box, Text } from "ink"
 import { glyphs } from "../glyphs.js"
 import {
   assistantBlock,
+  diffSummary,
   formatDiffLines,
   formatToolOutputLines,
   toolHeaderLines,
@@ -43,6 +44,7 @@ function ToolBlock({
   const hasOutput = Boolean(item.output?.trim())
   const width = Math.max(20, columns - 2)
   const header = toolHeaderLines(item, width)
+  const summary = item.diff ? diffSummary(item.diff) : undefined
   const dot =
     item.status === "failed"
       ? theme.danger
@@ -68,6 +70,13 @@ function ToolBlock({
         )
       })}
 
+      {summary ? (
+        <Text dimColor wrap="truncate">
+          {"  ⎿  "}
+          {summary}
+        </Text>
+      ) : null}
+
       {item.diff
         ? formatDiffLines(item.diff, Math.max(10, width - 5), expanded).map(
             (line, index) => (
@@ -77,7 +86,7 @@ function ToolBlock({
                 dimColor={line.dim}
                 wrap="truncate"
               >
-                {index === 0 ? "  ⎿  " : "     "}
+                {summary || index > 0 ? "     " : "  ⎿  "}
                 {line.text}
               </Text>
             ),

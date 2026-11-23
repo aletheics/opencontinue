@@ -25,11 +25,7 @@ describe("timeline lines", () => {
   })
 
   it("wraps user lines to the viewport width", () => {
-    const lines = timelineLines(
-      [{ kind: "user", id: "u1", text: "x".repeat(120) }],
-      40,
-      false,
-    )
+    const lines = timelineLines([{ kind: "user", id: "u1", text: "x".repeat(120) }], 40, false)
     expect(lines.length).toBeGreaterThan(1)
     for (const line of lines) expect(line.text.length).toBeLessThanOrEqual(40)
   })
@@ -42,21 +38,16 @@ describe("timeline lines", () => {
       name: "edit",
       input: { path: "src/app.ts" },
       status: "done",
-      diff: ["--- a/src/app.ts", "+++ b/src/app.ts", "@@ -1 +1 @@", "-old", "+new"].join(
-        "\n",
-      ),
+      diff: ["--- a/src/app.ts", "+++ b/src/app.ts", "@@ -1 +1 @@", "-old", "+new"].join("\n"),
     }
     const lines = timelineLines([tool], 60, false)
-    expect(lines[0]?.text).toContain("Edit(src/app.ts)")
+    expect(lines[0]?.text).toContain("Update(src/app.ts)")
+    expect(lines[1]?.text).toContain("Added 1 line, removed 1 line")
+    expect(lines.some((line) => line.text.endsWith("+new") && line.color === theme.diffAdd)).toBe(
+      true,
+    )
     expect(
-      lines.some(
-        (line) => line.text.endsWith("+new") && line.color === theme.diffAdd,
-      ),
-    ).toBe(true)
-    expect(
-      lines.some(
-        (line) => line.text.endsWith("-old") && line.color === theme.diffRemove,
-      ),
+      lines.some((line) => line.text.endsWith("-old") && line.color === theme.diffRemove),
     ).toBe(true)
   })
 
