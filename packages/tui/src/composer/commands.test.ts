@@ -17,8 +17,12 @@ describe("slash commands", () => {
     expect(matchSlashCommands("help")).toEqual([])
   })
 
-  it("builds help from the same source", () => {
-    expect(HELP_TEXT.split("\n")).toHaveLength(SLASH_COMMANDS.length)
+  it("builds help from the same source and documents keys", () => {
+    expect(
+      HELP_TEXT.split("\n").filter((line) => line.startsWith("/")),
+    ).toHaveLength(SLASH_COMMANDS.length)
     expect(HELP_TEXT).toContain("/resume — resume a session")
+    expect(HELP_TEXT).toContain("Shift+Tab  cycle Plan/Confirm/Auto")
+    expect(HELP_TEXT).toContain("Ctrl+O     expanded transcript")
   })
 })

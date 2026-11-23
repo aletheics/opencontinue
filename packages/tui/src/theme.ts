@@ -15,7 +15,7 @@ export const theme = {
   syntaxLiteral: "yellow",
   syntaxFunction: "blue",
   user: "green",
-  userBar: "#3A3A3A",
+  userBar: "#252525",
   assistant: "white",
   tool: "yellow",
   error: "#EF4444",

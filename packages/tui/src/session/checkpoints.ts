@@ -16,7 +16,7 @@ export function checkpointLabel(checkpoint: Checkpoint): string {
     checkpoint.durationMs === undefined
       ? ""
       : ` · ${formatDuration(checkpoint.durationMs)}`
-  return `event ${checkpoint.seq} · ${time}${duration} · ${checkpoint.status}`
+  return `${time}${duration} · ${checkpoint.status}`
 }
 
 export function formatCheckpoints(

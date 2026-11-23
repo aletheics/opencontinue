@@ -71,7 +71,8 @@ import { formatWorkspaceDiff, workspaceDiff } from "./session/git.js"
 import { summarizeRun, type RunToolResult } from "./session/summary.js"
 import { latestTodos } from "./session/todos.js"
 import { workspaceInfo } from "./session/workspace.js"
-import { formatClock, formatDuration, formatTokens } from "./status/format.js"
+import { footerLayout } from "./status/footer.js"
+import { formatClock, formatDuration } from "./status/format.js"
 import {
   pickSpinnerTip,
   pickSpinnerVerb,
@@ -162,7 +163,6 @@ export function App({ options }: { options: TuiOptions }) {
   const [transcriptScroll, setTranscriptScroll] = useState(0)
   const [transcriptKey, setTranscriptKey] = useState(0)
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
-  const [lastDurationMs, setLastDurationMs] = useState<number | null>(null)
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [historySearch, setHistorySearch] = useState(false)
@@ -624,7 +624,6 @@ export function App({ options }: { options: TuiOptions }) {
         const started = runStartedRef.current
         if (started !== null) {
           const elapsed = Date.now() - started
-          setLastDurationMs(elapsed)
           const symbol =
             event.type === "run.completed" ? glyphs.done : glyphs.failed
           const outcome =
@@ -634,9 +633,7 @@ export function App({ options }: { options: TuiOptions }) {
             `${symbol} ${outcome} in ${formatDuration(elapsed)} · ${formatClock()}`,
           ]
           if (summary) lines.push(summary)
-          lines.push(
-            `${glyphs.checkpoint} Checkpoint saved · event ${event.seq}`,
-          )
+          lines.push(`${glyphs.checkpoint} Checkpoint saved`)
           appendMeta(lines.join("\n"))
         }
         runToolsRef.current = new Map()
@@ -795,7 +792,6 @@ export function App({ options }: { options: TuiOptions }) {
     if (current) void client.abort(current).catch(() => {})
     resetPermissions()
     setBusy(false)
-    setLastDurationMs(null)
     setRunStartedAt(null)
     runStartedRef.current = null
 
@@ -857,7 +853,7 @@ export function App({ options }: { options: TuiOptions }) {
           modelName,
           providerLabel,
           undefined,
-          `${glyphs.checkpoint} Forked session at event ${chosen.seq} · working tree unchanged`,
+          `${glyphs.checkpoint} Forked session · working tree unchanged`,
         )
         setScreen("chat")
       })
@@ -1095,7 +1091,6 @@ export function App({ options }: { options: TuiOptions }) {
     setHistory((items) => [...items, text])
     setHistoryIndex(-1)
     setBusy(true)
-    setLastDurationMs(null)
     spinnerVerbRef.current = pickSpinnerVerb()
     spinnerTipRef.current = pickSpinnerTip()
     activeRunIdRef.current = null
@@ -1448,10 +1443,6 @@ export function App({ options }: { options: TuiOptions }) {
   const activeTool = [...timeline]
     .reverse()
     .find((item) => item.kind === "tool" && item.status === "running")
-  const totalTokens = timeline.reduce(
-    (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
-    0,
-  )
   const elapsedMs = runStartedAt !== null ? Date.now() - runStartedAt : 0
   const idleMs = busy ? Date.now() - lastActivityRef.current : 0
   const targetStall = busy ? stallIntensity(idleMs, Boolean(activeTool)) : 0
@@ -1470,13 +1461,6 @@ export function App({ options }: { options: TuiOptions }) {
     : 0
   const runTokens = Math.round(runChars / 4)
 
-  const modeText =
-    permissionMode === "auto"
-      ? `${glyphs.auto} Auto · shift+tab`
-      : permissionMode === "plan"
-        ? `${glyphs.plan} Plan · read-only · shift+tab`
-        : `${glyphs.confirm} Confirm · shift+tab`
-
   const menuHint = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
     : fileMenuOpen
@@ -1485,7 +1469,18 @@ export function App({ options }: { options: TuiOptions }) {
         ? "↑/↓ select · Tab complete · Enter run · Esc close"
         : null
 
-  const busyHint = busy ? " · esc to interrupt" : ""
+  const reasoningText =
+    reasoningLevels.length > 0 && reasoningEffort !== "auto"
+      ? `Reasoning: ${reasoningEffort.charAt(0).toUpperCase()}${reasoningEffort.slice(1)}`
+      : undefined
+  const normalFooter = footerLayout({
+    mode: permissionMode,
+    branch: workspaceStatus.branch ?? undefined,
+    reasoning: reasoningText,
+    busy: busy && !permission,
+    columns: Math.max(1, columns - 4),
+  })
+
   const footerTint =
     screen === "chat" && !transcriptMode && !menuHint && !permission
       ? permissionMode === "auto"
@@ -1498,7 +1493,7 @@ export function App({ options }: { options: TuiOptions }) {
       ? (menuHint ??
         (permission
           ? "y allow once · a always allow this tool · n deny"
-          : `${modeText}${busyHint}`))
+          : normalFooter.left))
       : screen === "checkpoints"
         ? "↑/↓ select · Enter fork · Esc back"
         : screen === "provider" || screen === "models" || screen === "sessions"
@@ -1508,26 +1503,10 @@ export function App({ options }: { options: TuiOptions }) {
           : screen === "loading"
             ? "Loading…"
             : "Ctrl+C exit"
-
-  const durationText =
-    lastDurationMs !== null ? formatDuration(lastDurationMs) : undefined
-  const tokenText = totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : undefined
-  const reasoningText =
-    reasoningLevels.length > 0
-      ? `Reasoning: ${reasoningEffort.charAt(0).toUpperCase()}${reasoningEffort.slice(1)}`
-      : undefined
-  const rightStatus = [
-    reasoningText,
-    workspaceStatus.name,
-    workspaceStatus.branch,
-    `model: ${options.url ? "remote" : model}`,
-    durationText,
-    tokenText,
-    `${glyphs.approval} help`,
-  ]
-    .filter(Boolean)
-    .join(" · ")
-    .slice(0, Math.max(0, columns - footerLeft.length - 2))
+  const footerRight =
+    screen === "chat" && !transcriptMode && !menuHint && !permission
+      ? normalFooter.right
+      : ""
 
   const pickerWindow = Math.max(4, Math.min(12, rows - 6))
   const rule = "─".repeat(Math.max(1, columns))
@@ -1819,9 +1798,9 @@ export function App({ options }: { options: TuiOptions }) {
             <Text color={footerTint} dimColor={footerTint === undefined} wrap="truncate">
               {footerLeft}
             </Text>
-            {columns >= 50 ? (
+            {footerRight ? (
               <Text dimColor wrap="truncate">
-                {rightStatus}
+                {footerRight}
               </Text>
             ) : null}
           </Box>

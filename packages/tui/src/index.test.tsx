@@ -836,7 +836,7 @@ describe("TUI", () => {
       stdin.write("\r")
 
       await vi.waitFor(() =>
-        expect(output(frames)).toContain("Forked session at event"),
+        expect(output(frames)).toContain("Forked session"),
       )
       expect(output(frames)).toContain("working tree unchanged")
       await vi.waitFor(() => expect(lastFrame()).toContain("hello from tui"))
@@ -894,22 +894,21 @@ describe("TUI", () => {
     const first = render(<App options={{}} />)
     try {
       await ready(first.lastFrame)
-      await vi.waitFor(() =>
-        expect(first.lastFrame()).toContain("Reasoning: Auto"),
-      )
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(first.lastFrame()).not.toContain("Reasoning:")
 
-      for (const expected of [
-        "Reasoning: Low",
-        "Reasoning: Medium",
-        "Reasoning: High",
-        "Reasoning: Auto",
-        "Reasoning: Low",
-      ]) {
+      for (const expected of ["Low", "Medium", "High", null, "Low"]) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         first.stdin.write("/reasoning")
         await vi.waitFor(() => expect(first.lastFrame()).toContain("› /reasoning"))
         first.stdin.write("\r")
-        await vi.waitFor(() => expect(first.lastFrame()).toContain(expected))
+        await vi.waitFor(() => {
+          if (expected === null) {
+            expect(first.lastFrame()).not.toContain("Reasoning:")
+          } else {
+            expect(first.lastFrame()).toContain(`Reasoning: ${expected}`)
+          }
+        })
       }
     } finally {
       first.unmount()

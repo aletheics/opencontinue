@@ -10,10 +10,10 @@ describe("checkpoint list", () => {
     ])
 
     expect(text).toContain("◆ Checkpoints · 2")
-    expect(text.split("\n")[1]).toContain("event 9")
-    expect(text.split("\n")[2]).toContain("event 4")
+    expect(text.split("\n")[1]).toContain("failed")
+    expect(text.split("\n")[2]).toContain("completed")
     expect(text).toContain("3s")
-    expect(text).toContain("failed")
+    expect(text).not.toContain("event 9")
   })
 
   it("handles an empty session", () => {

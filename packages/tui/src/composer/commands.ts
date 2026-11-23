@@ -19,9 +19,18 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/exit", description: "quit" },
 ]
 
-export const HELP_TEXT = SLASH_COMMANDS.map(
+const KEY_HELP = [
+  "Shift+Tab  cycle Plan/Confirm/Auto",
+  "Shift+R    cycle reasoning effort (empty prompt)",
+  "Ctrl+O     expanded transcript",
+  "Ctrl+R     search input history",
+  "Esc        interrupt a run or close a menu",
+  "Ctrl+C     exit",
+]
+
+export const HELP_TEXT = `${SLASH_COMMANDS.map(
   (command) => `${command.name} — ${command.description}`,
-).join("\n")
+).join("\n")}\n\nKeys\n${KEY_HELP.join("\n")}`
 
 /**
  * A command menu is active only for a bare slash token. Arguments close it.
