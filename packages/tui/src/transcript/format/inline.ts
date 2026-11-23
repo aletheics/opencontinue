@@ -117,6 +117,30 @@ export function spanWidth(spans: Span[]): number {
   return textWidth(spanText(spans))
 }
 
+/**
+ * Render a prefixed block with a hanging indent, used by lists, quotes, and
+ * vertical table rows. Continuation lines align under the content.
+ */
+export function pushPrefixed(
+  lines: Line[],
+  prefix: Span[],
+  content: Span[],
+  width: number,
+  fallbackColor: string | undefined = theme.assistant,
+): void {
+  const contentWidth = Math.max(1, width - spanWidth(prefix))
+  const indent = " ".repeat(spanWidth(prefix))
+
+  for (const [index, spans] of wrapSpans(content, contentWidth).entries()) {
+    lines.push(
+      lineFromSpans(
+        index === 0 ? [...prefix, ...spans] : [{ text: indent, color: fallbackColor }, ...spans],
+        fallbackColor,
+      ),
+    )
+  }
+}
+
 type StyledChar = { char: string; style: Style; width: number }
 
 function isSpace(char: string): boolean {

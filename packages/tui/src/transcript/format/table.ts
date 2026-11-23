@@ -1,11 +1,12 @@
 import { theme } from "../../theme.js"
-import { lineFromSpans, parseInline, spanWidth, wrapSpans } from "./inline.js"
+import { lineFromSpans, parseInline, pushPrefixed, spanWidth, wrapSpans } from "./inline.js"
 import type { Line, Span } from "./line.js"
 
 export type TableAlignment = "left" | "center" | "right"
 
 const CELL_GAP = 2
 const MIN_COLUMN = 1
+const MIN_READABLE_COLUMN = 8
 
 function hasTablePipe(line: string): boolean {
   return line.includes("|")
@@ -122,9 +123,46 @@ function renderRow(
 }
 
 /**
+ * Narrow terminals lose the column grid: render each row as a key/value
+ * record instead of splitting words into unreadable fragments.
+ */
+function renderVertical(header: string[], body: string[][], width: number): Line[] {
+  const lines: Line[] = []
+  const labelLimit = Math.max(4, Math.floor(width / 2))
+
+  body.forEach((row, rowIndex) => {
+    if (rowIndex > 0) lines.push({ text: "", color: theme.assistant })
+
+    row.forEach((cell, index) => {
+      const label = (header[index] ?? "").trim() || `Column ${index + 1}`
+      const labelSpans = parseInline(label, {
+        color: theme.textSecondary,
+        bold: true,
+      })
+      const prefix: Span[] = [...labelSpans, { text: ": ", color: theme.textSecondary }]
+
+      if (spanWidth(prefix) <= labelLimit) {
+        pushPrefixed(lines, prefix, parseInline(cell), width)
+        return
+      }
+
+      for (const spans of wrapSpans(prefix, Math.max(1, width))) {
+        lines.push(lineFromSpans(spans))
+      }
+      for (const spans of wrapSpans(parseInline(cell), Math.max(1, width - 2))) {
+        lines.push(lineFromSpans([{ text: "  " }, ...spans]))
+      }
+    })
+  })
+
+  return lines
+}
+
+/**
  * Render a GFM table as aligned text: a bold header, a dim rule, then the
  * body. Columns are measured in terminal cells, so CJK text aligns with
- * narrow text, and wide tables wrap cells instead of overflowing.
+ * narrow text, and wide tables wrap cells instead of overflowing. When the
+ * grid cannot keep every column readable, it becomes vertical records.
  */
 export function formatTable(rows: string[], width: number): Line[] {
   const [headerRow, delimiterRow, ...bodyRows] = rows
@@ -152,9 +190,20 @@ export function formatTable(rows: string[], width: number): Line[] {
     Math.max(spanWidth(cell), ...bodyCells.map((row) => spanWidth(row[index] ?? [])), MIN_COLUMN),
   )
 
-  const gap = width >= columns * 4 ? CELL_GAP : 1
-  const available = Math.max(columns, Math.max(1, width) - gap * (columns - 1))
-  const widths = allocateWidths(natural, available)
+  const safeWidth = Math.max(1, width)
+  const gap = safeWidth >= columns * 4 ? CELL_GAP : 1
+  const naturalTotal = natural.reduce((sum, size) => sum + size, 0) + gap * (columns - 1)
+  const naturalWidths = naturalTotal <= safeWidth
+
+  let widths = natural
+  if (!naturalWidths) {
+    const available = Math.max(columns, safeWidth - gap * (columns - 1))
+    widths = allocateWidths(natural, available)
+
+    if (body.length > 0 && widths.some((size) => size < MIN_READABLE_COLUMN)) {
+      return renderVertical(header, body, safeWidth)
+    }
+  }
 
   const lines = renderRow(headerCells, widths, alignments, gap)
   lines.push({

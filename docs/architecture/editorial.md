@@ -84,7 +84,7 @@ screen re-projects the durable timeline. Both must use the same formatter.
 |---|---|---|
 | 0 | Feature corpus, 60/80/120 width guards, this document | done |
 | 1 | Paragraph joining, white heading hierarchy, full-width rules, block spacing | done |
-| 2 | Table readable minimums and vertical narrow layout | planned |
+| 2 | Table readable minimums and vertical narrow layout | done |
 | 3 | Code labels/rules, PowerShell/YAML/Markdown/Diff highlighting | planned |
 | 4 | Link destinations, grapheme-aware emoji width | planned |
 | 5 | Streaming stability for tables/lists/links, inline/fullscreen parity | planned |

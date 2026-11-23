@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  formatEffort,
-  headerInfo,
-  headerLines,
-  truncatePathMiddle,
-  truncateToWidth,
-} from "./header.js"
-import { textWidth } from "./transcript/format/wrap.js"
+import { formatEffort, headerInfo, headerLines, truncatePathMiddle } from "./header.js"
+import { textWidth, truncateToWidth } from "./transcript/format/wrap.js"
 
 describe("header helpers", () => {
   it("orders model, effort, and provider", () => {

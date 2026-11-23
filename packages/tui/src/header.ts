@@ -2,22 +2,7 @@ import { PRODUCT_NAME } from "./brand.js"
 import { glyphs } from "./glyphs.js"
 import { theme } from "./theme.js"
 import type { Line, Span } from "./transcript/format/line.js"
-import { charWidth, textWidth } from "./transcript/format/wrap.js"
-
-export function truncateToWidth(text: string, width: number): string {
-  if (textWidth(text) <= width) return text
-  if (width <= 1) return "…"
-
-  let result = ""
-  let used = 0
-  for (const char of text) {
-    const size = charWidth(char)
-    if (used + size > width - 1) break
-    result += char
-    used += size
-  }
-  return `${result}…`
-}
+import { charWidth, textWidth, truncateToWidth } from "./transcript/format/wrap.js"
 
 /**
  * Middle-shorten a workspace path while keeping its root and final segment,

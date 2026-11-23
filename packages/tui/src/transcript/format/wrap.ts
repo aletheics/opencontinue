@@ -8,11 +8,7 @@ export function charWidth(char: string): number {
 
   if (code === 0) return 0
   if (code < 32 || (code >= 0x7f && code < 0xa0)) return 0
-  if (
-    (code >= 0x0300 && code <= 0x036f) ||
-    (code >= 0x200b && code <= 0x200f) ||
-    code === 0xfeff
-  ) {
+  if ((code >= 0x0300 && code <= 0x036f) || (code >= 0x200b && code <= 0x200f) || code === 0xfeff) {
     return 0
   }
   if (
@@ -43,6 +39,22 @@ export function textWidth(text: string): number {
   let width = 0
   for (const char of text) width += charWidth(char)
   return width
+}
+
+/** Shorten text to a display width, ending with a single ellipsis. */
+export function truncateToWidth(text: string, width: number): string {
+  if (textWidth(text) <= width) return text
+  if (width <= 1) return "…"
+
+  let result = ""
+  let used = 0
+  for (const char of text) {
+    const size = charWidth(char)
+    if (used + size > width - 1) break
+    result += char
+    used += size
+  }
+  return `${result}…`
 }
 
 /**
@@ -114,11 +126,7 @@ export function wrapText(text: string, width: number): string[] {
   return result
 }
 
-export function wrapPrefixed(
-  prefix: string,
-  text: string,
-  width: number,
-): string[] {
+export function wrapPrefixed(prefix: string, text: string, width: number): string[] {
   const prefixWidth = textWidth(prefix)
   const lines = wrapText(text, Math.max(10, width - prefixWidth))
   return lines.map((line, index) =>

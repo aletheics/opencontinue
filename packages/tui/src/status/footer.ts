@@ -1,8 +1,7 @@
 import { glyphs } from "../glyphs.js"
-import { truncateToWidth } from "../header.js"
 import { modeName, type PermissionMode } from "../permissions/types.js"
 import { theme } from "../theme.js"
-import { textWidth } from "../transcript/format/wrap.js"
+import { textWidth, truncateToWidth } from "../transcript/format/wrap.js"
 
 export function modeLabel(mode: PermissionMode): string {
   const glyph = mode === "auto" ? glyphs.auto : mode === "plan" ? glyphs.plan : glyphs.confirm

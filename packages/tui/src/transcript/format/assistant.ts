@@ -1,7 +1,7 @@
 import { theme } from "../../theme.js"
 import { highlightCodeLine, type HighlightState } from "./highlight.js"
 import type { Line, Span } from "./line.js"
-import { lineFromSpans, parseInline, spanWidth, wrapSpans } from "./inline.js"
+import { lineFromSpans, parseInline, pushPrefixed, wrapSpans } from "./inline.js"
 import { formatTable, isTableStart } from "./table.js"
 
 function baseSpan(text: string, color: string | undefined = theme.assistant): Span {
@@ -22,25 +22,6 @@ function spansOf(line: Line): Span[] {
       backgroundColor: line.backgroundColor,
     },
   ]
-}
-
-function pushPrefixed(
-  lines: Line[],
-  prefix: Span[],
-  content: Span[],
-  width: number,
-  fallbackColor: string | undefined = theme.assistant,
-): void {
-  const contentWidth = Math.max(1, width - spanWidth(prefix))
-  const indent = " ".repeat(spanWidth(prefix))
-  for (const [index, spans] of wrapSpans(content, contentWidth).entries()) {
-    lines.push(
-      lineFromSpans(
-        index === 0 ? [...prefix, ...spans] : [baseSpan(indent, fallbackColor), ...spans],
-        fallbackColor,
-      ),
-    )
-  }
 }
 
 type Block =
