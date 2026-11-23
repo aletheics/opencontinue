@@ -5,16 +5,18 @@ import { theme } from "../theme.js"
 
 export type PromptProps = {
   columns: number
+  height: number
   input: string
   onInput: (value: string) => void
   onSubmit: (value: string) => void
-  permission: { tool: string } | null
+  permission: { tool: string; detail: string } | null
   busy: boolean
   spinner: string
 }
 
 export function Prompt({
   columns,
+  height,
   input,
   onInput,
   onSubmit,
@@ -25,16 +27,23 @@ export function Prompt({
   return (
     <Box
       flexShrink={0}
-      height={3}
+      height={height}
+      flexDirection={permission ? "column" : "row"}
       borderStyle="round"
-      borderColor={theme.inputBorder}
+      borderColor={permission ? theme.tool : theme.inputBorder}
       paddingX={1}
       overflow="hidden"
     >
       {permission ? (
-        <Text color={theme.tool} wrap="truncate">
-          permission: {permission.tool} · Allow? [y/N]
-        </Text>
+        <>
+          <Text color={theme.tool} wrap="truncate">
+            ● Permission needed: {permission.tool}
+          </Text>
+          <Text wrap="truncate">{permission.detail || "(no details)"}</Text>
+          <Text dimColor wrap="truncate">
+            [y] allow · [a] allow {permission.tool} for session · [n] deny
+          </Text>
+        </>
       ) : busy ? (
         <Text dimColor wrap="truncate">
           {spinner} Thinking…

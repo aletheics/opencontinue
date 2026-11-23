@@ -61,6 +61,58 @@ async function fakeProvider(
   return { server, url: `http://127.0.0.1:${address.port}/v1` }
 }
 
+async function fakeToolProvider(): Promise<{ server: http.Server; url: string }> {
+  let chatCalls = 0
+  const server = http.createServer((request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      chatCalls++
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      if (chatCalls === 1) {
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      function: {
+                        name: "bash",
+                        arguments: JSON.stringify({ command: "echo hi" }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          })}\n\n`,
+        )
+      } else {
+        response.write(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: "done" } }] })}\n\n`,
+        )
+      }
+      response.end("data: [DONE]\n\n")
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
 describe("TUI", () => {
   it("shows providers before asking for a key", () => {
     const { lastFrame, unmount } = render(<App options={{ readonly: true }} />)
@@ -169,6 +221,40 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).toContain("you> remember this"), {
         timeout: 5000,
       })
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("shows a permission dialog and remembers the tool", async () => {
+    const { server, url } = await fakeToolProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{}} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("run it")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> run it"))
+
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Permission needed: bash"), {
+        timeout: 5000,
+      })
+      expect(lastFrame()).toContain("echo hi")
+      expect(lastFrame()).toContain("allow bash for session")
+
+      stdin.write("a")
+      await vi.waitFor(() => expect(lastFrame()).toContain("done"), { timeout: 5000 })
+      expect(lastFrame()).toContain("Bash echo hi")
+      expect(lastFrame()).toContain("hi")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

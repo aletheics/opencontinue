@@ -18,12 +18,17 @@ import {
 } from "@opencontinue/providers"
 import type { SessionSummary } from "@opencontinue/protocol"
 import { runAgent } from "@opencontinue/runtime"
-import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
+import { ToolRegistry } from "@opencontinue/tools"
 
 import { Header } from "./components/Header.js"
 import { Picker } from "./components/Picker.js"
 import { Prompt } from "./components/Prompt.js"
 import { Timeline } from "./components/Timeline.js"
+import {
+  TuiPermissionGate,
+  type PermissionMode,
+  type PermissionRequest,
+} from "./permission-gate.js"
 import { timelineLines } from "./render.js"
 import { theme } from "./theme.js"
 import { reduceTimeline, timelineFromEvents, type TimelineItem } from "./timeline.js"
@@ -43,14 +48,6 @@ type Screen =
   | "sessions"
   | "chat"
   | "error"
-type PermissionMode = "ask" | "auto" | "readonly"
-
-type PermissionRequest = {
-  tool: string
-  input: string
-  resolve: (approved: boolean) => void
-}
-
 const SLASH_COMMANDS = [
   { name: "/help", description: "show commands" },
   { name: "/clear", description: "new session" },
@@ -65,44 +62,6 @@ const SLASH_COMMANDS = [
 const HELP_TEXT = SLASH_COMMANDS.map((command) => `${command.name} — ${command.description}`).join(
   "\n",
 )
-
-class TuiPermissionGate implements PermissionGate {
-  pending: PermissionRequest | null = null
-  private listener: (() => void) | undefined
-
-  constructor(private mode: PermissionMode) {}
-
-  setMode(mode: PermissionMode): void {
-    this.mode = mode
-  }
-
-  onChange(listener: () => void): void {
-    this.listener = listener
-  }
-
-  async authorize(tool: Tool, input: unknown): Promise<boolean> {
-    if (this.mode === "auto") return true
-    if (tool.capability === "read") return true
-    if (this.mode === "readonly") return false
-
-    return new Promise<boolean>((resolve) => {
-      this.pending = {
-        tool: tool.name,
-        input: JSON.stringify(input).slice(0, 200),
-        resolve,
-      }
-      this.listener?.()
-    })
-  }
-
-  answer(approved: boolean): void {
-    const pending = this.pending
-    if (!pending) return
-    this.pending = null
-    pending.resolve(approved)
-    this.listener?.()
-  }
-}
 
 function formatTokens(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
@@ -636,10 +595,14 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen !== "chat") return
 
     if (permission) {
-      if (character.toLowerCase() === "y") {
+      const answer = character.toLowerCase()
+      if (answer === "y") {
         gate.answer(true)
         setPermission(null)
-      } else if (character.toLowerCase() === "n" || key.escape) {
+      } else if (answer === "a") {
+        gate.answer(true, true)
+        setPermission(null)
+      } else if (answer === "n" || key.escape) {
         gate.answer(false)
         setPermission(null)
       }
@@ -721,7 +684,9 @@ export function App({ options }: { options: TuiOptions }) {
       : footer
   const footerLine = footerText.slice(0, Math.max(10, columns - 2))
 
-  const inputHeight = screen === "chat" ? 3 : 0
+  const maxInputHeight = Math.max(3, rows - 8)
+  const inputHeight =
+    screen === "chat" ? Math.min(permission ? 5 : 3, maxInputHeight) : 0
   const bodyHeight = Math.max(4, rows - 3 - inputHeight - 1)
 
   const body = (() => {
@@ -861,6 +826,7 @@ export function App({ options }: { options: TuiOptions }) {
       {screen === "chat" ? (
         <Prompt
           columns={columns}
+          height={inputHeight}
           input={input}
           onInput={setInput}
           onSubmit={send}
