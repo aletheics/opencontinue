@@ -16,7 +16,7 @@ export function Prompt({
   columns,
   input,
   cursor,
-  prefix = "❯ ",
+  prefix = "› ",
   menuOpen,
   onInput,
   onSubmit,

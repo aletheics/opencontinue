@@ -1159,7 +1159,7 @@ export function App({ options }: { options: TuiOptions }) {
             {preset?.label} API key
           </Text>
           <Box marginTop={1} width={Math.max(10, columns - 4)}>
-            <Text color={theme.assistant}>❯ </Text>
+            <Text color={theme.assistant}>› </Text>
             <TextInput value={keyInput} onChange={setKeyInput} mask="*" onSubmit={submitKey} />
           </Box>
           <Text dimColor wrap="truncate">
@@ -1176,7 +1176,7 @@ export function App({ options }: { options: TuiOptions }) {
             {preset?.label} base URL
           </Text>
           <Box marginTop={1} width={Math.max(10, columns - 4)}>
-            <Text color={theme.assistant}>❯ </Text>
+            <Text color={theme.assistant}>› </Text>
             <TextInput
               value={baseInput}
               onChange={setBaseInput}

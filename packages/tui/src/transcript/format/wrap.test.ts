@@ -14,8 +14,8 @@ describe("wrap", () => {
   })
 
   it("indents continuation lines", () => {
-    expect(wrapPrefixed("❯ ", "abcdefghijklmno", 14)).toEqual([
-      "❯ abcdefghijkl",
+    expect(wrapPrefixed("› ", "abcdefghijklmno", 14)).toEqual([
+      "› abcdefghijkl",
       "  mno",
     ])
   })

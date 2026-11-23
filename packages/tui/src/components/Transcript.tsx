@@ -137,7 +137,7 @@ export function TranscriptItem({
       >
         {wrapText(item.text || " ", Math.max(10, width - 4)).map((line, index) => (
           <Text key={index} wrap="truncate">
-            <Text color={theme.assistant}>{index === 0 ? "❯ " : "  "}</Text>
+            <Text color={theme.assistant}>{index === 0 ? "› " : "  "}</Text>
             {line}
           </Text>
         ))}

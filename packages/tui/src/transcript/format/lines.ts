@@ -47,7 +47,7 @@ export function timelineLines(
     }
 
     if (item.kind === "user") {
-      for (const line of wrapPrefixed("❯ ", item.text, width)) {
+      for (const line of wrapPrefixed("› ", item.text, width)) {
         lines.push({ text: line, color: theme.assistant })
       }
       continue

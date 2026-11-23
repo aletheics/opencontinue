@@ -214,7 +214,7 @@ describe("TUI", () => {
         leading={false}
       />,
     )
-    expect(user.lastFrame() ?? "").toContain("❯ fix the bug")
+    expect(user.lastFrame() ?? "").toContain("› fix the bug")
     user.unmount()
 
     const assistant = render(
@@ -312,7 +312,7 @@ describe("TUI", () => {
     try {
       await ready(lastFrame)
       stdin.write("/model")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /model"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /model"))
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a provider"))
       stdin.write("\r")
@@ -351,7 +351,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/resume")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /resume"))
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Resume a session"))
       expect(lastFrame()).toContain("Previous work")
@@ -359,7 +359,7 @@ describe("TUI", () => {
       stdin.write("previous")
       await vi.waitFor(() => expect(lastFrame()).toContain("/previous/"))
       stdin.write("\r")
-      await vi.waitFor(() => expect(output(frames)).toContain("❯ remember this"), {
+      await vi.waitFor(() => expect(output(frames)).toContain("› remember this"), {
         timeout: 5000,
       })
     } finally {
@@ -387,7 +387,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/resume")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /resume"))
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Resume a session"))
       expect(lastFrame()).toContain("fix the parser")
@@ -395,7 +395,7 @@ describe("TUI", () => {
       stdin.write("parser")
       await vi.waitFor(() => expect(lastFrame()).toContain("/parser/"))
       stdin.write("\r")
-      await vi.waitFor(() => expect(output(frames)).toContain("❯ fix the parser"), {
+      await vi.waitFor(() => expect(output(frames)).toContain("› fix the parser"), {
         timeout: 5000,
       })
     } finally {
@@ -418,7 +418,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("change it")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ change it"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› change it"))
       stdin.write("\r")
 
       await vi.waitFor(() => expect(lastFrame()).toContain("Permission required · write"), {
@@ -449,7 +449,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("run it")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ run it"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› run it"))
 
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Permission required · bash"), {
@@ -486,7 +486,7 @@ describe("TUI", () => {
       expect(lastFrame()).not.toContain("show commands")
 
       stdin.write("\t")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /resume"))
 
       stdin.write("\u001b")
       await ready(lastFrame)
@@ -538,7 +538,7 @@ describe("TUI", () => {
 
       stdin.write("\t")
       await vi.waitFor(() =>
-        expect(lastFrame()).toContain("❯ look @src/app.ts"),
+        expect(lastFrame()).toContain("› look @src/app.ts"),
       )
       expect(lastFrame()).not.toContain("+ src/app.ts")
     } finally {
@@ -562,7 +562,7 @@ describe("TUI", () => {
       for (const [index, text] of ["alpha", "beta"].entries()) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         stdin.write(text)
-        await vi.waitFor(() => expect(lastFrame()).toContain(`❯ ${text}`))
+        await vi.waitFor(() => expect(lastFrame()).toContain(`› ${text}`))
         stdin.write("\r")
         await vi.waitFor(() => {
           const count = output(frames).match(/hello from tui/g)?.length ?? 0
@@ -585,7 +585,7 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).not.toContain("History · /bet/"))
 
       stdin.write("!")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ beta!"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› beta!"))
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -611,7 +611,7 @@ describe("TUI", () => {
 
       stdin.write("hi")
       await vi.waitFor(() => {
-        expect(lastFrame()).toContain("❯ hi")
+        expect(lastFrame()).toContain("› hi")
       })
 
       stdin.write("\r")
@@ -630,7 +630,7 @@ describe("TUI", () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/help")
       await vi.waitFor(() => {
-        expect(lastFrame()).toContain("❯ /help")
+        expect(lastFrame()).toContain("› /help")
       })
       stdin.write("\r")
       await vi.waitFor(() => {
@@ -656,7 +656,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("hello")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ hello"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› hello"))
       stdin.write("\r")
       await vi.waitFor(() => expect(output(frames)).toContain("hello from tui"), {
         timeout: 5000,
@@ -694,7 +694,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("hello")
-      await vi.waitFor(() => expect(lastFrame()).toContain("❯ hello"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("› hello"))
       stdin.write("\r")
       await vi.waitFor(() => expect(output(frames)).toContain("Echo: hello"), {
         timeout: 5000,
@@ -721,7 +721,7 @@ describe("TUI", () => {
       for (let index = 0; index < 5; index++) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         stdin.write("/help")
-        await vi.waitFor(() => expect(lastFrame()).toContain("❯ /help"))
+        await vi.waitFor(() => expect(lastFrame()).toContain("› /help"))
         stdin.write("\r")
         await vi.waitFor(() => {
           const count = output(frames).match(/show commands/g)?.length ?? 0
@@ -732,7 +732,7 @@ describe("TUI", () => {
       const frame = lastFrame() ?? ""
       expect(frame).toContain("Type a message…")
       expect(output(frames)).not.toContain("/help/help")
-      expect(output(frames)).not.toContain("❯ /help/help")
+      expect(output(frames)).not.toContain("› /help/help")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

@@ -10,7 +10,7 @@ describe("timeline lines", () => {
       { kind: "assistant", id: "a1", runId: "r1", text: "hi there" },
     ]
     const lines = timelineLines(items, 40, false)
-    expect(lines.map((line) => line.text)).toEqual(["❯ hello", "● hi there"])
+    expect(lines.map((line) => line.text)).toEqual(["› hello", "● hi there"])
     expect(lines[0]?.color).toBe("white")
   })
 

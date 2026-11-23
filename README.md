@@ -59,7 +59,7 @@ OPENCONTINUE_MODEL=gpt-6.2
 
 ## Usage
 
-`opencontinue` starts the Claude Code-style inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `❯` is the prompt, `●` calls tools, and `⏵⏵` shows the permission mode. Use `/resume` to switch sessions, `@` to complete workspace files, `ctrl+r` to search input history, and `ctrl+o` to open the expanded transcript.
+`opencontinue` starts the Claude Code-style inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `●` calls tools, and `⏵⏵` shows the permission mode. Use `/resume` to switch sessions, `@` to complete workspace files, `ctrl+r` to search input history, and `ctrl+o` to open the expanded transcript.
 
 ```bash
 opencontinue                    # TUI
