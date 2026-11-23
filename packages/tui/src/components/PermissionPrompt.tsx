@@ -1,6 +1,6 @@
 import { Box, Text } from "ink"
 
-import { formatDiffLines } from "../render.js"
+import { formatDiffLines } from "../transcript/format/index.js"
 import { theme } from "../theme.js"
 
 export type PermissionPromptProps = {

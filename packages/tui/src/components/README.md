@@ -14,4 +14,4 @@
 
 **Rule:** components are presentational. Sessions, providers, permissions, commands, and keybindings stay in `index.tsx`. A component receives already-computed data and callbacks.
 
-**Tests:** behavior is covered through `../index.test.tsx`; formatting is covered in `../render.test.ts`.
+**Tests:** behavior is covered through `../index.test.tsx`; formatting is covered in `../transcript/format/*.test.ts`.

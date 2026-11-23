@@ -35,7 +35,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Permission dialog: bordered, shows the tool name and a readable detail (command, path, or pattern); write/edit tools also show a dry-run diff before approval. `y` allows once, `a` remembers the tool for the session, `n` denies. Permissions arrive as protocol events; the TUI answers through the client. Previews come from the tool's optional `preview` method via `PermissionBroker`.
 - Provider/model pickers with type-to-filter search, `Esc` to clear or return, and per-provider API keys.
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
-- Formatting in `packages/tui/src/render.ts`: tool headers, `⎿` output, diff coloring, markdown, and the expanded transcript line buffer.
+- Formatting in `packages/tui/src/transcript/format/`: one file each for wrapping, markdown, diffs, tool headers/output, and transcript lines.
 - Presentational components in `packages/tui/src/components/` (Transcript, Picker, Prompt, Input, SlashMenu, PermissionPrompt); `index.tsx` stays the state machine and event wiring.
 - A cursor-aware input (`components/Input.tsx` plus pure `input.ts`): horizontal and vertical scrolling, readline keys, forward delete, and multi-line entry when the terminal reports modifiers.
 - `Ctrl+R` history search, `@file` completion, workspace/git status, and Ink `kittyKeyboard` auto mode.
@@ -52,7 +52,7 @@ packages/tui/src/
   status/          token and duration formatting
   components/      presentational Ink components
   input.ts         editor math and viewport
-  render.ts        transcript/tool/markdown formatting
+  transcript/format/  wrap, markdown, diff, tool, transcript lines
   timeline.ts      durable event -> timeline reducer
   index.tsx        state machine and event wiring
 ```

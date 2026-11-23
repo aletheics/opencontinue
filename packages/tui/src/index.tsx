@@ -42,7 +42,7 @@ import {
   filterProviders,
   initialProviderIndex,
 } from "./providers/selection.js"
-import { timelineLines, toolDisplayName } from "./render.js"
+import { timelineLines, toolDisplayName } from "./transcript/format/index.js"
 import { filterSessions, sessionLabel } from "./session/labels.js"
 import { partitionTimeline } from "./session/transcript.js"
 import { workspaceInfo } from "./session/workspace.js"

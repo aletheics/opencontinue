@@ -6,7 +6,7 @@ import {
   formatToolOutputLines,
   toolHeaderLines,
   wrapText,
-} from "../render.js"
+} from "../transcript/format/index.js"
 import { theme } from "../theme.js"
 import type { TimelineItem, ToolTimelineItem } from "../timeline.js"
 import { Welcome } from "./Welcome.js"
