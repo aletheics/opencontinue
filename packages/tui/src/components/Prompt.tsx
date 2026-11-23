@@ -1,6 +1,6 @@
 import { Box } from "ink"
 
-import { Input } from "./Input.js"
+import { Input } from "../composer/editor/Input.js"
 
 export type PromptProps = {
   columns: number

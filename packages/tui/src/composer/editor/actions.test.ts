@@ -6,16 +6,14 @@ import {
   deleteToLineEnd,
   deleteToLineStart,
   deleteWordBefore,
-  inputView,
   insertText,
-  lineInfo,
   moveHorizontal,
   moveToLineEnd,
   moveToLineStart,
   moveVertical,
-} from "./input.js"
+} from "./actions.js"
 
-describe("editor", () => {
+describe("editor actions", () => {
   it("inserts at the cursor", () => {
     expect(insertText({ value: "ac", cursor: 1 }, "b")).toEqual({
       value: "abc",
@@ -29,9 +27,15 @@ describe("editor", () => {
 
   it("deletes backward and forward", () => {
     expect(backspace({ value: "abc", cursor: 2 })).toEqual({ value: "ac", cursor: 1 })
-    expect(deleteForward({ value: "abc", cursor: 1 })).toEqual({ value: "ac", cursor: 1 })
+    expect(deleteForward({ value: "abc", cursor: 1 })).toEqual({
+      value: "ac",
+      cursor: 1,
+    })
     expect(backspace({ value: "abc", cursor: 0 })).toEqual({ value: "abc", cursor: 0 })
-    expect(deleteForward({ value: "abc", cursor: 3 })).toEqual({ value: "abc", cursor: 3 })
+    expect(deleteForward({ value: "abc", cursor: 3 })).toEqual({
+      value: "abc",
+      cursor: 3,
+    })
   })
 
   it("moves horizontally and clamps", () => {
@@ -51,31 +55,9 @@ describe("editor", () => {
     })
   })
 
-  it("finds line boundaries", () => {
-    expect(lineInfo("one\ntwo", 5)).toMatchObject({
-      line: 1,
-      column: 1,
-      lineStart: 4,
-      lineEnd: 7,
-      lineCount: 2,
-    })
+  it("moves to line boundaries", () => {
     expect(moveToLineStart({ value: "one\ntwo", cursor: 6 }).cursor).toBe(4)
     expect(moveToLineEnd({ value: "one\ntwo", cursor: 4 }).cursor).toBe(7)
-  })
-
-  it("scrolls horizontally to keep the cursor visible", () => {
-    const view = inputView("abcdefghij", 10, 5, 1)
-    expect(view.lines).toEqual([{ text: "ghij", cursor: 4 }])
-    expect(inputView("abc", 1, 5, 1).lines).toEqual([{ text: "abc", cursor: 1 }])
-  })
-
-  it("windows multiline input around the cursor", () => {
-    const view = inputView("a\nb\nc\nd", 5, 10, 2)
-    expect(view.startLine).toBe(1)
-    expect(view.lines).toEqual([
-      { text: "b", cursor: -1 },
-      { text: "c", cursor: 1 },
-    ])
   })
 
   it("deletes words and line ranges", () => {

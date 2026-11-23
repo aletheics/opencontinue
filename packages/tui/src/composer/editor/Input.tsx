@@ -15,8 +15,8 @@ import {
   moveToStart,
   moveVertical,
   type EditorState,
-} from "../input.js"
-import { theme } from "../theme.js"
+} from "./index.js"
+import { theme } from "../../theme.js"
 
 export type InputProps = {
   value: string

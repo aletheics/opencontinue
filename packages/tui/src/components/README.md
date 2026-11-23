@@ -7,8 +7,7 @@
 - `Welcome.tsx` — startup logo, version, model/provider, workspace, and welcome line.
 - `Transcript.tsx` — Claude Code-style inline blocks: `❯` prompts, `● Tool(args)`, `⎿` output, colored diffs, collapsed output hints, and dim meta lines.
 - `Picker.tsx` — generic type-to-filter list used by provider, model, session, history, and file selection.
-- `Prompt.tsx` — borderless prompt composed with the cursor-aware `Input`.
-- `Input.tsx` — cursor-aware editor with horizontal/vertical scrolling and readline keys; pure editing math lives in `../input.ts`.
+- `Prompt.tsx` — borderless prompt composed with `composer/editor/Input.tsx`.
 - `SlashMenu.tsx` — borderless command palette above the prompt.
 - `PermissionPrompt.tsx` — bordered permission dialog with the tool detail, preview diff, and y/a/n choices.
 
