@@ -10,3 +10,6 @@ opencontinue-check.log
 .opencontinue/cache/
 .DS_Store
 Thumbs.db
+
+# Local reference screenshots
+/[1-7].png
