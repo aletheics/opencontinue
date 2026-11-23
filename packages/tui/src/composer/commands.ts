@@ -12,6 +12,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/mode", description: "cycle Plan/Confirm/Auto" },
   { name: "/reasoning", description: "cycle reasoning effort" },
   { name: "/diff", description: "show working tree changes" },
+  { name: "/checkpoints", description: "list run checkpoints" },
   { name: "/status", description: "session status" },
   { name: "/exit", description: "quit" },
 ]

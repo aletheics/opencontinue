@@ -61,6 +61,10 @@ import { timelineLines } from "./transcript/format/index.js"
 import { filterSessions, sessionLabel } from "./session/labels.js"
 import { stableStreamBoundary } from "./session/stream.js"
 import { partitionTimeline } from "./session/transcript.js"
+import {
+  formatCheckpoints,
+  type Checkpoint,
+} from "./session/checkpoints.js"
 import { formatWorkspaceDiff, workspaceDiff } from "./session/git.js"
 import { summarizeRun, type RunToolResult } from "./session/summary.js"
 import { latestTodos } from "./session/todos.js"
@@ -177,6 +181,8 @@ export function App({ options }: { options: TuiOptions }) {
   const spinnerTipRef = useRef<string>(pickSpinnerTip())
   const activeRunIdRef = useRef<string | null>(null)
   const runToolsRef = useRef(new Map<string, RunToolResult>())
+  const checkpointsRef = useRef<Checkpoint[]>([])
+  const runStartsRef = useRef(new Map<string, string>())
   const streamRef = useRef(
     new Map<string, { committed: number; chunk: number }>(),
   )
@@ -512,6 +518,7 @@ export function App({ options }: { options: TuiOptions }) {
     sessionId: string,
     bannerModel: string,
     bannerProvider: string,
+    restoredEvents?: number,
   ) => {
     clientRef.current = client
     sessionRef.current = sessionId
@@ -519,6 +526,8 @@ export function App({ options }: { options: TuiOptions }) {
     resetPermissions()
     streamRef.current = new Map()
     setStreamChunks([])
+    checkpointsRef.current = []
+    runStartsRef.current = new Map()
     setTimeline([
       {
         kind: "banner",
@@ -533,6 +542,11 @@ export function App({ options }: { options: TuiOptions }) {
     setTranscriptScroll(0)
     setTranscriptMode(false)
     setBusy(false)
+    if (restoredEvents && restoredEvents > 0) {
+      appendSystem(
+        `${glyphs.checkpoint} Restored session · ${restoredEvents} event${restoredEvents === 1 ? "" : "s"}`,
+      )
+    }
 
     const subscription = client.subscribe(sessionId, -1, (event) => {
       lastActivityRef.current = Date.now()
@@ -545,6 +559,7 @@ export function App({ options }: { options: TuiOptions }) {
       if (event.type === "run.started") {
         activeRunIdRef.current = event.runId
         runToolsRef.current = new Map()
+        runStartsRef.current.set(event.runId, event.at)
         return
       }
       if (event.type === "permission.resolved") {
@@ -580,6 +595,24 @@ export function App({ options }: { options: TuiOptions }) {
         return
       }
       if (event.type === "run.completed" || event.type === "run.failed") {
+        const startAt = runStartsRef.current.get(event.runId)
+        const startMs = startAt ? Date.parse(startAt) : Number.NaN
+        const endMs = Date.parse(event.at)
+        const durationMs =
+          Number.isNaN(startMs) || Number.isNaN(endMs)
+            ? undefined
+            : Math.max(0, endMs - startMs)
+        checkpointsRef.current = [
+          ...checkpointsRef.current.slice(-49),
+          {
+            seq: event.seq,
+            at: event.at,
+            status:
+              event.type === "run.completed" ? "completed" : "failed",
+            durationMs,
+          },
+        ]
+
         const started = runStartedRef.current
         if (started !== null) {
           const elapsed = Date.now() - started
@@ -599,6 +632,7 @@ export function App({ options }: { options: TuiOptions }) {
           appendMeta(lines.join("\n"))
         }
         runToolsRef.current = new Map()
+        runStartsRef.current.delete(event.runId)
         activeRunIdRef.current = null
         runStartedRef.current = null
         setRunStartedAt(null)
@@ -635,9 +669,11 @@ export function App({ options }: { options: TuiOptions }) {
 
     void (async () => {
       let sessionId = resumeId
+      let restoredEvents: number | undefined
       if (sessionId) {
         try {
-          await client.getSession(sessionId)
+          const snapshot = await client.getSession(sessionId)
+          restoredEvents = snapshot.lastSeq
         } catch {
           sessionId = undefined
         }
@@ -645,7 +681,13 @@ export function App({ options }: { options: TuiOptions }) {
       const session = sessionId
         ? { id: sessionId }
         : await client.createSession("OpenContinue TUI")
-      attachSession(client, session.id, modelName, providerLabel)
+      attachSession(
+        client,
+        session.id,
+        modelName,
+        providerLabel,
+        restoredEvents,
+      )
       setScreen("chat")
     })().catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -659,9 +701,11 @@ export function App({ options }: { options: TuiOptions }) {
 
     void (async () => {
       let sessionId = options.resume
+      let restoredEvents: number | undefined
       if (sessionId) {
         try {
-          await client.getSession(sessionId)
+          const snapshot = await client.getSession(sessionId)
+          restoredEvents = snapshot.lastSeq
         } catch {
           sessionId = undefined
         }
@@ -669,7 +713,13 @@ export function App({ options }: { options: TuiOptions }) {
       const session = sessionId
         ? { id: sessionId }
         : await client.createSession("OpenContinue TUI")
-      attachSession(client, session.id, "remote", "server")
+      attachSession(
+        client,
+        session.id,
+        "remote",
+        "server",
+        restoredEvents,
+      )
       setModel("remote")
       setScreen("chat")
     })().catch((cause) => {
@@ -773,6 +823,7 @@ export function App({ options }: { options: TuiOptions }) {
       chosen.id,
       options.url ? "remote" : model,
       options.url ? "server" : (preset?.label ?? initial.provider ?? "configured provider"),
+      chosen.lastSeq,
     )
     setSessionQuery("")
     setScreen("chat")
@@ -829,6 +880,9 @@ export function App({ options }: { options: TuiOptions }) {
               `Could not read the working tree: ${error instanceof Error ? error.message : String(error)}`,
             )
           })
+        return true
+      case "/checkpoints":
+        appendSystem(formatCheckpoints(checkpointsRef.current))
         return true
       case "/status": {
         const tokens = timeline.reduce(

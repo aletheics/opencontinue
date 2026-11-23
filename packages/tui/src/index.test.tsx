@@ -484,6 +484,8 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(output(frames)).toContain("› remember this"), {
         timeout: 5000,
       })
+      expect(output(frames)).toContain("Restored session")
+      expect(output(frames)).toContain("1 event")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -587,6 +589,15 @@ describe("TUI", () => {
       expect(output(frames)).toContain("hi")
       expect(output(frames)).toContain("1 command")
       expect(output(frames)).toContain("◆ Checkpoint saved")
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/checkpoints")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /checkpoints"))
+      stdin.write("\r")
+      await vi.waitFor(() =>
+        expect(output(frames)).toContain("◆ Checkpoints · 1"),
+      )
+      expect(output(frames)).toContain("completed")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

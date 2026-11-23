@@ -392,7 +392,8 @@ Suggested status:
 Suggested future commands:
 
 -   `/resume` --- existing documented session-resume entry point.
--   `/checkpoints` --- proposed checkpoint browser.
+-   `/checkpoints` --- implemented as a current-session run list with
+    event seq, time, duration, and status. Selection/restore is future.
 -   `/sessions` --- proposed session list, if not already covered by
     `/resume`.
 
@@ -632,8 +633,11 @@ Architecture rules:
 
 ### P3 --- Deepen OpenContinue's identity
 
--   [ ] Add checkpoint notices and safe resume summaries.
--   [ ] Add a checkpoint browser if the session model supports it.
+-   [x] Add checkpoint notices, `/checkpoints` for the current session,
+    and a restored-event summary on resume. Interrupted-operation detail
+    still depends on the snapshot exposing raw events.
+-   [ ] Add a checkpoint browser with selection/restore. `/checkpoints`
+    lists run boundaries; restoring to one is not implemented.
 -   [x] Add change awareness and `/diff`. `/diff` runs `git status
     --short` and `git diff --stat` directly, outside the agent gate.
 -   [ ] Add permission-rule inspection and management.
