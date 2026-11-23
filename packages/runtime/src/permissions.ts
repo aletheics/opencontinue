@@ -35,7 +35,35 @@ const EMPTY_POLICY: PermissionPolicy = { allow: [], ask: [], deny: [] }
 
 type Pending = {
   sessionId: string
-  resolve: (approved: boolean) => void
+  settle: (approved: boolean) => void
+}
+
+const HIGH_RISK_COMMAND: RegExp[] = [
+  /(^|[;&|]\s*)(rm|rmdir|del|erase|unlink|shred)\s/i,
+  /\b(mkfs(?:\.\w+)?|dd)\s/i,
+  /\b(shutdown|reboot|poweroff|halt)\b/i,
+  /\b(taskkill|pkill|killall)\b/i,
+  /\b(sudo|doas|runas)\b/i,
+  /\bgit\s+(reset\s+--hard|clean\s+-[a-z]*f|checkout\s+--\s+\.)/i,
+  /\bgit\s+push\b[\s\S]*--force/i,
+  /\b(chmod|chown)\s+-R\b/i,
+  /\|\s*(sh|bash|zsh|pwsh|powershell|cmd)(\s|$)/i,
+  /\b(curl|wget|iwr|Invoke-WebRequest)\b[\s\S]*\|\s*(sh|bash|iex|Invoke-Expression)\b/i,
+  /\b(Invoke-Expression|iex)\b/i,
+  /\bRemove-Item\b/i,
+  /\bformat\s+[a-z]:/i,
+  /:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
+]
+
+/** Conservative shell-command risk check used by Auto mode. */
+export function isHighRiskCommand(command: string): boolean {
+  return HIGH_RISK_COMMAND.some((pattern) => pattern.test(command))
+}
+
+function commandOf(input: unknown): string {
+  if (typeof input !== "object" || input === null) return ""
+  const command = (input as Record<string, unknown>).command
+  return typeof command === "string" ? command : ""
 }
 
 export function permissionDetail(name: string, input: unknown): string {
@@ -101,6 +129,7 @@ export class PermissionBroker implements PermissionGate {
     input: unknown,
     context: ToolContext,
   ): Promise<PermissionDecision> {
+    if (context.signal?.aborted) return { approved: false }
     if (this.policy.deny.includes(tool.name)) return { approved: false }
 
     if (this.mode === "plan") {
@@ -118,7 +147,12 @@ export class PermissionBroker implements PermissionGate {
       return { approved: true, reason: "read" }
     }
     if (this.mode === "auto" && !explicitAsk) {
-      return { approved: true, reason: "auto" }
+      const highRisk =
+        tool.name === "bash" && isHighRiskCommand(commandOf(input))
+      if (!highRisk) return { approved: true, reason: "auto" }
+
+      const approved = await this.request(tool, input, context)
+      return approved ? { approved: true, reason: "user" } : { approved: false }
     }
 
     const approved = await this.request(tool, input, context)
@@ -126,6 +160,8 @@ export class PermissionBroker implements PermissionGate {
   }
 
   private async request(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {
+    if (context.signal?.aborted) return false
+
     let detail = permissionDetail(tool.name, input)
     let diff: string | undefined
     if (tool.preview) {
@@ -137,28 +173,9 @@ export class PermissionBroker implements PermissionGate {
         // Keep the basic detail when a preview cannot be computed.
       }
     }
+    if (context.signal?.aborted) return false
 
     const requestId = randomUUID()
-    const decision = new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId)
-        this.store.append(context.sessionId, {
-          type: "permission.resolved",
-          requestId,
-          approved: false,
-        })
-        resolve(false)
-      }, 5 * 60_000)
-
-      this.pending.set(requestId, {
-        sessionId: context.sessionId,
-        resolve: (approved) => {
-          clearTimeout(timer)
-          resolve(approved)
-        },
-      })
-    })
-
     this.store.append(context.sessionId, {
       type: "permission.requested",
       requestId,
@@ -169,7 +186,37 @@ export class PermissionBroker implements PermissionGate {
       ...(diff === undefined ? {} : { diff }),
     })
 
-    return decision
+    return await new Promise<boolean>((resolve) => {
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+
+      const onAbort = () => settle(false)
+      const settle = (approved: boolean) => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        context.signal?.removeEventListener("abort", onAbort)
+        this.pending.delete(requestId)
+        this.store.append(context.sessionId, {
+          type: "permission.resolved",
+          requestId,
+          approved,
+        })
+        resolve(approved)
+      }
+
+      timer = setTimeout(() => settle(false), 5 * 60_000)
+      this.pending.set(requestId, {
+        sessionId: context.sessionId,
+        settle,
+      })
+
+      if (context.signal?.aborted) {
+        settle(false)
+        return
+      }
+      context.signal?.addEventListener("abort", onAbort, { once: true })
+    })
   }
 
   resolve(requestId: string, approved: boolean, sessionId?: string): boolean {
@@ -177,9 +224,7 @@ export class PermissionBroker implements PermissionGate {
     if (!pending) return false
     if (sessionId && pending.sessionId !== sessionId) return false
 
-    this.pending.delete(requestId)
-    this.store.append(pending.sessionId, { type: "permission.resolved", requestId, approved })
-    pending.resolve(approved)
+    pending.settle(approved)
     return true
   }
 }

@@ -50,6 +50,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
     let finished = false
 
     for (let step = 0; step < maxSteps; step++) {
+      throwIfAborted(signal)
       let text = ""
       const calls: ToolCall[] = []
       const thinking: AssistantThinkingBlock[] = []
@@ -100,6 +101,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
         break
       }
 
+      throwIfAborted(signal)
       for (const call of calls) {
         store.append(sessionId, {
           type: "tool.started",
@@ -111,12 +113,14 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
       }
 
       for (const call of calls) {
+        throwIfAborted(signal)
         const result = await tools.execute(
           call.name,
           call.arguments,
           { workspace, sessionId, signal },
           permissions,
         )
+        throwIfAborted(signal)
 
         if (result.ok) {
           store.append(sessionId, {
@@ -152,6 +156,11 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     })
   }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return
+  throw signal.reason instanceof Error ? signal.reason : new Error("Aborted")
 }
 
 function parseArguments(value: string): unknown {

@@ -9,6 +9,7 @@ import type { ChatMessage, ChatProvider } from "@opencontinue/providers"
 import { ToolRegistry, type PermissionGate } from "@opencontinue/tools"
 
 import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
+import { PermissionBroker } from "./permissions.js"
 
 const allowAll: PermissionGate = {
   async authorize() {
@@ -387,6 +388,60 @@ describe("runAgent", () => {
     expect(store.events(session.id).find((event) => event.type === "tool.completed")).toMatchObject(
       { authorization: "auto" },
     )
+  })
+
+  it("aborts while a permission is pending without running the tool", async () => {
+    const workspace = await makeWorkspace()
+    const store = new MemorySessionStore()
+    const session = store.create()
+    store.append(session.id, { type: "message.user", text: "write the marker" })
+
+    let step = 0
+    const provider: ChatProvider = {
+      id: "fake",
+      model: "fake",
+      async *streamChat() {
+        step++
+        if (step === 1) {
+          yield {
+            type: "tool_call",
+            call: {
+              id: "call_1",
+              name: "bash",
+              arguments: JSON.stringify({
+                command:
+                  'node -e "require(\'fs\').writeFileSync(\'marker.txt\',\'x\')"',
+              }),
+            },
+          }
+          return
+        }
+        yield { type: "text", text: "should not continue" }
+      },
+    }
+
+    const controller = new AbortController()
+    const permissions = new PermissionBroker(store, "confirm")
+    store.subscribe(session.id, (event) => {
+      if (event.type === "permission.requested") controller.abort()
+    })
+
+    await runAgent({
+      store,
+      sessionId: session.id,
+      provider,
+      tools: new ToolRegistry(),
+      permissions,
+      workspace,
+      signal: controller.signal,
+    })
+
+    const types = store.events(session.id).map((event) => event.type)
+    expect(types).toContain("permission.requested")
+    expect(types).toContain("permission.resolved")
+    expect(types).toContain("run.failed")
+    expect(types).not.toContain("tool.completed")
+    await expect(readFile(path.join(workspace, "marker.txt"), "utf8")).rejects.toThrow()
   })
 
   it("records a failed run", async () => {

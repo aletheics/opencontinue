@@ -62,6 +62,32 @@ describe("SqliteSessionStore", () => {
     reopened.close()
   })
 
+  it("closes a pending permission request on reopen", async () => {
+    const file = await makeDbPath()
+    const store = new SqliteSessionStore(file)
+    const session = store.create()
+
+    store.append(session.id, {
+      type: "permission.requested",
+      requestId: "req-1",
+      tool: "write",
+      capability: "write",
+      input: { path: "a.txt" },
+    })
+    store.close()
+
+    const reopened = new SqliteSessionStore(file)
+    const resolved = reopened
+      .events(session.id)
+      .find(
+        (event) =>
+          event.type === "permission.resolved" &&
+          event.requestId === "req-1",
+      )
+    expect(resolved).toMatchObject({ approved: false })
+    reopened.close()
+  })
+
   it("forks a session through a sequence", async () => {
     const file = await makeDbPath()
     const store = new SqliteSessionStore(file)

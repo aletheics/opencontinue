@@ -224,15 +224,31 @@ export class SqliteSessionStore implements SessionStore {
 
   recover(): void {
     for (const session of this.list()) {
-      const open = new Map<string, boolean>()
+      const openRuns = new Map<string, boolean>()
+      const pendingPermissions = new Map<string, boolean>()
+
       for (const event of this.events(session.id)) {
-        if (event.type === "run.started") open.set(event.runId, true)
+        if (event.type === "run.started") openRuns.set(event.runId, true)
         else if (event.type === "run.completed" || event.type === "run.failed") {
-          open.set(event.runId, false)
+          openRuns.set(event.runId, false)
+        } else if (event.type === "permission.requested") {
+          pendingPermissions.set(event.requestId, true)
+        } else if (event.type === "permission.resolved") {
+          pendingPermissions.delete(event.requestId)
         }
       }
 
-      for (const [runId, running] of open) {
+      // A prompt cannot be answered after a restart. Close it before the run
+      // failure so replay clears the card instead of showing a stale request.
+      for (const requestId of pendingPermissions.keys()) {
+        this.append(session.id, {
+          type: "permission.resolved",
+          requestId,
+          approved: false,
+        })
+      }
+
+      for (const [runId, running] of openRuns) {
         if (running) {
           this.append(session.id, {
             type: "run.failed",
