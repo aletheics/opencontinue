@@ -13,6 +13,15 @@ describe("wrap", () => {
     expect(wrapText("one\n\ntwo", 40)).toEqual(["one", "", "two"])
   })
 
+  it("breaks at spaces before splitting a word", () => {
+    expect(wrapText("alpha beta gamma", 12)).toEqual(["alpha beta", "gamma"])
+    expect(wrapText("abcdefghijkl", 10)).toEqual(["abcdefghij", "kl"])
+    expect(wrapText("abcdefghijkl mnop", 10)).toEqual([
+      "abcdefghij",
+      "kl mnop",
+    ])
+  })
+
   it("indents continuation lines", () => {
     expect(wrapPrefixed("› ", "abcdefghijklmno", 14)).toEqual([
       "› abcdefghijkl",

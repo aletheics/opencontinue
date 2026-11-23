@@ -117,32 +117,86 @@ export function spanWidth(spans: Span[]): number {
   return textWidth(spanText(spans))
 }
 
+type StyledChar = { char: string; style: Style; width: number }
+
+function isSpace(char: string): boolean {
+  return /^\s$/.test(char)
+}
+
 /**
- * Wrap a span sequence at a display width, splitting span text when a
- * character crosses the boundary.
+ * Wrap styled characters at spaces before splitting a word, then merge
+ * adjacent characters that share a style back into spans.
  */
 export function wrapSpans(spans: Span[], width: number): Span[][] {
   const safeWidth = Math.max(1, width)
-  const lines: Span[][] = []
-  let current: Span[] = []
-  let used = 0
-
-  const pushChar = (span: Style, char: string, size: number) => {
-    if (used > 0 && used + size > safeWidth) {
-      lines.push(current)
-      current = []
-      used = 0
-    }
-    push(current, { ...span, text: char })
-    used += size
-  }
+  const chars: StyledChar[] = []
 
   for (const span of spans) {
     const { text, ...style } = span
-    for (const char of text) pushChar(style, char, charWidth(char))
+    for (const char of text) {
+      chars.push({ char, style, width: charWidth(char) })
+    }
   }
 
-  if (current.length > 0 || lines.length === 0) lines.push(current)
+  if (chars.length === 0) return [[]]
+
+  const lines: Span[][] = []
+  let line: StyledChar[] = []
+  let used = 0
+
+  const pushLine = (items: StyledChar[]) => {
+    let end = items.length
+    while (end > 0 && isSpace(items[end - 1]!.char)) end--
+    const merged: Span[] = []
+    for (const item of items.slice(0, end)) {
+      push(merged, { ...item.style, text: item.char })
+    }
+    lines.push(merged)
+  }
+
+  for (const item of chars) {
+    if (used + item.width > safeWidth && line.length > 0) {
+      if (isSpace(item.char)) {
+        pushLine(line)
+        line = []
+        used = 0
+        continue
+      }
+
+      let breakAt = -1
+      for (let index = line.length - 1; index >= 0; index--) {
+        if (isSpace(line[index]!.char)) {
+          breakAt = index
+          break
+        }
+      }
+
+      if (breakAt > 0) {
+        const carry = line.slice(breakAt + 1)
+        pushLine(line.slice(0, breakAt))
+        line = carry
+        used = carry.reduce((sum, entry) => sum + entry.width, 0)
+      } else if (line.every((entry) => isSpace(entry.char))) {
+        line = []
+        used = 0
+      } else {
+        pushLine(line)
+        line = []
+        used = 0
+      }
+    }
+
+    if (line.length === 0 && lines.length > 0 && isSpace(item.char)) {
+      continue
+    }
+
+    line.push(item)
+    used += item.width
+  }
+
+  if (line.length > 0) pushLine(line)
+  else if (lines.length === 0) lines.push([])
+
   return lines
 }
 

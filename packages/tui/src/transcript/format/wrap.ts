@@ -46,31 +46,69 @@ export function textWidth(text: string): number {
 }
 
 /**
- * Display-width wrapping. One terminal row per returned string.
+ * Display-width wrapping that breaks at spaces before splitting a word.
+ * A word longer than the row is hard-split. One terminal row per string.
  */
 export function wrapText(text: string, width: number): string[] {
   const safeWidth = Math.max(10, width)
   const result: string[] = []
 
   for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
-    if (raw.length === 0) {
+    if (raw.length === 0 || raw.trim().length === 0) {
       result.push("")
       continue
     }
 
+    const before = result.length
     let line = ""
     let lineWidth = 0
-    for (const char of raw) {
-      const next = charWidth(char)
-      if (line.length > 0 && lineWidth + next > safeWidth) {
-        result.push(line)
+    const flush = () => {
+      result.push(line.trimEnd())
+      line = ""
+      lineWidth = 0
+    }
+
+    for (const token of raw.match(/\s+|\S+/g) ?? [raw]) {
+      const tokenWidth = textWidth(token)
+
+      if (lineWidth + tokenWidth <= safeWidth) {
+        line += token
+        lineWidth += tokenWidth
+        continue
+      }
+
+      if (/^\s+$/.test(token)) {
+        if (line.length > 0) flush()
+        continue
+      }
+
+      if (line.trim().length > 0) flush()
+      else {
         line = ""
         lineWidth = 0
       }
-      line += char
-      lineWidth += next
+
+      let rest = token
+      while (textWidth(rest) > safeWidth) {
+        let part = ""
+        let used = 0
+        for (const char of rest) {
+          const size = charWidth(char)
+          if (used + size > safeWidth) break
+          part += char
+          used += size
+        }
+        if (part.length === 0) break
+        result.push(part)
+        rest = rest.slice(part.length)
+      }
+
+      line = rest
+      lineWidth = textWidth(rest)
     }
-    result.push(line)
+
+    if (line.length > 0) result.push(line.trimEnd())
+    else if (result.length === before) result.push("")
   }
 
   return result

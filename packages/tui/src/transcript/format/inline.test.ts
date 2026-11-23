@@ -29,6 +29,14 @@ describe("inline markdown", () => {
     }
   })
 
+  it("wraps styled spans at spaces before splitting a word", () => {
+    const wrapped = wrapSpans(parseInline("**hello world**"), 6)
+    expect(wrapped.map(spanText)).toEqual(["hello", "world"])
+    for (const line of wrapped) {
+      for (const span of line) expect(span.bold).toBe(true)
+    }
+  })
+
   it("collapses uniform spans and keeps mixed spans", () => {
     const plain = lineFromSpans(parseInline("hello"))
     expect(plain.spans).toBeUndefined()
