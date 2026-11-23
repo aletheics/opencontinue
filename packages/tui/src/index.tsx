@@ -945,6 +945,11 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (key.escape && !busy && input.length > 0) {
+      setDraft("")
+      return
+    }
+
     if (key.ctrl && character === "d" && input.length === 0) {
       exit()
       return
