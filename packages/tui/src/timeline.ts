@@ -11,6 +11,8 @@ export type AssistantTimelineItem = {
   id: string
   runId: string
   text: string
+  /** Render as a continuation of the previous assistant block (no dot/margin). */
+  continuation?: boolean
 }
 
 export type ToolTimelineItem = {

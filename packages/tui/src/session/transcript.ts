@@ -21,6 +21,8 @@ export function isCommittedItem(
   }
   if (item.kind === "tool") return item.status !== "running"
   if (item.kind === "assistant") {
+    // Streamed prefixes are immutable once printed, even while the run is live.
+    if (item.id.startsWith("stream:")) return true
     if (!busy) return true
     return items.slice(index + 1).some((later) => later.kind !== "usage")
   }

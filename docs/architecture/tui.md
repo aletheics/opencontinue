@@ -21,7 +21,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Live spinner: `⠋ Analyzing…` followed by `(15m 57s · ↓ 45.5k tokens)` once the run passes 30 seconds, with a dim `  ⎿  Tip: …` line below. The Braille spinner advances every 120ms (`OPENCONTINUE_ASCII=1` falls back to `| / - \`). The verb is sampled per turn from OpenContinue's engineering vocabulary and shimmers in working blue (`#60A5FA`); after 3s without model output it fades to danger red (`#EF4444`) over 2s. Active tools suppress the stall, and narrow terminals drop the token count before the timer.
 - Completion line: `✓ Completed in 3.2s · 16:01`, or `× Failed in …` when the run fails.
 - Bottom mode line: `◈ Confirm · approve writes/bash · shift+tab to cycle` (default), `◎ Plan · read-only …`, or `⟳ Auto · no per-action prompts …`; busy adds `esc to interrupt`; workspace, branch, model, duration, tokens, and `? help` sit dim on the right when width allows.
-- The live assistant is clipped to the viewport tail. Completed output is printed once from `Static`, which prevents long streaming responses from scrolling part of the live frame into scrollback and then reprinting it.
+- The streaming assistant is split like Claude Code's `StreamingMarkdown`: complete lines above the current partial line are committed to scrollback through `Static`, while only the unfinished tail stays live. The commit boundary always ends a line and never cuts a fenced block or inline code. This keeps early output visible instead of hiding it until the run ends, and the full message is never reprinted when the run completes. Resume and `ctrl+o` read the durable full message, not the display chunks.
 - Slash, file, and history menus render below the prompt. File completion uses a `+ path` list and includes directories with the platform separator (`.github\` on Windows); completing a directory keeps the menu open at the trailing slash. Slash completion uses name/description columns.
 - Prompt input submitted while a run is active is queued and sent when the run finishes.
 - Keybindings:
@@ -69,7 +69,7 @@ A folder's README states why it exists. New pure logic goes beside its test in a
 The TUI is an inline Ink app:
 
 - `<Static>` owns committed transcript items and prints each once; never mutate a committed item.
-- The live area below it renders the streaming assistant item, running tools, queued notices, spinner, menus, permission dialog, and prompt.
+- The live area below it renders only the unfinished streaming tail, running tools, queued notices, spinner, menus, permission card, and prompt. Completed streamed lines are in scrollback.
 - Every rendered line must be truncated or pre-wrapped so the terminal cannot auto-wrap. Wrapping measures terminal display width, so CJK and fullwidth characters count as two columns, and it breaks at spaces before hard-splitting a long word. Terminal scrollback is the scrollback; do not replace it with a fixed-height viewport.
 - The expanded `Ctrl+O` transcript is the only scrolling viewport and is rendered on demand.
 - The permission prompt is an inline card, matching the transcript. Picker and setup screens stay borderless.

@@ -166,13 +166,15 @@ export function TranscriptItem({
 
   if (item.kind === "assistant") {
     if (!item.text) return null
-    const all = assistantBlock(item.text, width)
+    const all = assistantBlock(item.text, width, {
+      dotted: !item.continuation,
+    })
     const limit = maxLines ? Math.max(1, maxLines) : all.length
     const hidden = all.length > limit ? all.length - (limit - 1) : 0
     const visible = hidden > 0 ? all.slice(hidden) : all
 
     return (
-      <Box marginTop={leading ? 1 : 0} flexDirection="column">
+      <Box marginTop={leading && !item.continuation ? 1 : 0} flexDirection="column">
         {hidden > 0 ? (
           <Text dimColor wrap="truncate">
             {"  "}… +{hidden} earlier lines

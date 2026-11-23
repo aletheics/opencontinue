@@ -75,6 +75,41 @@ async function fakeProvider(
   return { server, url: `http://127.0.0.1:${address.port}/v1` }
 }
 
+async function fakeLineProvider(
+  lines = 30,
+): Promise<{ server: http.Server; url: string }> {
+  const server = http.createServer(async (request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      for (let index = 0; index < lines; index++) {
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [{ delta: { content: `line ${index}\n` } }],
+          })}\n\n`,
+        )
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      response.end("data: [DONE]\n\n")
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
 async function fakeToolProvider(): Promise<{ server: http.Server; url: string }> {
   let chatCalls = 0
   const server = http.createServer((request, response) => {
@@ -591,6 +626,41 @@ describe("TUI", () => {
 
       stdin.write("\t")
       await vi.waitFor(() => expect(lastFrame()).toContain("› @src/"))
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("commits streamed lines to scrollback instead of hiding them", async () => {
+    const { server, url } = await fakeLineProvider(30)
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
+
+    try {
+      await ready(lastFrame)
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("stream")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› stream"))
+      stdin.write("\r")
+
+      await vi.waitFor(() => expect(lastFrame()).toContain("● line 0"), {
+        timeout: 5000,
+      })
+      expect(output(frames)).not.toContain("Completed in")
+      expect(lastFrame()).not.toContain("● line 1")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("line 29"), {
+        timeout: 5000,
+      })
+      await vi.waitFor(() => expect(output(frames)).toContain("Completed in"), {
+        timeout: 5000,
+      })
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

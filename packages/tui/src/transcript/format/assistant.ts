@@ -168,15 +168,23 @@ export function formatAssistantLines(text: string, width: number): Line[] {
  * to the assistant dot: the first content line starts with `● ` and every
  * following line is indented by two spaces. Blank lines stay empty.
  */
-export function assistantBlock(text: string, width: number): Line[] {
+export function assistantBlock(
+  text: string,
+  width: number,
+  options: { dotted?: boolean } = {},
+): Line[] {
   const body = formatAssistantLines(text, Math.max(10, width - 2))
-  let dotted = false
+  const dotted = options.dotted ?? true
+  let first = true
 
   return body.map((line) => {
     if (line.text.length === 0) return line
     const content = spansOf(line)
     if (!dotted) {
-      dotted = true
+      return lineFromSpans([baseSpan("  "), ...content])
+    }
+    if (first) {
+      first = false
       return lineFromSpans([baseSpan("● "), ...content])
     }
     return lineFromSpans([baseSpan("  "), ...content])

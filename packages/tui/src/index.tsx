@@ -54,6 +54,7 @@ import {
 } from "./providers/selection.js"
 import { timelineLines } from "./transcript/format/index.js"
 import { filterSessions, sessionLabel } from "./session/labels.js"
+import { stableStreamBoundary } from "./session/stream.js"
 import { partitionTimeline } from "./session/transcript.js"
 import { workspaceInfo } from "./session/workspace.js"
 import { formatClock, formatDuration, formatTokens } from "./status/format.js"
@@ -64,7 +65,11 @@ import {
   stallIntensity,
 } from "./status/spinner.js"
 import { theme } from "./theme.js"
-import { reduceTimeline, type TimelineItem } from "./timeline.js"
+import {
+  reduceTimeline,
+  type AssistantTimelineItem,
+  type TimelineItem,
+} from "./timeline.js"
 
 const VERSION = "0.0.1"
 
@@ -114,6 +119,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
+  const [streamChunks, setStreamChunks] = useState<AssistantTimelineItem[]>([])
   const [input, setInput] = useState("")
   const [cursor, setCursor] = useState(0)
   const [queued, setQueued] = useState<string[]>([])
@@ -148,6 +154,9 @@ export function App({ options }: { options: TuiOptions }) {
   const spinnerVerbRef = useRef<string>(pickSpinnerVerb())
   const spinnerTipRef = useRef<string>(pickSpinnerTip())
   const activeRunIdRef = useRef<string | null>(null)
+  const streamRef = useRef(
+    new Map<string, { committed: number; chunk: number }>(),
+  )
   const stallRef = useRef(0)
   const spinnerFrameSet = useMemo(() => spinnerFrames(), [])
   const lastActivityRef = useRef(Date.now())
@@ -170,6 +179,46 @@ export function App({ options }: { options: TuiOptions }) {
     const timer = setInterval(() => setTick((value) => value + 1), 50)
     return () => clearInterval(timer)
   }, [busy])
+
+  /**
+   * Stream completed lines into scrollback instead of holding the whole
+   * assistant message in the clipped live viewport. Only the current partial
+   * line stays live, which is what Claude Code's streaming transcript does.
+   */
+  useEffect(() => {
+    let lastIndex = -1
+    for (let index = timeline.length - 1; index >= 0; index--) {
+      if (timeline[index]?.kind !== "usage") {
+        lastIndex = index
+        break
+      }
+    }
+    const active = timeline[lastIndex]
+    if (!active || active.kind !== "assistant") return
+
+    const states = streamRef.current
+    let state = states.get(active.id)
+    if (!state) {
+      state = { committed: 0, chunk: 0 }
+      states.set(active.id, state)
+    }
+
+    const boundary = stableStreamBoundary(active.text)
+    if (boundary <= state.committed) return
+
+    const raw = active.text.slice(state.committed, boundary)
+    const text = raw.endsWith("\n") ? raw.slice(0, -1) : raw
+    state.committed = boundary
+    const chunk: AssistantTimelineItem = {
+      kind: "assistant",
+      id: `stream:${active.id}:${state.chunk}`,
+      runId: active.runId,
+      text,
+      continuation: state.chunk > 0,
+    }
+    state.chunk += 1
+    setStreamChunks((current) => [...current, chunk])
+  }, [timeline])
 
   useEffect(() => {
     setSlashIndex(0)
@@ -394,6 +443,8 @@ export function App({ options }: { options: TuiOptions }) {
     sessionRef.current = sessionId
     subscriptionRef.current?.close()
     resetPermissions()
+    streamRef.current = new Map()
+    setStreamChunks([])
     setTimeline([
       {
         kind: "banner",
@@ -1078,7 +1129,36 @@ export function App({ options }: { options: TuiOptions }) {
 
   })
 
-  const { committed, live } = partitionTimeline(timeline, busy)
+  const chunksByItem = useMemo(() => {
+    const byItem = new Map<string, AssistantTimelineItem[]>()
+    for (const chunk of streamChunks) {
+      const match = /^stream:(.*):\d+$/.exec(chunk.id)
+      const itemId = match?.[1]
+      if (!itemId) continue
+      const list = byItem.get(itemId) ?? []
+      list.push(chunk)
+      byItem.set(itemId, list)
+    }
+    return byItem
+  }, [streamChunks])
+
+  const displayTimeline = useMemo(
+    () =>
+      timeline.flatMap((item): TimelineItem[] => {
+        if (item.kind !== "assistant") return [item]
+        const state = streamRef.current.get(item.id)
+        if (!state || state.committed <= 0) return [item]
+
+        const chunks = chunksByItem.get(item.id) ?? []
+        const suffix = item.text.slice(state.committed)
+        return suffix.length > 0
+          ? [...chunks, { ...item, text: suffix, continuation: true }]
+          : chunks
+      }),
+    [timeline, chunksByItem],
+  )
+
+  const { committed, live } = partitionTimeline(displayTimeline, busy)
 
   const activeTool = [...timeline]
     .reverse()
