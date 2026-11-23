@@ -4,7 +4,7 @@
 
 **Owns:** an inline Claude Code-style terminal UI: saved-provider auto-start, a startup banner with logo, version, model/provider, workspace, and welcome line; completed transcript written to terminal scrollback through Ink `Static`, `❯` prompts, `● Tool(args)` blocks, `⎿` output, colored diffs, compact output hints, `✻` thinking/completion lines, `⏵⏵` permission-mode line, queued messages, provider/model/session pickers, permission dialogs with preview diffs, markdown-style assistant output, cursor-aware multi-line input, `ctrl+r` history search, `@file` completion, and a workspace/git status line. There is no alternate screen and no bordered body/input.
 
-**Files:** `index.tsx` owns state, screens, and event wiring; `components/` holds Welcome, Transcript, Picker, Prompt, Input, SlashMenu, and PermissionPrompt; `input.ts` holds pure editing math; `render.ts` formats inline tool blocks and the `ctrl+o` transcript; `timeline.ts` reduces session events; `theme.ts` holds color tokens.
+**Files:** `index.tsx` owns state, screens, and event wiring; `components/` holds Welcome, Transcript, Picker, Prompt, Input, SlashMenu, and PermissionPrompt; `composer/` holds pure slash, history, and `@file` logic; `input.ts` holds pure editing math; `render.ts` formats inline tool blocks and the `ctrl+o` transcript; `timeline.ts` reduces session events; `theme.ts` holds color tokens.
 
 **Public API:** `runTui`, `App`.
 

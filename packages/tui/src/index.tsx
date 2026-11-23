@@ -32,6 +32,13 @@ import type {
 } from "@opencontinue/protocol"
 import { listWorkspaceFiles } from "@opencontinue/tools"
 
+import {
+  completeMention as applyMention,
+  filterWorkspaceFiles,
+  mentionQueryAt,
+} from "./composer/mentions.js"
+import { historyIndexAfterMove, searchHistory } from "./composer/history.js"
+import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
 import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
@@ -68,21 +75,6 @@ type Screen =
   | "sessions"
   | "chat"
   | "error"
-const SLASH_COMMANDS = [
-  { name: "/help", description: "show commands" },
-  { name: "/clear", description: "new session" },
-  { name: "/model", description: "change model" },
-  { name: "/provider", description: "change provider" },
-  { name: "/resume", description: "resume a session" },
-  { name: "/mode", description: "cycle permissions" },
-  { name: "/status", description: "session status" },
-  { name: "/exit", description: "quit" },
-]
-
-const HELP_TEXT = SLASH_COMMANDS.map((command) => `${command.name} — ${command.description}`).join(
-  "\n",
-)
-
 function formatTokens(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
 }
@@ -297,53 +289,26 @@ export function App({ options }: { options: TuiOptions }) {
     )
   }, [sessionLabels, sessions, sessionQuery])
 
-  const historyMatches = useMemo(() => {
-    if (!historySearch) return []
-    const query = historyQuery.trim().toLowerCase()
-    const matches = query
-      ? history.filter((item) => item.toLowerCase().includes(query))
-      : history
-    return [...matches].reverse().slice(0, 20)
-  }, [history, historyQuery, historySearch])
+  const historyMatches = useMemo(
+    () => (historySearch ? searchHistory(history, historyQuery) : []),
+    [history, historyQuery, historySearch],
+  )
 
-  const mentionMatch =
-    screen === "chat" ? input.slice(0, cursor).match(/(?:^|\s)@([^\s@]*)$/) : null
-  const mentionQuery = mentionMatch?.[1] ?? null
+  const mentionQuery = screen === "chat" ? mentionQueryAt(input, cursor) : null
 
-  const fileMatches = useMemo(() => {
-    if (mentionQuery === null) return []
-    const query = mentionQuery.toLowerCase()
-    const score = (file: string): number => {
-      const lower = file.toLowerCase()
-      const base = lower.split("/").at(-1) ?? ""
-      if (base.startsWith(query)) return 0
-      if (lower.startsWith(query)) return 1
-      if (base.includes(query)) return 2
-      return 3
-    }
-
-    return workspaceFiles
-      .filter((file) => file.toLowerCase().includes(query))
-      .sort(
-        (left, right) =>
-          score(left) - score(right) ||
-          left.length - right.length ||
-          left.localeCompare(right),
-      )
-      .slice(0, 20)
-  }, [mentionQuery, workspaceFiles])
+  const fileMatches = useMemo(
+    () =>
+      mentionQuery === null
+        ? []
+        : filterWorkspaceFiles(workspaceFiles, mentionQuery),
+    [mentionQuery, workspaceFiles],
+  )
 
   useEffect(() => {
     setFileIndex(0)
   }, [mentionQuery])
 
-  const slashQuery =
-    screen === "chat" && input.startsWith("/") && !/\s/.test(input)
-      ? (input.split(/\s+/)[0] ?? "/")
-      : ""
-  const slashMatches = slashQuery
-    ? SLASH_COMMANDS.filter((command) => command.name.startsWith(slashQuery)).slice(0, 5)
-    : []
+  const slashMatches = screen === "chat" ? matchSlashCommands(input) : []
   const fileMenuOpen =
     screen === "chat" &&
     mentionQuery !== null &&
@@ -884,12 +849,9 @@ export function App({ options }: { options: TuiOptions }) {
   }
 
   const completeMention = (file: string) => {
-    const before = input.slice(0, cursor)
-    const match = before.match(/(^|\s)@([^\s@]*)$/)
-    if (!match) return
-    const start = before.length - (match[0]?.length ?? 0) + (match[1]?.length ?? 0)
-    const next = `${input.slice(0, start)}@${file} ${input.slice(cursor)}`
-    setDraft(next, start + file.length + 2)
+    const next = applyMention(input, cursor, file)
+    if (!next) return
+    setDraft(next.value, next.cursor)
     setDismissedMention(null)
   }
 

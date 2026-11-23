@@ -40,6 +40,22 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - A cursor-aware input (`components/Input.tsx` plus pure `input.ts`): horizontal and vertical scrolling, readline keys, forward delete, and multi-line entry when the terminal reports modifiers.
 - `Ctrl+R` history search, `@file` completion, workspace/git status, and Ink `kittyKeyboard` auto mode.
 
+## Module layout
+
+The TUI follows OpenCode's feature-folder rule: one concern per folder, pure decisions separate from Ink.
+
+```text
+packages/tui/src/
+  composer/        slash commands, history search, @file mentions (pure + tests)
+  components/      presentational Ink components
+  input.ts         editor math and viewport
+  render.ts        transcript/tool/markdown formatting
+  timeline.ts      durable event -> timeline reducer
+  index.tsx        state machine and event wiring
+```
+
+A folder's README states why it exists. New pure logic goes beside its test in a feature folder before it is wired into `index.tsx`.
+
 ## Rendering contract
 
 The TUI is an inline Ink app:
