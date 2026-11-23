@@ -6,6 +6,7 @@ import type { SessionStore } from "./types.js"
 export type CreateSessionStoreOptions = {
   workspace: string
   dbPath?: string
+  busyTimeoutMs?: number
 }
 
 /**
@@ -16,5 +17,7 @@ export function createSessionStore(options: CreateSessionStoreOptions): SessionS
     options.dbPath ??
     process.env.OPENCONTINUE_DB ??
     path.join(options.workspace, ".opencontinue", "sessions", "sessions.db")
-  return new SqliteSessionStore(dbPath)
+  return new SqliteSessionStore(dbPath, {
+    busyTimeoutMs: options.busyTimeoutMs,
+  })
 }

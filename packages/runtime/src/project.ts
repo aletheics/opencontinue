@@ -25,7 +25,9 @@ export function loadProjectConfig(workspace: string): ProjectConfig {
   let parsed: Record<string, unknown> = {}
   if (existsSync(configPath)) {
     try {
-      const value = JSON.parse(readFileSync(configPath, "utf8")) as unknown
+      const text = readFileSync(configPath, "utf8")
+      const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+      const value = JSON.parse(clean) as unknown
       if (isRecord(value)) parsed = value
     } catch {
       parsed = {}
@@ -45,7 +47,11 @@ export function loadProjectConfig(workspace: string): ProjectConfig {
   const instructions = listed
     .map((item) => path.resolve(root, item))
     .filter((file) => isInside(root, file) && existsSync(file))
-    .map((file) => readFileSync(file, "utf8").slice(0, MAX_INSTRUCTION_BYTES).trim())
+    .map((file) => {
+      const text = readFileSync(file, "utf8")
+      const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+      return clean.slice(0, MAX_INSTRUCTION_BYTES).trim()
+    })
     .filter(Boolean)
     .join("\n\n")
 

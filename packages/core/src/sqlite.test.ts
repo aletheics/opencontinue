@@ -115,6 +115,21 @@ describe("SqliteSessionStore", () => {
     store.close()
   })
 
+  it("supports two connections to the same database", async () => {
+    const file = await makeDbPath()
+    const first = new SqliteSessionStore(file)
+    const second = new SqliteSessionStore(file)
+    const session = first.create("shared")
+
+    first.append(session.id, { type: "message.user", text: "one" })
+    second.append(session.id, { type: "message.user", text: "two" })
+
+    expect(first.events(session.id)).toHaveLength(3)
+    expect(second.events(session.id)).toHaveLength(3)
+    first.close()
+    second.close()
+  })
+
   it("rejects a malformed import before writing rows", async () => {
     const file = await makeDbPath()
     const store = new SqliteSessionStore(file)

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 
@@ -70,6 +70,26 @@ describe("config", () => {
       permissionMode: undefined,
       reasoningEffort: undefined,
     })
+  })
+
+  it("accepts UTF-8 BOM in config and auth files", async () => {
+    const bom = String.fromCharCode(0xfeff)
+    await writeFile(
+      path.join(home, "config.json"),
+      bom + JSON.stringify({ provider: "deepseek", model: "deepseek-chat" }),
+      "utf8",
+    )
+    await writeFile(
+      path.join(home, "auth.json"),
+      bom + JSON.stringify({ keys: { deepseek: "bom-key" } }),
+      "utf8",
+    )
+
+    expect(loadProviderConfig()).toMatchObject({
+      provider: "deepseek",
+      model: "deepseek-chat",
+    })
+    expect(resolveProviderSettings({}).apiKey).toBe("bom-key")
   })
 
   it("does not leak OPENAI_* env into another provider", () => {

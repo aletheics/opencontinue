@@ -73,7 +73,9 @@ export function authPath(): string {
 function readJson<T>(file: string): T | undefined {
   if (!existsSync(file)) return undefined
   try {
-    return JSON.parse(readFileSync(file, "utf8")) as T
+    const text = readFileSync(file, "utf8")
+    const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+    return JSON.parse(clean) as T
   } catch {
     return undefined
   }

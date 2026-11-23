@@ -53,12 +53,18 @@ export class SqliteSessionStore implements SessionStore {
   private readonly listeners = new Map<SessionId, Set<SessionListener>>()
   private closed = false
 
-  constructor(private readonly path: string) {
+  constructor(
+    private readonly path: string,
+    options: { busyTimeoutMs?: number } = {},
+  ) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true })
     this.db = new DatabaseSync(path)
     try {
       this.db.exec("PRAGMA journal_mode = WAL")
       this.db.exec("PRAGMA foreign_keys = ON")
+      this.db.exec(
+        `PRAGMA busy_timeout = ${Math.max(0, Math.trunc(options.busyTimeoutMs ?? 5_000))}`,
+      )
       this.migrate()
       this.recover()
     } catch (error) {

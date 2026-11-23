@@ -40,6 +40,25 @@ describe("loadProjectConfig", () => {
     expect(config.instructions).toBe("runtime rules")
   })
 
+  it("accepts UTF-8 BOM in project config and instructions", async () => {
+    const workspace = await makeWorkspace()
+    await mkdir(path.join(workspace, ".opencontinue"), { recursive: true })
+    const bom = String.fromCharCode(0xfeff)
+    await writeFile(
+      path.join(workspace, ".opencontinue", "opencontinue.json"),
+      bom + JSON.stringify({ permissions: { mode: "auto" } }),
+    )
+    await writeFile(
+      path.join(workspace, ".opencontinue", "AGENTS.md"),
+      `${bom}project rules`,
+    )
+
+    const config = loadProjectConfig(workspace)
+
+    expect(config.permissionMode).toBe("auto")
+    expect(config.instructions).toBe("project rules")
+  })
+
   it("falls back to .opencontinue/AGENTS.md and ignores malformed config", async () => {
     const workspace = await makeWorkspace()
     await mkdir(path.join(workspace, ".opencontinue"), { recursive: true })
