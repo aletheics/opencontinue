@@ -1,3 +1,10 @@
+const SEGMENTER = new Intl.Segmenter(undefined, { granularity: "grapheme" })
+
+/** Split text into user-perceived characters (emoji sequences stay whole). */
+export function graphemes(text: string): string[] {
+  return Array.from(SEGMENTER.segment(text), (entry) => entry.segment)
+}
+
 /**
  * Display width of one character, following the same width class a terminal
  * uses: CJK and fullwidth ranges take two columns, combining and zero-width
@@ -35,9 +42,31 @@ export function charWidth(char: string): number {
   return 1
 }
 
+function isEmojiGrapheme(grapheme: string): boolean {
+  const codes = Array.from(grapheme, (char) => char.codePointAt(0) ?? 0)
+  if (codes.includes(0x200d)) return true
+  if (codes.includes(0x20e3)) return true
+  if (codes.includes(0xfe0f)) return true
+  return codes.some(
+    (code) =>
+      (code >= 0x1f000 && code <= 0x1faff) ||
+      (code >= 0x1f1e6 && code <= 0x1f1ff) ||
+      (code >= 0x1f3fb && code <= 0x1f3ff),
+  )
+}
+
+/** Display width of a whole grapheme, never splitting emoji sequences. */
+export function graphemeWidth(grapheme: string): number {
+  if (isEmojiGrapheme(grapheme)) return 2
+
+  let width = 0
+  for (const char of grapheme) width += charWidth(char)
+  return width
+}
+
 export function textWidth(text: string): number {
   let width = 0
-  for (const char of text) width += charWidth(char)
+  for (const grapheme of graphemes(text)) width += graphemeWidth(grapheme)
   return width
 }
 
@@ -48,13 +77,44 @@ export function truncateToWidth(text: string, width: number): string {
 
   let result = ""
   let used = 0
-  for (const char of text) {
-    const size = charWidth(char)
+  for (const grapheme of graphemes(text)) {
+    const size = graphemeWidth(grapheme)
     if (used + size > width - 1) break
-    result += char
+    result += grapheme
     used += size
   }
   return `${result}…`
+}
+
+/** Shorten text from the middle while keeping both ends readable. */
+export function truncateMiddle(text: string, width: number): string {
+  if (textWidth(text) <= width) return text
+  if (width <= 1) return "…"
+
+  const parts = graphemes(text)
+  const leftBudget = Math.ceil((width - 1) / 2)
+  const rightBudget = Math.floor((width - 1) / 2)
+
+  let left = ""
+  let used = 0
+  for (const grapheme of parts) {
+    const size = graphemeWidth(grapheme)
+    if (used + size > leftBudget) break
+    left += grapheme
+    used += size
+  }
+
+  let right = ""
+  used = 0
+  for (let index = parts.length - 1; index >= 0; index--) {
+    const grapheme = parts[index] ?? ""
+    const size = graphemeWidth(grapheme)
+    if (used + size > rightBudget) break
+    right = `${grapheme}${right}`
+    used += size
+  }
+
+  return `${left}…${right}`
 }
 
 /**
@@ -104,10 +164,10 @@ export function wrapText(text: string, width: number): string[] {
       while (textWidth(rest) > safeWidth) {
         let part = ""
         let used = 0
-        for (const char of rest) {
-          const size = charWidth(char)
+        for (const grapheme of graphemes(rest)) {
+          const size = graphemeWidth(grapheme)
           if (used + size > safeWidth) break
-          part += char
+          part += grapheme
           used += size
         }
         if (part.length === 0) break

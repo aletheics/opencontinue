@@ -1,6 +1,6 @@
 import { theme } from "../../theme.js"
 import type { Line, Span } from "./line.js"
-import { charWidth, textWidth } from "./wrap.js"
+import { graphemeWidth, graphemes, textWidth, truncateMiddle } from "./wrap.js"
 
 type Style = Omit<Span, "text">
 
@@ -91,12 +91,25 @@ export function parseInline(text: string, style: Style = BASE): Span[] {
     const link = rest.match(/^\[([^\]]+)\]\(([^)]+)\)/)
     if (link) {
       flush()
-      push(spans, {
+      const label = link[1] ?? ""
+      const url = link[2] ?? ""
+      for (const span of parseInline(label, {
         ...style,
         color: theme.link,
         underline: true,
-        text: link[1] ?? "",
-      })
+      })) {
+        push(spans, span)
+      }
+      if (url && url !== label) {
+        push(spans, { ...style, dim: true, text: " (" })
+        push(spans, {
+          ...style,
+          color: theme.textSecondary,
+          dim: true,
+          text: truncateMiddle(url, 48),
+        })
+        push(spans, { ...style, dim: true, text: ")" })
+      }
       index += link[0].length
       continue
     }
@@ -141,10 +154,10 @@ export function pushPrefixed(
   }
 }
 
-type StyledChar = { char: string; style: Style; width: number }
+type StyledGlyph = { text: string; style: Style; width: number }
 
-function isSpace(char: string): boolean {
-  return /^\s$/.test(char)
+function isSpace(text: string): boolean {
+  return /^\s$/.test(text)
 }
 
 /**
@@ -158,34 +171,38 @@ export function wrapSpans(
 ): Span[][] {
   const safeWidth = Math.max(1, width)
   const breakWords = options?.breakWords ?? true
-  const chars: StyledChar[] = []
+  const glyphs: StyledGlyph[] = []
 
   for (const span of spans) {
     const { text, ...style } = span
-    for (const char of text) {
-      chars.push({ char, style, width: charWidth(char) })
+    for (const grapheme of graphemes(text)) {
+      glyphs.push({
+        text: grapheme,
+        style,
+        width: graphemeWidth(grapheme),
+      })
     }
   }
 
-  if (chars.length === 0) return [[]]
+  if (glyphs.length === 0) return [[]]
 
   const lines: Span[][] = []
-  let line: StyledChar[] = []
+  let line: StyledGlyph[] = []
   let used = 0
 
-  const pushLine = (items: StyledChar[]) => {
+  const pushLine = (items: StyledGlyph[]) => {
     let end = items.length
-    while (end > 0 && isSpace(items[end - 1]!.char)) end--
+    while (end > 0 && isSpace(items[end - 1]!.text)) end--
     const merged: Span[] = []
     for (const item of items.slice(0, end)) {
-      push(merged, { ...item.style, text: item.char })
+      push(merged, { ...item.style, text: item.text })
     }
     lines.push(merged)
   }
 
-  for (const item of chars) {
+  for (const item of glyphs) {
     if (used + item.width > safeWidth && line.length > 0) {
-      if (isSpace(item.char)) {
+      if (isSpace(item.text)) {
         pushLine(line)
         line = []
         used = 0
@@ -195,7 +212,7 @@ export function wrapSpans(
       let breakAt = -1
       if (breakWords) {
         for (let index = line.length - 1; index >= 0; index--) {
-          if (isSpace(line[index]!.char)) {
+          if (isSpace(line[index]!.text)) {
             breakAt = index
             break
           }
@@ -207,7 +224,7 @@ export function wrapSpans(
         pushLine(line.slice(0, breakAt))
         line = carry
         used = carry.reduce((sum, entry) => sum + entry.width, 0)
-      } else if (line.every((entry) => isSpace(entry.char))) {
+      } else if (line.every((entry) => isSpace(entry.text))) {
         line = []
         used = 0
       } else {
@@ -217,7 +234,7 @@ export function wrapSpans(
       }
     }
 
-    if (line.length === 0 && lines.length > 0 && isSpace(item.char)) {
+    if (line.length === 0 && lines.length > 0 && isSpace(item.text)) {
       continue
     }
 

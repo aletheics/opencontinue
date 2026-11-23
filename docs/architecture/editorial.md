@@ -86,7 +86,7 @@ screen re-projects the durable timeline. Both must use the same formatter.
 | 1 | Paragraph joining, white heading hierarchy, full-width rules, block spacing | done |
 | 2 | Table readable minimums and vertical narrow layout | done |
 | 3 | Code labels/rules, PowerShell/YAML/Markdown/Diff highlighting | done |
-| 4 | Link destinations, grapheme-aware emoji width | planned |
+| 4 | Link destinations, grapheme-aware emoji width | done |
 | 5 | Streaming stability for tables/lists/links, inline/fullscreen parity | planned |
 | 6 | Light/dark theme tokens | planned |
 | 7 | Answer-structure guidance and final visual verification | planned |

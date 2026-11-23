@@ -318,6 +318,24 @@ describe("assistant markdown", () => {
     }
   })
 
+  it("shows a link destination without repeating its label", () => {
+    const lines = formatAssistantLines("See [docs](https://example.com).", 60)
+    expect(lines[0]?.text).toBe("See docs (https://example.com).")
+
+    const same = formatAssistantLines("[https://example.com](https://example.com)", 60)
+    expect(same[0]?.text).toBe("https://example.com")
+  })
+
+  it("does not split emoji sequences in assistant text", () => {
+    const family = "👨‍👩‍👧‍👦"
+    const lines = formatAssistantLines(`${"word ".repeat(4)}${family}${"word ".repeat(4)}`, 12)
+
+    for (const line of lines) {
+      expect(textWidth(line.text)).toBeLessThanOrEqual(12)
+      if (line.text.includes("👨")) expect(line.text).toContain(family)
+    }
+  })
+
   it("styles inline code and bold inside assistant text", () => {
     const lines = assistantBlock("run `typecheck` and **ship** it", 80)
     const spans = lines[0]?.spans ?? []

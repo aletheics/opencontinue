@@ -10,15 +10,30 @@ describe("inline markdown", () => {
     )
 
     expect(spanText(spans)).toBe(
-      "run typecheck and ship it, carefully, later docs",
+      "run typecheck and ship it, carefully, later docs (https://example.com)",
     )
-    expect(
-      spans.find((span) => span.text === "typecheck")?.color,
-    ).toBe(theme.inlineCode)
+    expect(spans.find((span) => span.text === "typecheck")?.color).toBe(theme.inlineCode)
     expect(spans.find((span) => span.text === "ship")?.bold).toBe(true)
     expect(spans.find((span) => span.text === "carefully")?.italic).toBe(true)
     expect(spans.find((span) => span.text === "later")?.strikethrough).toBe(true)
     expect(spans.find((span) => span.text === "docs")?.underline).toBe(true)
+    expect(spans.find((span) => span.text === "https://example.com")?.dim).toBe(true)
+  })
+
+  it("middle-shortens long link destinations", () => {
+    const url = `https://example.com/${"a".repeat(80)}`
+    const text = spanText(parseInline(`[docs](${url})`))
+
+    expect(text.startsWith("docs (https://example.com/")).toBe(true)
+    expect(text.endsWith(")")).toBe(true)
+    expect(text).toContain("…")
+    expect(text.length).toBeLessThan(url.length + 10)
+  })
+
+  it("does not repeat a link destination equal to its label", () => {
+    expect(spanText(parseInline("[https://example.com](https://example.com)"))).toBe(
+      "https://example.com",
+    )
   })
 
   it("wraps styled spans by display width", () => {
@@ -27,6 +42,13 @@ describe("inline markdown", () => {
     for (const line of wrapped) {
       for (const span of line) expect(span.color).toBe(theme.inlineCode)
     }
+  })
+
+  it("wraps emoji sequences as single graphemes", () => {
+    const family = "👨‍👩‍👧‍👦"
+    const wrapped = wrapSpans(parseInline(`${family}${family}🚀`), 2)
+
+    expect(wrapped.map(spanText)).toEqual([family, family, "🚀"])
   })
 
   it("wraps styled spans at spaces before splitting a word", () => {

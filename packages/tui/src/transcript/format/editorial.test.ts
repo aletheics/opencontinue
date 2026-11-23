@@ -10,7 +10,9 @@ import { textWidth } from "./wrap.js"
 const CORPUS = [
   "# Project report",
   "",
-  "A paragraph with **bold**, *italic*, ~~strike~~, `code`, and a [link](https://example.com).",
+  "A paragraph with **bold**, *italic*, ~~strike~~, and `code`.",
+  "",
+  "See [docs](https://example.com).",
   "",
   "## Findings",
   "",
@@ -56,7 +58,8 @@ describe("editorial corpus", () => {
 
       for (const expected of [
         "Project report",
-        "A paragraph with bold, italic, strike, code, and a link.",
+        "A paragraph with bold, italic, strike, and code.",
+        "See docs (https://example.com).",
         "Findings",
         "Details",
         "Deeper",

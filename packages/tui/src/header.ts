@@ -2,7 +2,7 @@ import { PRODUCT_NAME } from "./brand.js"
 import { glyphs } from "./glyphs.js"
 import { theme } from "./theme.js"
 import type { Line, Span } from "./transcript/format/line.js"
-import { charWidth, textWidth, truncateToWidth } from "./transcript/format/wrap.js"
+import { graphemeWidth, graphemes, textWidth, truncateToWidth } from "./transcript/format/wrap.js"
 
 /**
  * Middle-shorten a workspace path while keeping its root and final segment,
@@ -34,13 +34,14 @@ export function truncatePathMiddle(path: string, width: number): string {
   const room = width - textWidth(root) - 1
   if (room <= 0) return truncateToWidth(path, width)
 
+  const tailParts = graphemes(basename)
   let tail = ""
   let used = 0
-  for (let index = basename.length - 1; index >= 0; index--) {
-    const char = basename[index] ?? ""
-    const size = charWidth(char)
+  for (let index = tailParts.length - 1; index >= 0; index--) {
+    const grapheme = tailParts[index] ?? ""
+    const size = graphemeWidth(grapheme)
     if (used + size > room) break
-    tail = `${char}${tail}`
+    tail = `${grapheme}${tail}`
     used += size
   }
   return `${root}…${tail}`

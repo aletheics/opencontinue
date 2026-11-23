@@ -29,6 +29,14 @@ describe("header helpers", () => {
     expect(textWidth(truncatePathMiddle("/work/opencontinue", 8))).toBe(8)
   })
 
+  it("keeps emoji graphemes whole when shortening paths", () => {
+    const family = "👨‍👩‍👧‍👦"
+    const shortened = truncatePathMiddle(`/work/${family}-project`, 12)
+
+    expect(textWidth(shortened)).toBeLessThanOrEqual(12)
+    if (shortened.includes("👨")) expect(shortened).toContain(family)
+  })
+
   it("measures CJK cells", () => {
     expect(truncateToWidth("你好世界", 5)).toBe("你好…")
     const path = truncatePathMiddle("D:\\项目\\opencontinue", 12)

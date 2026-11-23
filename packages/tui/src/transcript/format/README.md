@@ -5,7 +5,7 @@
 **Files:**
 
 - `line.ts` — the styled line shape used by every formatter.
-- `wrap.ts` — width wrapping and prefixed continuation.
+- `wrap.ts` — display-width wrapping, grapheme-aware emoji, and prefixed continuation.
 - `assistant.ts` — markdown-style assistant output, top-level block spacing, and ruled code blocks.
 - `highlight.ts` — language-aware code tokenizer and canonical code labels.
 - `table.ts` — GFM tables with display-width column alignment and a vertical fallback for narrow terminals.
