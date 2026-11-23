@@ -4,7 +4,7 @@
 
 **Owns:** provider picker, per-provider key prompt, model picker, streaming chat, permission prompt, session resume, Claude Code-style timeline (user/assistant/tool blocks), collapsible tool output, colored diffs, token/time stats, spinner, fixed header/body/input/footer.
 
-**Files:** `index.tsx` owns screens, input, and the fixed frame; `render.ts` turns timeline items into a clipped line buffer (one terminal row per line); `timeline.ts` reduces session events; `theme.ts` holds color tokens.
+**Files:** `index.tsx` owns state, screens, and event wiring; `components/` holds the fixed frame pieces (Header, Picker, Timeline, Prompt); `render.ts` turns timeline items into a clipped line buffer (one terminal row per line); `timeline.ts` reduces session events; `theme.ts` holds color tokens.
 
 **Public API:** `runTui`, `App`.
 

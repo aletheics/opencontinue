@@ -19,9 +19,13 @@ import {
 import { runAgent } from "@opencontinue/runtime"
 import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
 
+import { Header } from "./components/Header.js"
+import { Picker } from "./components/Picker.js"
+import { Prompt } from "./components/Prompt.js"
+import { Timeline } from "./components/Timeline.js"
 import { timelineLines } from "./render.js"
-import { reduceTimeline, timelineFromEvents, type TimelineItem } from "./timeline.js"
 import { theme } from "./theme.js"
+import { reduceTimeline, timelineFromEvents, type TimelineItem } from "./timeline.js"
 
 export type TuiOptions = {
   auto?: boolean
@@ -130,42 +134,6 @@ function isPrintableInput(
   return character.length > 0 && !key.ctrl && !key.meta && !/[\r\n\t]/.test(character)
 }
 
-function Header({
-  provider,
-  model,
-  mode,
-  stats,
-}: {
-  provider: string
-  model: string
-  mode: string
-  stats?: string
-}) {
-  return (
-    <Box
-      flexShrink={0}
-      height={3}
-      borderStyle="round"
-      borderColor={theme.border}
-      paddingX={1}
-      justifyContent="space-between"
-      overflow="hidden"
-    >
-      <Box flexShrink={0}>
-        <Text bold color={theme.brand} wrap="truncate">
-          OpenContinue
-        </Text>
-      </Box>
-      <Box flexShrink={1} overflow="hidden">
-        <Text dimColor wrap="truncate">
-          {provider} · model: {model} · {mode}
-          {stats ? ` · ${stats}` : ""}
-        </Text>
-      </Box>
-    </Box>
-  )
-}
-
 export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
   const { columns, rows } = useTerminalSize()
@@ -222,7 +190,7 @@ export function App({ options }: { options: TuiOptions }) {
     return () => clearInterval(timer)
   }, [busy])
 
-  const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10]
+  const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10] ?? "⠋"
 
   const filteredProviders = useMemo(() => {
     const query = providerQuery.trim().toLowerCase()
@@ -681,49 +649,18 @@ export function App({ options }: { options: TuiOptions }) {
 
   const body = (() => {
     if (screen === "provider") {
-      if (filteredProviders.length === 0) {
-        return (
-          <>
-            <Text dimColor wrap="truncate">
-              No providers match “{providerQuery}”
-            </Text>
-            <Text dimColor wrap="truncate">
-              Backspace to edit · Esc to clear
-            </Text>
-          </>
-        )
-      }
-
-      const windowSize = Math.max(4, Math.min(12, bodyHeight - 4))
-      const start = Math.max(
-        0,
-        Math.min(
-          providerIndex - Math.floor(windowSize / 2),
-          Math.max(0, filteredProviders.length - windowSize),
-        ),
-      )
-      const visible = filteredProviders.slice(start, start + windowSize)
-
       return (
-        <>
-          <Text dimColor wrap="truncate">
-            {`Select a provider${providerQuery ? ` · /${providerQuery}/` : ""} (${providerIndex + 1}/${filteredProviders.length})`}
-          </Text>
-          {visible.map((item, offset) => {
-            const index = start + offset
-            return (
-              <Text
-                key={item.id}
-                color={index === providerIndex ? "cyan" : undefined}
-                wrap="truncate"
-              >
-                {index === providerIndex ? "› " : "  "}
-                {item.label}
-                {item.note ? ` — ${item.note}` : ""}
-              </Text>
-            )
-          })}
-        </>
+        <Picker
+          header={`Select a provider${providerQuery ? ` · /${providerQuery}/` : ""} (${providerIndex + 1}/${filteredProviders.length})`}
+          items={filteredProviders.map((item) => ({
+            key: item.id,
+            label: item.label,
+            note: item.note,
+          }))}
+          selectedIndex={providerIndex}
+          windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
+          emptyText={`No providers match “${providerQuery}”`}
+        />
       )
     }
 
@@ -786,90 +723,20 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (screen === "models") {
-      if (filteredModels.length === 0) {
-        return (
-          <>
-            <Text dimColor wrap="truncate">
-              No models match “{modelQuery}”
-            </Text>
-            <Text dimColor wrap="truncate">
-              Backspace to edit · Esc to clear
-            </Text>
-          </>
-        )
-      }
-
-      const windowSize = Math.max(4, Math.min(12, bodyHeight - 4))
-      const start = Math.max(
-        0,
-        Math.min(
-          modelIndex - Math.floor(windowSize / 2),
-          Math.max(0, filteredModels.length - windowSize),
-        ),
-      )
-      const visible = filteredModels.slice(start, start + windowSize)
-
       return (
-        <>
-          <Text dimColor wrap="truncate">
-            {`Select a model · ${preset?.label ?? "provider"}${modelQuery ? ` · /${modelQuery}/` : ""} (${modelIndex + 1}/${filteredModels.length})`}
-          </Text>
-          {visible.map((item, offset) => {
-            const index = start + offset
-            return (
-              <Text
-                key={item}
-                color={index === modelIndex ? "cyan" : undefined}
-                wrap="truncate"
-              >
-                {index === modelIndex ? "› " : "  "}
-                {item}
-              </Text>
-            )
-          })}
-        </>
+        <Picker
+          header={`Select a model · ${preset?.label ?? "provider"}${modelQuery ? ` · /${modelQuery}/` : ""} (${modelIndex + 1}/${filteredModels.length})`}
+          items={filteredModels.map((item) => ({ key: item, label: item }))}
+          selectedIndex={modelIndex}
+          windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
+          emptyText={`No models match “${modelQuery}”`}
+        />
       )
     }
 
     const lines = timelineLines(timeline, Math.max(20, columns - 4), expandAll)
     lineCountRef.current = lines.length
-    const maxLines = Math.max(1, bodyHeight - 4)
-    const end = Math.max(0, lines.length - scrollOffset)
-    const start = Math.max(0, end - maxLines)
-    const visibleLines = lines.slice(start, end)
-    const hiddenAbove = start
-    const hiddenBelow = lines.length - end
-
-    return (
-      <>
-        {hiddenAbove > 0 ? (
-          <Text dimColor wrap="truncate">
-            … {hiddenAbove} older lines · PgUp
-          </Text>
-        ) : null}
-        {visibleLines.length === 0 ? (
-          <Text dimColor wrap="truncate">
-            Type a message to start.
-          </Text>
-        ) : (
-          visibleLines.map((line, index) => (
-            <Text
-              key={`${start + index}`}
-              color={line.color}
-              dimColor={line.dim}
-              wrap="truncate"
-            >
-              {line.text}
-            </Text>
-          ))
-        )}
-        {hiddenBelow > 0 ? (
-          <Text dimColor wrap="truncate">
-            … {hiddenBelow} newer lines · PgDn
-          </Text>
-        ) : null}
-      </>
-    )
+    return <Timeline lines={lines} bodyHeight={bodyHeight} scrollOffset={scrollOffset} />
   })()
 
   const totalTokens = timeline.reduce(
@@ -899,35 +766,15 @@ export function App({ options }: { options: TuiOptions }) {
         {body}
       </Box>
       {screen === "chat" ? (
-        <Box
-          flexShrink={0}
-          height={3}
-          borderStyle="round"
-          borderColor={theme.inputBorder}
-          paddingX={1}
-          overflow="hidden"
-        >
-          {permission ? (
-            <Text color="yellow" wrap="truncate">
-              permission: {permission.tool} · Allow? [y/N]
-            </Text>
-          ) : busy ? (
-            <Text dimColor wrap="truncate">
-              {spinner} Thinking…
-            </Text>
-          ) : (
-            <Box width={Math.max(10, columns - 8)} overflow="hidden">
-              <Text color="green">{"you> "}</Text>
-              <TextInput
-                value={input}
-                onChange={setInput}
-                onSubmit={send}
-                placeholder="Type a message…"
-                focus={!busy && !permission}
-              />
-            </Box>
-          )}
-        </Box>
+        <Prompt
+          columns={columns}
+          input={input}
+          onInput={setInput}
+          onSubmit={send}
+          permission={permission}
+          busy={busy}
+          spinner={spinner}
+        />
       ) : null}
       <Box paddingX={1} flexShrink={0} height={1} overflow="hidden">
         <Text dimColor wrap="truncate">
