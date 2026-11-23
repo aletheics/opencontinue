@@ -7,7 +7,7 @@ import path from "node:path"
 
 import { HttpSessionClient } from "@opencontinue/client"
 import { createSessionStore } from "@opencontinue/core"
-import { EchoProvider } from "@opencontinue/providers"
+import { EchoProvider, type ChatProvider, type ChatRequest } from "@opencontinue/providers"
 import { closeServer, startServer } from "@opencontinue/server"
 import { afterEach, describe, expect, it } from "vitest"
 
@@ -23,6 +23,28 @@ async function workspace(): Promise<string> {
   const directory = await mkdtemp(path.join(os.tmpdir(), "opencontinue-e2e-"))
   temporary.push(directory)
   return directory
+}
+
+class BlockingProvider implements ChatProvider {
+  readonly id = "blocking"
+  readonly model = "blocking"
+
+  async listModels(): Promise<string[]> {
+    return [this.model]
+  }
+
+  async *streamChat(request: ChatRequest): AsyncGenerator<never, void, unknown> {
+    await new Promise<never>((_, reject) => {
+      if (request.signal?.aborted) {
+        reject(new Error("Aborted"))
+        return
+      }
+      request.signal?.addEventListener("abort", () => reject(new Error("Aborted")), {
+        once: true,
+      })
+    })
+    yield* []
+  }
 }
 
 describe("client/server e2e", () => {
@@ -78,6 +100,51 @@ describe("client/server e2e", () => {
         id: session.id,
         lastSeq: expect.any(Number),
       })
+    } finally {
+      client.close()
+      await closeServer(running.server)
+      store.close()
+    }
+  }, 15000)
+
+  it("aborts a running session through the HTTP contract", async () => {
+    const directory = await workspace()
+    const store = createSessionStore({ workspace: directory })
+    const running = startServer({
+      store,
+      provider: new BlockingProvider(),
+      port: 0,
+      workspace: directory,
+      permissionMode: "readonly",
+    })
+    const server = running.server as unknown as HttpServer
+    if (!server.listening) await once(server, "listening")
+    const address = server.address() as AddressInfo
+    const client = new HttpSessionClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      reconnectDelayMs: 20,
+    })
+
+    try {
+      const session = await client.createSession("abort")
+      const failed = new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timed out")), 5000)
+        const subscription = client.subscribe(session.id, -1, (event) => {
+          if (event.type === "run.started") void client.abort(session.id)
+          if (event.type === "run.failed") {
+            clearTimeout(timer)
+            subscription.close()
+            resolve(event.error)
+          }
+        })
+        void subscription.ready.catch((error) => {
+          clearTimeout(timer)
+          reject(error)
+        })
+      })
+
+      await client.sendMessage(session.id, "block")
+      await expect(failed).resolves.toMatch(/abort/i)
     } finally {
       client.close()
       await closeServer(running.server)

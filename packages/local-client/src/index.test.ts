@@ -1,9 +1,30 @@
 import { ClientHttpError } from "@opencontinue/client"
 import { MemorySessionStore } from "@opencontinue/core"
-import { EchoProvider } from "@opencontinue/providers"
+import { EchoProvider, type ChatProvider, type ChatRequest } from "@opencontinue/providers"
 import { describe, expect, it } from "vitest"
 
 import { LocalSessionClient } from "./index.js"
+
+class BlockingProvider implements ChatProvider {
+  readonly id = "blocking"
+  readonly model = "blocking"
+
+  async listModels(): Promise<string[]> {
+    return [this.model]
+  }
+
+  async *streamChat(request: ChatRequest): AsyncGenerator<never, void, unknown> {
+    await new Promise<never>((_, reject) => {
+      const signal = request.signal
+      if (signal?.aborted) {
+        reject(new Error("Aborted"))
+        return
+      }
+      signal?.addEventListener("abort", () => reject(new Error("Aborted")), { once: true })
+    })
+    yield* []
+  }
+}
 
 function setup(): { store: MemorySessionStore; client: LocalSessionClient } {
   const store = new MemorySessionStore()
@@ -56,6 +77,41 @@ describe("LocalSessionClient", () => {
 
     await expect(client.listSessions()).resolves.toHaveLength(1)
     await expect(client.getSession(session.id)).resolves.toMatchObject({ id: session.id })
+    client.close()
+  })
+
+  it("aborts an active run through the client contract", async () => {
+    const store = new MemorySessionStore()
+    const client = new LocalSessionClient({
+      store,
+      provider: new BlockingProvider(),
+      workspace: process.cwd(),
+      permissionMode: "readonly",
+    })
+    const session = await client.createSession("abort")
+    const events: string[] = []
+
+    const failed = new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("timed out")), 3000)
+      const subscription = client.subscribe(session.id, -1, (event) => {
+        events.push(event.type)
+        if (event.type === "run.started") void client.abort(session.id)
+        if (event.type === "run.failed") {
+          clearTimeout(timer)
+          subscription.close()
+          resolve(event.error)
+        }
+      })
+      void subscription.ready.catch((error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+    })
+
+    await client.sendMessage(session.id, "block")
+    await expect(failed).resolves.toMatch(/abort/i)
+    expect(events).toContain("run.started")
+    expect(events).toContain("run.failed")
     client.close()
   })
 

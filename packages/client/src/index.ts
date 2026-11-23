@@ -28,6 +28,7 @@ export interface OpenContinueClient {
   createSession(title?: string): Promise<SessionSnapshot>
   getSession(sessionId: string): Promise<SessionSnapshot>
   sendMessage(sessionId: string, text: string): Promise<void>
+  abort(sessionId: string): Promise<void>
   resolvePermission(
     sessionId: string,
     requestId: string,
@@ -89,7 +90,7 @@ export class HttpSessionClient implements OpenContinueClient {
   readonly baseUrl: string
   private readonly fetchImpl: FetchLike
   private readonly reconnectDelayMs: number
-  private readonly abort = new AbortController()
+  private readonly closeController = new AbortController()
   private readonly subscriptions = new Set<AbortController>()
   private closed = false
 
@@ -122,6 +123,13 @@ export class HttpSessionClient implements OpenContinueClient {
     await this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/messages`, {
       method: "POST",
       body: JSON.stringify({ text }),
+    })
+  }
+
+  async abort(sessionId: string): Promise<void> {
+    await this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/abort`, {
+      method: "POST",
+      body: "{}",
     })
   }
 
@@ -186,7 +194,7 @@ export class HttpSessionClient implements OpenContinueClient {
   close(): void {
     if (this.closed) return
     this.closed = true
-    this.abort.abort()
+    this.closeController.abort()
     for (const controller of this.subscriptions) controller.abort()
     this.subscriptions.clear()
   }
@@ -194,7 +202,7 @@ export class HttpSessionClient implements OpenContinueClient {
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
-      signal: init.signal ?? this.abort.signal,
+      signal: init.signal ?? this.closeController.signal,
       headers: {
         "content-type": "application/json",
         ...(init.headers ?? {}),

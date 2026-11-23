@@ -91,6 +91,9 @@ async function fixture(): Promise<Fixture> {
     if (url.pathname === `/v1/sessions/${sessionId}/messages`) {
       return json({ accepted: true }, 202)
     }
+    if (url.pathname === `/v1/sessions/${sessionId}/abort`) {
+      return json({ aborted: true })
+    }
     if (url.pathname.startsWith(`/v1/sessions/${sessionId}/permissions/`)) {
       return json({ ok: true })
     }
@@ -131,6 +134,7 @@ describe("HttpSessionClient", () => {
     await expect(client.createSession("Test session")).resolves.toEqual(snapshot)
     await expect(client.getSession(sessionId)).resolves.toEqual(snapshot)
     await expect(client.sendMessage(sessionId, "hello")).resolves.toBeUndefined()
+    await expect(client.abort(sessionId)).resolves.toBeUndefined()
     await expect(client.resolvePermission(sessionId, "request-1", true)).resolves.toBeUndefined()
 
     expect(requests).toContainEqual({
@@ -142,6 +146,11 @@ describe("HttpSessionClient", () => {
       method: "POST",
       path: `/v1/sessions/${sessionId}/messages`,
       body: JSON.stringify({ text: "hello" }),
+    })
+    expect(requests).toContainEqual({
+      method: "POST",
+      path: `/v1/sessions/${sessionId}/abort`,
+      body: "{}",
     })
     expect(requests).toContainEqual({
       method: "POST",

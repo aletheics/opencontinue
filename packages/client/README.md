@@ -2,7 +2,7 @@
 
 **Why:** every client needs one session contract and one SSE implementation, not a copy per app.
 
-**Owns:** the typed session client interface, HTTP request helpers, SSE replay/reconnect, and subscriber lifecycle. It knows the protocol, not the runtime, tools, provider, or database.
+**Owns:** the typed session client interface, HTTP request helpers, run abort, SSE replay/reconnect, and subscriber lifecycle. It knows the protocol, not the runtime, tools, provider, or database.
 
 **Public API:** `OpenContinueClient`, `HttpSessionClient`, `SessionSubscription`, `ClientHttpError`.
 

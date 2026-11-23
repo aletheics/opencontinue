@@ -44,6 +44,7 @@ export class LocalSessionClient implements OpenContinueClient {
   private readonly tools: ToolRegistry
   private readonly permissions: PermissionBroker
   private readonly subscriptions = new Set<() => void>()
+  private readonly activeRuns = new Map<string, AbortController>()
   private closed = false
 
   constructor(options: LocalClientOptions) {
@@ -84,7 +85,13 @@ export class LocalSessionClient implements OpenContinueClient {
   async sendMessage(sessionId: string, text: string): Promise<void> {
     if (!this.store.get(sessionId)) throw new ClientHttpError(404, "session not found")
 
+    if (this.activeRuns.has(sessionId)) {
+      throw new ClientHttpError(409, "session is already running")
+    }
+
     this.store.append(sessionId, { type: "message.user", text })
+    const controller = new AbortController()
+    this.activeRuns.set(sessionId, controller)
     void runAgent({
       store: this.store,
       sessionId,
@@ -93,7 +100,16 @@ export class LocalSessionClient implements OpenContinueClient {
       permissions: this.permissions,
       workspace: this.workspace,
       systemPrompt: this.systemPrompt,
+      signal: controller.signal,
+    }).finally(() => {
+      if (this.activeRuns.get(sessionId) === controller) this.activeRuns.delete(sessionId)
     })
+  }
+
+  async abort(sessionId: string): Promise<void> {
+    if (!this.store.get(sessionId)) throw new ClientHttpError(404, "session not found")
+    this.activeRuns.get(sessionId)?.abort()
+    this.activeRuns.delete(sessionId)
   }
 
   async resolvePermission(
@@ -153,6 +169,8 @@ export class LocalSessionClient implements OpenContinueClient {
     this.closed = true
     for (const close of this.subscriptions) close()
     this.subscriptions.clear()
+    for (const controller of this.activeRuns.values()) controller.abort()
+    this.activeRuns.clear()
   }
 
   private snapshot(sessionId: string): SessionSnapshot {

@@ -52,6 +52,7 @@ export function createApp(
   workspace: string,
 ): Hono {
   const app = new Hono()
+  const activeRuns = new Map<string, AbortController>()
 
   app.use("*", cors())
 
@@ -82,7 +83,13 @@ export function createApp(
     const parsed = SendMessageRequest.safeParse(body)
     if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
 
+    if (activeRuns.has(sessionId)) {
+      return c.json({ error: "session is already running" }, 409)
+    }
+
     store.append(sessionId, { type: "message.user", text: parsed.data.text })
+    const controller = new AbortController()
+    activeRuns.set(sessionId, controller)
     void runAgent({
       store,
       sessionId,
@@ -91,8 +98,22 @@ export function createApp(
       tools,
       permissions,
       workspace,
+      signal: controller.signal,
+    }).finally(() => {
+      if (activeRuns.get(sessionId) === controller) activeRuns.delete(sessionId)
     })
     return c.json({ accepted: true }, 202)
+  })
+
+  app.post("/v1/sessions/:id/abort", (c) => {
+    const sessionId = c.req.param("id")
+    if (!store.get(sessionId)) return c.json({ error: "session not found" }, 404)
+
+    const controller = activeRuns.get(sessionId)
+    if (!controller) return c.json({ aborted: false })
+    controller.abort()
+    activeRuns.delete(sessionId)
+    return c.json({ aborted: true })
   })
 
   app.post("/v1/sessions/:id/permissions/:requestId", async (c) => {
