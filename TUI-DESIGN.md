@@ -612,7 +612,9 @@ Architecture rules:
 ### P1 --- Improve daily usability
 
 -   [x] Refine startup/header hierarchy.
--   [ ] Add concise task progress for multi-step work.
+-   [x] Add concise task progress for multi-step work. The model
+    maintains a `todo` tool list; the TUI shows the newest list above the
+    prompt with `✓`, `▸`, and `○` state markers.
 -   [ ] Add evidence-based completion summaries.
 -   [ ] Make narrow-terminal behavior reliable.
 -   [x] Document existing shortcuts and commands in `?` help.

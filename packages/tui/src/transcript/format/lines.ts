@@ -70,6 +70,8 @@ export function timelineLines(
       continue
     }
 
+    if (item.name === "todo") continue
+
     const header = toolHeaderLines(item, width)
     header.forEach((text, index) => {
       lines.push({

@@ -299,6 +299,42 @@ const bashInput = z.object({
   timeoutMs: z.number().int().positive().max(600_000).optional().describe("Timeout in milliseconds"),
 })
 
+const todoStatus = z.enum(["pending", "in_progress", "completed"])
+
+const todoInput = z.object({
+  todos: z
+    .array(
+      z.object({
+        content: z.string().min(1).describe("Imperative task description"),
+        status: todoStatus.describe("pending, in_progress, or completed"),
+        activeForm: z
+          .string()
+          .optional()
+          .describe("Present-continuous label shown while in progress"),
+      }),
+    )
+    .max(12)
+    .describe("The complete task list, in order; replace it on every update"),
+})
+
+export const todoTool: Tool = {
+  name: "todo",
+  description:
+    "Maintain a short task list for multi-step work. Call with the complete list whenever a task starts, finishes, or changes. Use three or more meaningful steps; skip it for simple questions. Keep at most one task in_progress.",
+  capability: "read",
+  input: todoInput,
+  async execute(raw) {
+    const { todos } = todoInput.parse(raw)
+    const active = todos.filter((todo) => todo.status === "in_progress").length
+    if (active > 1) {
+      throw new Error("Only one todo may be in_progress")
+    }
+
+    const done = todos.filter((todo) => todo.status === "completed").length
+    return `${done}/${todos.length} complete`
+  },
+}
+
 export const bashTool: Tool = {
   name: "bash",
   description: "Run a shell command inside the workspace and return combined stdout/stderr.",
@@ -360,7 +396,17 @@ export const bashTool: Tool = {
 export class ToolRegistry {
   private readonly tools = new Map<string, Tool>()
 
-  constructor(tools: Tool[] = [readTool, writeTool, editTool, globTool, grepTool, bashTool]) {
+  constructor(
+    tools: Tool[] = [
+      readTool,
+      writeTool,
+      editTool,
+      globTool,
+      grepTool,
+      bashTool,
+      todoTool,
+    ],
+  ) {
     for (const tool of tools) this.tools.set(tool.name, tool)
   }
 

@@ -75,7 +75,7 @@ Flags: `--auto`, `--plan`, `--readonly` (alias for `--plan`), `--resume <id>`, `
 
 Sessions persist in `.opencontinue/sessions/sessions.db` (WAL). Set `OPENCONTINUE_DB` to override. Interrupted runs are marked failed on the next start.
 
-Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
+Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`, `todo`. The `todo` tool is read-capability (no approval) and powers the task panel above the prompt.
 
 Execution modes: **Plan** reads and analyzes but never writes or runs shell commands; **Confirm** (default) allows reads and asks before `write`/`bash`; **Auto** (`--auto`) runs protected tools without per-action prompts. `--plan` selects Plan, and `--readonly` remains a compatibility alias. The TUI shows the active mode and cycles with `shift+tab`; the choice is saved to `~/.opencontinue/config.json` and survives restarts. Resolution order is explicit flag, saved preference, project `.opencontinue/opencontinue.json`, then Confirm. Mode changes go through the runtime broker, not a UI-side policy.
 

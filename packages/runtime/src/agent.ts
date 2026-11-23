@@ -12,7 +12,7 @@ import type { PermissionGate, ToolRegistry } from "@opencontinue/tools"
 import { projectHistory } from "./history.js"
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "You are OpenContinue, a concise coding assistant. Be concrete. Use the available tools when they help. Answer in the user's language."
+  "You are OpenContinue, a concise coding assistant. Be concrete. Use the available tools when they help. For multi-step work with three or more meaningful steps, maintain a short task list with the todo tool and update it as items start and finish. Skip the todo list for simple questions. Answer in the user's language."
 
 const DEFAULT_MAX_STEPS = 12
 

@@ -6,6 +6,8 @@ export type Glyphs = {
   failed: string
   approval: string
   checkpoint: string
+  pending: string
+  active: string
   plan: string
   confirm: string
   auto: string
@@ -20,6 +22,8 @@ const UNICODE: Glyphs = {
   failed: "×",
   approval: "?",
   checkpoint: "◆",
+  pending: "○",
+  active: "▸",
   plan: "◎",
   confirm: "◈",
   auto: "⟳",
@@ -34,6 +38,8 @@ const ASCII: Glyphs = {
   failed: "x",
   approval: "!",
   checkpoint: "*",
+  pending: "o",
+  active: ">",
   plan: "o",
   confirm: "C",
   auto: "A",

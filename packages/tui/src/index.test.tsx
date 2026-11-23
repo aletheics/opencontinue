@@ -110,6 +110,70 @@ async function fakeLineProvider(
   return { server, url: `http://127.0.0.1:${address.port}/v1` }
 }
 
+async function fakeTodoProvider(): Promise<{ server: http.Server; url: string }> {
+  let chatCalls = 0
+  const server = http.createServer((request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      chatCalls++
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      if (chatCalls === 1) {
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_todo",
+                      function: {
+                        name: "todo",
+                        arguments: JSON.stringify({
+                          todos: [
+                            {
+                              content: "Inspect the parser",
+                              status: "completed",
+                            },
+                            {
+                              content: "Fix the bug",
+                              status: "in_progress",
+                              activeForm: "Fixing the bug",
+                            },
+                          ],
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          })}\n\n`,
+        )
+      } else {
+        response.write(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: "fixed" } }] })}\n\n`,
+        )
+      }
+      response.end("data: [DONE]\n\n")
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
 async function fakeToolProvider(): Promise<{ server: http.Server; url: string }> {
   let chatCalls = 0
   const server = http.createServer((request, response) => {
@@ -656,6 +720,37 @@ describe("TUI", () => {
       expect(second.lastFrame()).toContain("⟳ Auto")
     } finally {
       second.unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("shows the model's todo list above the prompt", async () => {
+    const { server, url } = await fakeTodoProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("fix it")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› fix it"))
+      stdin.write("\r")
+
+      await vi.waitFor(() => expect(lastFrame()).toContain("Tasks · 1/2"), {
+        timeout: 5000,
+      })
+      expect(lastFrame()).toContain("✓ Inspect the parser")
+      expect(lastFrame()).toContain("▸ Fixing the bug")
+      expect(output(frames)).not.toContain("Todo(")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("fixed"), {
+        timeout: 5000,
+      })
+      expect(lastFrame()).toContain("Tasks · 1/2")
+    } finally {
+      unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   }, 20000)

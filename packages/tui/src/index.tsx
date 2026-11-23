@@ -50,6 +50,7 @@ import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
 import { SlashMenu } from "./components/SlashMenu.js"
 import { SpinnerLine } from "./components/SpinnerLine.js"
+import { TodoPanel } from "./components/TodoPanel.js"
 import { Transcript, TranscriptItem } from "./components/Transcript.js"
 import {
   filterModels,
@@ -60,6 +61,7 @@ import { timelineLines } from "./transcript/format/index.js"
 import { filterSessions, sessionLabel } from "./session/labels.js"
 import { stableStreamBoundary } from "./session/stream.js"
 import { partitionTimeline } from "./session/transcript.js"
+import { latestTodos } from "./session/todos.js"
 import { workspaceInfo } from "./session/workspace.js"
 import { formatClock, formatDuration, formatTokens } from "./status/format.js"
 import {
@@ -1244,6 +1246,7 @@ export function App({ options }: { options: TuiOptions }) {
   )
 
   const { committed, live } = partitionTimeline(displayTimeline, busy)
+  const todos = useMemo(() => latestTodos(timeline), [timeline])
 
   const activeTool = [...timeline]
     .reverse()
@@ -1515,6 +1518,8 @@ export function App({ options }: { options: TuiOptions }) {
                   </Text>
                 </Box>
               ) : null}
+
+              <TodoPanel todos={todos} />
 
               {permission ? (
                 <PermissionPrompt columns={columns} permission={permission} />

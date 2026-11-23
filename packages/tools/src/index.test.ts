@@ -11,6 +11,7 @@ import {
   globTool,
   grepTool,
   readTool,
+  todoTool,
   writeTool,
   type ToolContext,
 } from "./index.js"
@@ -108,6 +109,29 @@ describe("tools", () => {
     expect(failed).toContain("Exit code 3")
   })
 
+  it("validates and summarizes a todo list", async () => {
+    const workspace = await makeWorkspace()
+    const todos = [
+      { content: "Inspect the parser", status: "completed" as const },
+      { content: "Fix the bug", status: "in_progress" as const },
+    ]
+
+    await expect(todoTool.execute({ todos }, context(workspace))).resolves.toBe(
+      "1/2 complete",
+    )
+    await expect(
+      todoTool.execute(
+        {
+          todos: [
+            { content: "One", status: "in_progress" },
+            { content: "Two", status: "in_progress" },
+          ],
+        },
+        context(workspace),
+      ),
+    ).rejects.toThrow(/one todo/i)
+  })
+
   it("enforces the permission gate", async () => {
     const workspace = await makeWorkspace()
     const registry = new ToolRegistry()
@@ -133,6 +157,14 @@ describe("tools", () => {
   it("exposes JSON schemas for providers", () => {
     const registry = new ToolRegistry()
     const names = registry.definitions().map((definition) => definition.name)
-    expect(names).toEqual(["read", "write", "edit", "glob", "grep", "bash"])
+    expect(names).toEqual([
+      "read",
+      "write",
+      "edit",
+      "glob",
+      "grep",
+      "bash",
+      "todo",
+    ])
   })
 })

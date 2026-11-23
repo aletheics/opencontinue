@@ -188,6 +188,8 @@ export function TranscriptItem({
   }
 
   if (item.kind === "tool") {
+    // Todo updates are a task panel, not transcript noise.
+    if (item.name === "todo") return null
     return (
       <ToolBlock
         item={item}
