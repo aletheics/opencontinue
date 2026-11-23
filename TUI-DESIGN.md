@@ -432,8 +432,9 @@ Requirements:
 -   Do not claim a clean working tree unless verified.
 -   Keep full diff viewing separate from the main conversation flow.
 
-`/diff` is a proposed command, not an assertion that it is already
-implemented.
+`/diff` is implemented as a read-only git status plus diff-stat view.
+Completion summaries report only files and commands the tools actually
+reported; test counts are never inferred from free text.
 
 ## 10. Prompt and command interaction
 
@@ -615,7 +616,9 @@ Architecture rules:
 -   [x] Add concise task progress for multi-step work. The model
     maintains a `todo` tool list; the TUI shows the newest list above the
     prompt with `✓`, `▸`, and `○` state markers.
--   [ ] Add evidence-based completion summaries.
+-   [x] Add evidence-based completion summaries. File counts come from
+    successful write/edit tool results; command counts and failures come
+    from bash tool status. Tests are not inferred from output.
 -   [ ] Make narrow-terminal behavior reliable.
 -   [x] Document existing shortcuts and commands in `?` help.
 
@@ -631,7 +634,8 @@ Architecture rules:
 
 -   [ ] Add checkpoint notices and safe resume summaries.
 -   [ ] Add a checkpoint browser if the session model supports it.
--   [ ] Add change awareness and `/diff`.
+-   [x] Add change awareness and `/diff`. `/diff` runs `git status
+    --short` and `git diff --stat` directly, outside the agent gate.
 -   [ ] Add permission-rule inspection and management.
 -   [ ] Add richer task timeline only where it improves clarity.
 

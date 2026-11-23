@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { once } from "node:events"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import http from "node:http"
@@ -584,6 +585,8 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(output(frames)).toContain("done"), { timeout: 5000 })
       expect(output(frames)).toContain("Bash(echo hi)")
       expect(output(frames)).toContain("hi")
+      expect(output(frames)).toContain("1 command")
+      expect(output(frames)).toContain("◆ Checkpoint saved")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -749,6 +752,46 @@ describe("TUI", () => {
         timeout: 5000,
       })
       expect(lastFrame()).toContain("Tasks · 1/2")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("shows working tree changes with /diff", async () => {
+    const git = (args: string[]) =>
+      execFileSync("git", args, { cwd: home, stdio: "ignore" })
+    git(["init"])
+    await writeFile(path.join(home, "note.txt"), "old\n")
+    git(["add", "note.txt"])
+    git([
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test",
+      "commit",
+      "-m",
+      "init",
+    ])
+    await writeFile(path.join(home, "note.txt"), "new\n")
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/diff")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /diff"))
+      stdin.write("\r")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("M note.txt"), {
+        timeout: 5000,
+      })
+      expect(output(frames)).toContain("1 file changed")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

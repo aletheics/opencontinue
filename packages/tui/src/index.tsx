@@ -61,6 +61,8 @@ import { timelineLines } from "./transcript/format/index.js"
 import { filterSessions, sessionLabel } from "./session/labels.js"
 import { stableStreamBoundary } from "./session/stream.js"
 import { partitionTimeline } from "./session/transcript.js"
+import { formatWorkspaceDiff, workspaceDiff } from "./session/git.js"
+import { summarizeRun, type RunToolResult } from "./session/summary.js"
 import { latestTodos } from "./session/todos.js"
 import { workspaceInfo } from "./session/workspace.js"
 import { formatClock, formatDuration, formatTokens } from "./status/format.js"
@@ -174,6 +176,7 @@ export function App({ options }: { options: TuiOptions }) {
   const spinnerVerbRef = useRef<string>(pickSpinnerVerb())
   const spinnerTipRef = useRef<string>(pickSpinnerTip())
   const activeRunIdRef = useRef<string | null>(null)
+  const runToolsRef = useRef(new Map<string, RunToolResult>())
   const streamRef = useRef(
     new Map<string, { committed: number; chunk: number }>(),
   )
@@ -541,10 +544,39 @@ export function App({ options }: { options: TuiOptions }) {
       }
       if (event.type === "run.started") {
         activeRunIdRef.current = event.runId
+        runToolsRef.current = new Map()
         return
       }
       if (event.type === "permission.resolved") {
         handlePermissionResolved(event)
+        return
+      }
+      if (event.type === "tool.started") {
+        runToolsRef.current.set(event.callId, {
+          name: event.name,
+          status: "running",
+          input: event.input,
+        })
+        return
+      }
+      if (event.type === "tool.completed") {
+        const tool = runToolsRef.current.get(event.callId)
+        runToolsRef.current.set(event.callId, {
+          name: tool?.name ?? "tool",
+          input: tool?.input,
+          status: "done",
+          diff: event.diff,
+        })
+        return
+      }
+      if (event.type === "tool.failed") {
+        const tool = runToolsRef.current.get(event.callId)
+        runToolsRef.current.set(event.callId, {
+          name: tool?.name ?? "tool",
+          input: tool?.input,
+          status: "failed",
+          error: event.error,
+        })
         return
       }
       if (event.type === "run.completed" || event.type === "run.failed") {
@@ -556,10 +588,17 @@ export function App({ options }: { options: TuiOptions }) {
             event.type === "run.completed" ? glyphs.done : glyphs.failed
           const outcome =
             event.type === "run.completed" ? "Completed" : "Failed"
-          appendMeta(
+          const summary = summarizeRun([...runToolsRef.current.values()])
+          const lines = [
             `${symbol} ${outcome} in ${formatDuration(elapsed)} · ${formatClock()}`,
+          ]
+          if (summary) lines.push(summary)
+          lines.push(
+            `${glyphs.checkpoint} Checkpoint saved · event ${event.seq}`,
           )
+          appendMeta(lines.join("\n"))
         }
+        runToolsRef.current = new Map()
         activeRunIdRef.current = null
         runStartedRef.current = null
         setRunStartedAt(null)
@@ -781,6 +820,15 @@ export function App({ options }: { options: TuiOptions }) {
         return true
       case "/reasoning":
         cycleReasoning()
+        return true
+      case "/diff":
+        void workspaceDiff(workspace)
+          .then((diff) => appendSystem(formatWorkspaceDiff(diff)))
+          .catch((error) => {
+            appendSystem(
+              `Could not read the working tree: ${error instanceof Error ? error.message : String(error)}`,
+            )
+          })
         return true
       case "/status": {
         const tokens = timeline.reduce(

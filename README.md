@@ -59,7 +59,7 @@ OPENCONTINUE_MODEL=gpt-6.2
 
 ## Usage
 
-`opencontinue` starts the inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `●` calls tools, and the status line always shows the active mode: `◈ Confirm` (default), `◎ Plan`, or `⟳ Auto`. `shift+tab` cycles modes, `?` opens help, `/resume` switches sessions, `@` completes workspace files, `ctrl+r` searches input history, and `ctrl+o` opens the expanded transcript.
+`opencontinue` starts the inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `↳` calls tools, and the status line always shows the active mode: `◈ Confirm` (default), `◎ Plan`, or `⟳ Auto`. `shift+tab` cycles modes, `?` opens help, `/resume` switches sessions, `/diff` shows the working tree, `@` completes workspace files, `ctrl+r` searches input history, and `ctrl+o` opens the expanded transcript. Multi-step work gets a model-maintained task panel above the prompt; each run ends with changed-file/command evidence and a `◆ Checkpoint saved` notice.
 
 ```bash
 opencontinue                    # TUI

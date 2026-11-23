@@ -204,10 +204,12 @@ export function TranscriptItem({
 
   if (item.kind === "meta") {
     return (
-      <Box marginTop={leading ? 1 : 0}>
-        <Text dimColor wrap="truncate">
-          {item.text}
-        </Text>
+      <Box marginTop={leading ? 1 : 0} flexDirection="column">
+        {item.text.split("\n").map((line, index) => (
+          <Text key={index} dimColor wrap="truncate">
+            {line}
+          </Text>
+        ))}
       </Box>
     )
   }
