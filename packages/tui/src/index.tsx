@@ -32,6 +32,8 @@ import {
 } from "./composer/mentions.js"
 import { historyIndexAfterMove, searchHistory } from "./composer/history.js"
 import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
+import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
+import type { PermissionMode } from "./permissions/types.js"
 import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
@@ -50,16 +52,7 @@ import { formatDuration, formatTokens } from "./status/format.js"
 import { theme } from "./theme.js"
 import { reduceTimeline, type TimelineItem } from "./timeline.js"
 
-type PermissionMode = "ask" | "auto" | "readonly"
-
 const VERSION = "0.0.1"
-
-type PermissionPromptState = {
-  requestId: string
-  tool: string
-  detail: string
-  diff?: string
-}
 
 export type TuiOptions = {
   auto?: boolean
@@ -143,7 +136,6 @@ export function App({ options }: { options: TuiOptions }) {
   const [transcriptKey, setTranscriptKey] = useState(0)
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [lastDurationMs, setLastDurationMs] = useState<number | null>(null)
-  const [permission, setPermission] = useState<PermissionPromptState | null>(null)
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [historySearch, setHistorySearch] = useState(false)
@@ -164,8 +156,18 @@ export function App({ options }: { options: TuiOptions }) {
   const lineCountRef = useRef(0)
   const autoStartedRef = useRef(false)
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
-  const allowedToolsRef = useRef<Set<string>>(new Set())
   permissionModeRef.current = permissionMode
+  const {
+    permission,
+    answer: answerPermission,
+    handleRequest: handlePermissionRequest,
+    handleResolved: handlePermissionResolved,
+    reset: resetPermissions,
+  } = usePermissionPrompt({
+    getClient: () => clientRef.current,
+    getSessionId: () => sessionRef.current,
+    getMode: () => permissionModeRef.current,
+  })
 
   useEffect(() => {
     if (!busy) return
@@ -330,20 +332,6 @@ export function App({ options }: { options: TuiOptions }) {
     setScreen("loading")
   }
 
-  const answerPermission = (approved: boolean, remember = false) => {
-    const request = permission
-    if (!request) return
-    if (approved && remember) allowedToolsRef.current.add(request.tool)
-    const client = clientRef.current
-    const sessionId = sessionRef.current
-    if (client && sessionId) {
-      void client
-        .resolvePermission(sessionId, request.requestId, approved)
-        .catch(() => {})
-    }
-    setPermission(null)
-  }
-
   const cycleMode = () => {
     const next: PermissionMode =
       permissionMode === "ask" ? "auto" : permissionMode === "auto" ? "readonly" : "ask"
@@ -377,36 +365,6 @@ export function App({ options }: { options: TuiOptions }) {
     ])
   }
 
-  const handlePermissionRequest = (
-    event: Extract<SessionEvent, { type: "permission.requested" }>,
-  ) => {
-    const client = clientRef.current
-    const sessionId = sessionRef.current
-    if (!client || !sessionId) return
-
-    if (allowedToolsRef.current.has(event.tool)) {
-      void client.resolvePermission(sessionId, event.requestId, true).catch(() => {})
-      return
-    }
-
-    const mode = permissionModeRef.current
-    if (mode === "auto") {
-      void client.resolvePermission(sessionId, event.requestId, true).catch(() => {})
-      return
-    }
-    if (mode === "readonly") {
-      void client.resolvePermission(sessionId, event.requestId, false).catch(() => {})
-      return
-    }
-
-    setPermission({
-      requestId: event.requestId,
-      tool: event.tool,
-      detail: event.detail ?? JSON.stringify(event.input).slice(0, 200),
-      diff: event.diff,
-    })
-  }
-
   const attachSession = (
     client: OpenContinueClient,
     sessionId: string,
@@ -416,8 +374,7 @@ export function App({ options }: { options: TuiOptions }) {
     clientRef.current = client
     sessionRef.current = sessionId
     subscriptionRef.current?.close()
-    allowedToolsRef.current = new Set()
-    setPermission(null)
+    resetPermissions()
     setTimeline([
       {
         kind: "banner",
@@ -441,9 +398,7 @@ export function App({ options }: { options: TuiOptions }) {
         return
       }
       if (event.type === "permission.resolved") {
-        setPermission((current) =>
-          current?.requestId === event.requestId ? null : current,
-        )
+        handlePermissionResolved(event)
         return
       }
       if (event.type === "run.completed" || event.type === "run.failed") {
@@ -584,7 +539,7 @@ export function App({ options }: { options: TuiOptions }) {
 
     const current = sessionRef.current
     if (current) void client.abort(current).catch(() => {})
-    setPermission(null)
+    resetPermissions()
     setBusy(false)
     setLastDurationMs(null)
     setRunStartedAt(null)

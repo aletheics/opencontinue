@@ -49,6 +49,7 @@ packages/tui/src/
   composer/        slash commands, history search, @file mentions, editor actions/view
   session/         transcript partition, session labels, workspace info
   providers/       provider/model picker filtering
+  permissions/     approval decision and prompt controller
   status/          token and duration formatting
   components/      presentational Ink components
   transcript/format/  wrap, markdown, diff, tool, transcript lines
