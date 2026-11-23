@@ -47,6 +47,9 @@ The TUI follows OpenCode's feature-folder rule: one concern per folder, pure dec
 ```text
 packages/tui/src/
   composer/        slash commands, history search, @file mentions (pure + tests)
+  session/         transcript partition, session labels, workspace info
+  providers/       provider/model picker filtering
+  status/          token and duration formatting
   components/      presentational Ink components
   input.ts         editor math and viewport
   render.ts        transcript/tool/markdown formatting

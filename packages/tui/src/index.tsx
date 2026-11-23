@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs"
-import path from "node:path"
-
 import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -25,11 +22,7 @@ import {
   type ChatProvider,
   type ProviderPreset,
 } from "@opencontinue/providers"
-import type {
-  SessionEvent,
-  SessionSnapshot,
-  SessionSummary,
-} from "@opencontinue/protocol"
+import type { SessionEvent, SessionSummary } from "@opencontinue/protocol"
 import { listWorkspaceFiles } from "@opencontinue/tools"
 
 import {
@@ -44,7 +37,16 @@ import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
 import { SlashMenu } from "./components/SlashMenu.js"
 import { Transcript, TranscriptItem } from "./components/Transcript.js"
+import {
+  filterModels,
+  filterProviders,
+  initialProviderIndex,
+} from "./providers/selection.js"
 import { timelineLines, toolDisplayName } from "./render.js"
+import { filterSessions, sessionLabel } from "./session/labels.js"
+import { partitionTimeline } from "./session/transcript.js"
+import { workspaceInfo } from "./session/workspace.js"
+import { formatDuration, formatTokens } from "./status/format.js"
 import { theme } from "./theme.js"
 import { reduceTimeline, type TimelineItem } from "./timeline.js"
 
@@ -75,19 +77,6 @@ type Screen =
   | "sessions"
   | "chat"
   | "error"
-function formatTokens(value: number): string {
-  return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.max(0, Math.round(ms / 1000))
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`
-  const hours = Math.floor(minutes / 60)
-  return `${hours}h ${minutes % 60}m`
-}
-
 function useTerminalSize(): { columns: number; rows: number } {
   const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
   const read = () => ({
@@ -107,80 +96,11 @@ function useTerminalSize(): { columns: number; rows: number } {
   return size
 }
 
-function initialProviderIndex(provider: string | undefined): number {
-  const index = PROVIDER_PRESETS.findIndex(
-    (item) =>
-      item.id === provider ||
-      (provider === "openai-compatible" && item.id === "openai") ||
-      (provider === "anthropic" && item.id === "claude"),
-  )
-  return index >= 0 ? index : 0
-}
-
 function isPrintableInput(
   character: string,
   key: { ctrl?: boolean; meta?: boolean },
 ): boolean {
   return character.length > 0 && !key.ctrl && !key.meta && !/[\r\n\t]/.test(character)
-}
-
-function workspaceInfo(workspace: string): { name: string; branch: string | null } {
-  const root = path.resolve(workspace)
-  let branch: string | null = null
-  let directory = root
-
-  for (let depth = 0; depth < 8; depth++) {
-    try {
-      const head = readFileSync(path.join(directory, ".git", "HEAD"), "utf8").trim()
-      if (head.startsWith("ref: refs/heads/")) {
-        branch = head.slice("ref: refs/heads/".length)
-      } else if (head) {
-        branch = head.slice(0, 7)
-      }
-      break
-    } catch {
-      const parent = path.dirname(directory)
-      if (parent === directory) break
-      directory = parent
-    }
-  }
-
-  return { name: path.basename(root), branch }
-}
-
-function isCommittedItem(
-  item: TimelineItem,
-  index: number,
-  items: TimelineItem[],
-  busy: boolean,
-): boolean {
-  if (item.kind === "usage") return false
-  if (
-    item.kind === "user" ||
-    item.kind === "system" ||
-    item.kind === "meta" ||
-    item.kind === "banner"
-  ) {
-    return true
-  }
-  if (item.kind === "tool") return item.status !== "running"
-  if (item.kind === "assistant") {
-    if (!busy) return true
-    return items.slice(index + 1).some((later) => later.kind !== "usage")
-  }
-  return false
-}
-
-function sessionLabel(snapshot: SessionSnapshot, item: SessionSummary): string {
-  const generic =
-    !item.title || item.title === "OpenContinue TUI" || item.title === "Untitled session"
-  if (!generic) return item.title
-
-  const first = snapshot.messages.find((message) => message.role === "user")
-  const text = first?.text.replace(/\s+/g, " ").trim()
-  if (text) return text.length > 60 ? `${text.slice(0, 57)}…` : text
-
-  return item.title || item.id.slice(0, 8)
 }
 
 export function App({ options }: { options: TuiOptions }) {
@@ -267,27 +187,18 @@ export function App({ options }: { options: TuiOptions }) {
       .finally(() => setFilesLoading(false))
   }, [screen])
 
-  const filteredProviders = useMemo(() => {
-    const query = providerQuery.trim().toLowerCase()
-    if (!query) return PROVIDER_PRESETS
-    return PROVIDER_PRESETS.filter((item) =>
-      `${item.label} ${item.id} ${item.note ?? ""}`.toLowerCase().includes(query),
-    )
-  }, [providerQuery])
-
-  const filteredModels = useMemo(() => {
-    const query = modelQuery.trim().toLowerCase()
-    if (!query) return models
-    return models.filter((item) => item.toLowerCase().includes(query))
-  }, [models, modelQuery])
-
-  const filteredSessions = useMemo(() => {
-    const query = sessionQuery.trim().toLowerCase()
-    if (!query) return sessions
-    return sessions.filter((item) =>
-      `${sessionLabels[item.id] ?? item.title} ${item.id}`.toLowerCase().includes(query),
-    )
-  }, [sessionLabels, sessions, sessionQuery])
+  const filteredProviders = useMemo(
+    () => filterProviders(providerQuery),
+    [providerQuery],
+  )
+  const filteredModels = useMemo(
+    () => filterModels(models, modelQuery),
+    [models, modelQuery],
+  )
+  const filteredSessions = useMemo(
+    () => filterSessions(sessions, sessionLabels, sessionQuery),
+    [sessionLabels, sessions, sessionQuery],
+  )
 
   const historyMatches = useMemo(
     () => (historySearch ? searchHistory(history, historyQuery) : []),
@@ -1157,13 +1068,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   })
 
-  const committed: TimelineItem[] = []
-  const live: TimelineItem[] = []
-  timeline.forEach((item, index) => {
-    if (item.kind === "usage") return
-    if (isCommittedItem(item, index, timeline, busy)) committed.push(item)
-    else live.push(item)
-  })
+  const { committed, live } = partitionTimeline(timeline, busy)
 
   const activeTool = [...timeline]
     .reverse()
