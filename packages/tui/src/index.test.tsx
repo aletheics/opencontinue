@@ -39,6 +39,13 @@ function output(frames: string[]): string {
   return frames.join("\n").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
 }
 
+async function ready(lastFrame: () => string | undefined): Promise<void> {
+  await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), {
+    timeout: 5000,
+  })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 async function fakeProvider(
   models: string[] = ["gpt-6.2"],
 ): Promise<{ server: http.Server; url: string }> {
@@ -305,7 +312,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/resume")
@@ -344,7 +351,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/resume")
@@ -378,7 +385,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("change it")
@@ -412,7 +419,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("run it")
@@ -446,7 +453,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/re")
@@ -459,7 +466,7 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
 
       stdin.write("\u001b")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"))
+      await ready(lastFrame)
       expect(lastFrame()).not.toContain("/resume — resume a session")
     } finally {
       unmount()
@@ -481,7 +488,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
       expect(lastFrame()).toContain(path.basename(home))
       expect(lastFrame()).toContain("main")
     } finally {
@@ -504,7 +511,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("look @ap")
@@ -537,7 +544,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       for (const [index, text] of ["alpha", "beta"].entries()) {
         await new Promise((resolve) => setTimeout(resolve, 0))
@@ -591,12 +598,7 @@ describe("TUI", () => {
       )
 
       stdin.write("\r")
-      await vi.waitFor(
-        () => {
-          expect(lastFrame()).toContain("Type a message…")
-        },
-        { timeout: 5000 },
-      )
+      await ready(lastFrame)
 
       stdin.write("hi")
       await vi.waitFor(() => {
@@ -644,7 +646,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("hello")
@@ -682,9 +684,7 @@ describe("TUI", () => {
     )
 
     try {
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), {
-        timeout: 5000,
-      })
+      await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("hello")
@@ -713,7 +713,7 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), { timeout: 5000 })
+      await ready(lastFrame)
 
       for (let index = 0; index < 5; index++) {
         await new Promise((resolve) => setTimeout(resolve, 0))
