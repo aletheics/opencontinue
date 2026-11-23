@@ -79,6 +79,19 @@ screen re-projects the durable timeline. Both must use the same formatter.
 - `NO_COLOR` (or `FORCE_COLOR=0`) removes all color while keeping glyphs,
   weights, and spacing meaningful.
 
+## Answer structure
+
+The runtime prompt chooses structure by task, not by habit:
+
+- simple question → direct answer
+- code explanation → principle, then a short example
+- project analysis → headings, table, or file tree
+- bug report → symptom, cause, fix
+- code change → files changed, what changed, test result
+- long report → sections
+
+Headings and tables are never mandatory.
+
 ## Staged delivery
 
 | Stage | Scope | Status |
@@ -90,4 +103,4 @@ screen re-projects the durable timeline. Both must use the same formatter.
 | 4 | Link destinations, grapheme-aware emoji width | done |
 | 5 | Streaming stability for tables/lists/links, inline/fullscreen parity | done |
 | 6 | Light/dark theme tokens | done |
-| 7 | Answer-structure guidance and final visual verification | planned |
+| 7 | Answer-structure guidance and final visual verification | done |

@@ -13,7 +13,7 @@ import type { PermissionGate, ToolRegistry } from "@opencontinue/tools"
 import { projectHistory } from "./history.js"
 
 export const DEFAULT_SYSTEM_PROMPT =
-  "You are OpenContinue, a concise coding assistant. Be concrete. Use the available tools when they help. For multi-step work with three or more meaningful steps, maintain a short task list with the todo tool and update it as items start and finish. Skip the todo list for simple questions. Answer in the user's language."
+  "You are OpenContinue, a concise coding assistant. Be concrete. Use the available tools when they help. For multi-step work with three or more meaningful steps, maintain a short task list with the todo tool and update it as items start and finish. Skip the todo list for simple questions. Shape the answer to the task: answer simple questions directly; explain code with the principle and a short example; use headings, tables, or a file tree for project analysis; describe bugs as symptom, cause, and fix; for code changes list the files changed, what changed, and the test result; section long reports. Do not force headings or tables onto every answer. Answer in the user's language."
 
 const DEFAULT_MAX_STEPS = 12
 
@@ -35,7 +35,8 @@ export type RunAgentOptions = {
  * the model answers without tools. Every step is durable in the event log.
  */
 export async function runAgent(options: RunAgentOptions): Promise<void> {
-  const { store, sessionId, provider, tools, permissions, workspace, systemPrompt, signal } = options
+  const { store, sessionId, provider, tools, permissions, workspace, systemPrompt, signal } =
+    options
 
   const history = projectHistory(store.events(sessionId))
   if (systemPrompt) history.unshift({ role: "system", content: systemPrompt })
@@ -79,7 +80,11 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
       }
 
       if (text === "" && calls.length === 0) {
-        store.append(sessionId, { type: "message.assistant.delta", runId, text: "(empty response)" })
+        store.append(sessionId, {
+          type: "message.assistant.delta",
+          runId,
+          text: "(empty response)",
+        })
       }
 
       const assistant: ChatMessage = {
@@ -123,9 +128,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
             ...(result.failed ? { failed: true } : {}),
             ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
             ...(result.timedOut ? { timedOut: true } : {}),
-            ...(result.authorization === undefined
-              ? {}
-              : { authorization: result.authorization }),
+            ...(result.authorization === undefined ? {} : { authorization: result.authorization }),
           })
           history.push({ role: "tool", toolCallId: call.id, content: result.output })
         } else {

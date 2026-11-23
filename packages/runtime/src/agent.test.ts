@@ -8,7 +8,7 @@ import { MemorySessionStore } from "@opencontinue/core"
 import type { ChatMessage, ChatProvider } from "@opencontinue/providers"
 import { ToolRegistry, type PermissionGate } from "@opencontinue/tools"
 
-import { runAgent } from "./agent.js"
+import { DEFAULT_SYSTEM_PROMPT, runAgent } from "./agent.js"
 
 const allowAll: PermissionGate = {
   async authorize() {
@@ -19,7 +19,9 @@ const allowAll: PermissionGate = {
 const temporary: string[] = []
 
 afterEach(async () => {
-  await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  await Promise.all(
+    temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 async function makeWorkspace(): Promise<string> {
@@ -27,6 +29,15 @@ async function makeWorkspace(): Promise<string> {
   temporary.push(directory)
   return directory
 }
+
+describe("default system prompt", () => {
+  it("guides answer structure without forcing headings", () => {
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("Shape the answer to the task")
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("simple questions directly")
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("Do not force headings or tables")
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("Answer in the user's language")
+  })
+})
 
 describe("runAgent", () => {
   it("streams provider text into the session", async () => {
@@ -111,9 +122,7 @@ describe("runAgent", () => {
       role: "assistant",
       thinking: [{ text: "plan the write", signature: "sig-1" }],
     })
-    await expect(readFile(path.join(workspace, "a.txt"), "utf8")).resolves.toBe(
-      "hello",
-    )
+    await expect(readFile(path.join(workspace, "a.txt"), "utf8")).resolves.toBe("hello")
   })
 
   it("executes a tool call and continues the conversation", async () => {
@@ -316,7 +325,11 @@ describe("runAgent", () => {
       sessionId: session.id,
       provider,
       tools: new ToolRegistry(),
-      permissions: { async authorize() { return false } },
+      permissions: {
+        async authorize() {
+          return false
+        },
+      },
       workspace,
     })
 
@@ -363,13 +376,17 @@ describe("runAgent", () => {
       sessionId: session.id,
       provider,
       tools: new ToolRegistry(),
-      permissions: { async authorize() { return { approved: true, reason: "auto" } } },
+      permissions: {
+        async authorize() {
+          return { approved: true, reason: "auto" }
+        },
+      },
       workspace,
     })
 
-    expect(
-      store.events(session.id).find((event) => event.type === "tool.completed"),
-    ).toMatchObject({ authorization: "auto" })
+    expect(store.events(session.id).find((event) => event.type === "tool.completed")).toMatchObject(
+      { authorization: "auto" },
+    )
   })
 
   it("records a failed run", async () => {
