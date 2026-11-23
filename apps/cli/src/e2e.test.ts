@@ -58,6 +58,57 @@ class BlockingProvider implements ChatProvider {
   }
 }
 
+describe("server security", () => {
+  it("requires a bearer token and rejects foreign browser origins", async () => {
+    const directory = await workspace()
+    const store = createSessionStore({ workspace: directory })
+    const running = startServer({
+      store,
+      provider: new EchoProvider(),
+      port: 0,
+      workspace: directory,
+      token: "test-token",
+      cors: ["https://app.example"],
+    })
+    const server = running.server as unknown as HttpServer
+    if (!server.listening) await once(server, "listening")
+    const address = server.address() as AddressInfo
+    const base = `http://127.0.0.1:${address.port}`
+
+    try {
+      const unauthorized = await fetch(`${base}/v1/sessions`)
+      expect(unauthorized.status).toBe(401)
+
+      const foreign = await fetch(`${base}/v1/sessions`, {
+        headers: {
+          authorization: "Bearer test-token",
+          origin: "https://evil.example",
+        },
+      })
+      expect(foreign.status).toBe(403)
+
+      const allowed = await fetch(`${base}/v1/sessions`, {
+        headers: {
+          authorization: "Bearer test-token",
+          origin: "https://app.example",
+        },
+      })
+      expect(allowed.status).toBe(200)
+      expect(allowed.headers.get("access-control-allow-origin")).toBe(
+        "https://app.example",
+      )
+
+      const sameHost = await fetch(`${base}/v1/sessions`, {
+        headers: { authorization: "Bearer test-token", origin: base },
+      })
+      expect(sameHost.status).toBe(200)
+    } finally {
+      await closeServer(running.server)
+      store.close()
+    }
+  }, 15000)
+})
+
 describe("client/server e2e", () => {
   it("creates a session, streams one echo run, and lists it", async () => {
     const directory = await workspace()
@@ -75,6 +126,7 @@ describe("client/server e2e", () => {
     const client = new HttpSessionClient({
       baseUrl: `http://127.0.0.1:${address.port}`,
       reconnectDelayMs: 20,
+      token: running.token,
     })
 
     try {
@@ -139,6 +191,7 @@ describe("client/server e2e", () => {
     const address = server.address() as AddressInfo
     const client = new HttpSessionClient({
       baseUrl: `http://127.0.0.1:${address.port}`,
+      token: running.token,
     })
 
     try {
@@ -180,6 +233,7 @@ describe("client/server e2e", () => {
     const client = new HttpSessionClient({
       baseUrl: `http://127.0.0.1:${address.port}`,
       reconnectDelayMs: 20,
+      token: running.token,
     })
 
     try {

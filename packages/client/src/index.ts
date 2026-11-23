@@ -14,6 +14,8 @@ export type ClientOptions = {
   baseUrl: string
   fetch?: FetchLike
   reconnectDelayMs?: number
+  /** Bearer token for a local server that requires authentication. */
+  token?: string
 }
 
 export type SessionEventListener = (event: SessionEvent) => void
@@ -111,6 +113,7 @@ export class HttpSessionClient implements OpenContinueClient {
   readonly baseUrl: string
   private readonly fetchImpl: FetchLike
   private readonly reconnectDelayMs: number
+  private readonly token: string | undefined
   private readonly closeController = new AbortController()
   private readonly subscriptions = new Set<AbortController>()
   private closed = false
@@ -119,6 +122,7 @@ export class HttpSessionClient implements OpenContinueClient {
     this.baseUrl = normalizeBaseUrl(options.baseUrl)
     this.fetchImpl = options.fetch ?? fetch
     this.reconnectDelayMs = Math.max(10, options.reconnectDelayMs ?? 500)
+    this.token = options.token
   }
 
   async health(): Promise<{
@@ -261,12 +265,17 @@ export class HttpSessionClient implements OpenContinueClient {
     this.subscriptions.clear()
   }
 
+  private authHeaders(): Record<string, string> {
+    return this.token ? { authorization: `Bearer ${this.token}` } : {}
+  }
+
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
       signal: init.signal ?? this.closeController.signal,
       headers: {
         "content-type": "application/json",
+        ...this.authHeaders(),
         ...(init.headers ?? {}),
       },
     })
@@ -295,7 +304,10 @@ export class HttpSessionClient implements OpenContinueClient {
           `${this.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}/events?after=${lastSeq}`,
           {
             signal,
-            headers: { accept: "text/event-stream" },
+            headers: {
+              accept: "text/event-stream",
+              ...this.authHeaders(),
+            },
           },
         )
 

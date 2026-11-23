@@ -2,6 +2,7 @@ import { closeServer, startServer } from "./index.js"
 
 const running = startServer()
 console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)
+console.log(`auth token: ${running.token}`)
 if (running.warning) console.warn(`provider: ${running.warning}`)
 else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
 console.log(`workspace: ${running.workspace}`)

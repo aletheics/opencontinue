@@ -27,6 +27,7 @@ type PermissionRequestEvent = Extract<SessionEvent, { type: "permission.requeste
 type ChatOptions = {
   print?: boolean
   url?: string
+  token?: string
   port?: string
   resume?: string
   auto?: boolean
@@ -127,10 +128,13 @@ function permissionMode(options: ChatOptions, headless = false): PermissionMode 
 async function withServer(
   options: ChatOptions,
   mode: PermissionMode | undefined,
-  run: (baseUrl: string) => Promise<void>,
+  run: (baseUrl: string, token: string | undefined) => Promise<void>,
 ): Promise<void> {
   if (options.url) {
-    await run(options.url.replace(/\/$/, ""))
+    await run(
+      options.url.replace(/\/$/, ""),
+      options.token ?? process.env.OPENCONTINUE_SERVER_TOKEN,
+    )
     return
   }
 
@@ -143,7 +147,7 @@ async function withServer(
   else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
   console.log(`permissions: ${running.permissionMode}`)
   try {
-    await run(`http://127.0.0.1:${running.port}`)
+    await run(`http://127.0.0.1:${running.port}`, running.token)
   } finally {
     await closeServer(running.server)
     store.close()
@@ -151,8 +155,8 @@ async function withServer(
 }
 
 async function chat(options: ChatOptions): Promise<void> {
-  await withServer(options, permissionMode(options), async (baseUrl) => {
-    const sessionClient = new HttpSessionClient({ baseUrl })
+  await withServer(options, permissionMode(options), async (baseUrl, token) => {
+    const sessionClient = new HttpSessionClient({ baseUrl, token })
     const sessionId = options.resume ?? (await sessionClient.createSession()).id
 
     const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -194,8 +198,8 @@ async function chat(options: ChatOptions): Promise<void> {
 async function printOnce(prompt: string, options: ChatOptions): Promise<void> {
   if (!prompt.trim()) throw new Error("A prompt is required with --print")
 
-  await withServer(options, permissionMode(options, true), async (baseUrl) => {
-    const sessionClient = new HttpSessionClient({ baseUrl })
+  await withServer(options, permissionMode(options, true), async (baseUrl, token) => {
+    const sessionClient = new HttpSessionClient({ baseUrl, token })
     const created = await sessionClient.createSession()
     let output = ""
     const conversation = new ConversationClient(
@@ -217,6 +221,7 @@ async function printOnce(prompt: string, options: ChatOptions): Promise<void> {
 
 async function serveCommand(options: {
   port?: string
+  token?: string
   auto?: boolean
   readonly?: boolean
   plan?: boolean
@@ -233,8 +238,15 @@ async function serveCommand(options: {
       : undefined
   const workspace = process.env.INIT_CWD ?? process.cwd()
   const store = createSessionStore({ workspace })
-  const running = startServer({ store, port, permissionMode: mode, workspace })
+  const running = startServer({
+    store,
+    port,
+    permissionMode: mode,
+    workspace,
+    token: options.token,
+  })
   console.log(`opencontinue server listening on http://127.0.0.1:${running.port}`)
+  console.log(`auth token: ${running.token}`)
   if (running.warning) console.warn(`provider: ${running.warning}`)
   else console.log(`provider: ${running.provider.id} (${running.provider.model})`)
   console.log(`workspace: ${running.workspace}`)
@@ -318,6 +330,7 @@ async function startTui(options: {
   plan?: boolean
   resume?: string
   url?: string
+  token?: string
   fullscreen?: boolean
 }): Promise<void> {
   if (options.auto && (options.readonly || options.plan)) {
@@ -330,8 +343,14 @@ async function startTui(options: {
   await runTui(options)
 }
 
-async function sessionsCommand(options: { url?: string }): Promise<void> {
-  const client = new HttpSessionClient({ baseUrl: options.url ?? "http://127.0.0.1:8787" })
+async function sessionsCommand(options: {
+  url?: string
+  token?: string
+}): Promise<void> {
+  const client = new HttpSessionClient({
+    baseUrl: options.url ?? "http://127.0.0.1:8787",
+    token: options.token ?? process.env.OPENCONTINUE_SERVER_TOKEN,
+  })
   try {
     const sessions = await client.listSessions()
     if (sessions.length === 0) {
@@ -356,6 +375,7 @@ program
   .argument("[prompt]", "Prompt to run once (headless)")
   .option("-p, --print", "Run once and print the result")
   .option("--url <url>", "Connect to a running server")
+  .option("--token <token>", "Bearer token for a remote server")
   .option("--port <port>", "Port for the embedded server", "8787")
   .option("--resume <id>", "Resume an existing session")
   .option("--auto", "Auto mode: allow write and shell tools without approval")
@@ -373,6 +393,7 @@ program
         plan: options.plan || options.readonly,
         resume: options.resume,
         url: options.url,
+        token: options.token,
         fullscreen: options.fullscreen,
       })
     } else await chat(options)
@@ -385,6 +406,7 @@ program
   .action(() =>
     serveCommand({
       port: String(program.opts().port ?? "8787"),
+      token: program.opts().token as string | undefined,
       auto: Boolean(program.opts().auto),
       plan: Boolean(program.opts().plan),
       readonly: Boolean(program.opts().readonly),
@@ -400,6 +422,7 @@ program
       plan: Boolean(program.opts().plan || program.opts().readonly),
       resume: program.opts().resume as string | undefined,
       url: program.opts().url as string | undefined,
+      token: program.opts().token as string | undefined,
       fullscreen: Boolean(program.opts().fullscreen),
     }),
   )
@@ -445,24 +468,43 @@ program
   .option("--json", "Print machine-readable checks")
   .option("--network", "Check the provider model list over the network")
   .option("--url <url>", "Also check a running server")
-  .action(async (options: { json?: boolean; network?: boolean; url?: string }) => {
-    const checks = await runDoctor({
-      workspace: process.env.INIT_CWD ?? process.cwd(),
-      url: options.url ? String(program.opts().url ?? options.url) : undefined,
-      network: options.network,
-    })
-    console.log(
-      options.json ? JSON.stringify({ checks }, null, 2) : formatDoctor(checks),
-    )
-    process.exitCode = doctorExitCode(checks)
-  })
+  .option("--token <token>", "Bearer token for the server check")
+  .action(
+    async (options: {
+      json?: boolean
+      network?: boolean
+      url?: string
+      token?: string
+    }) => {
+      const checks = await runDoctor({
+        workspace: process.env.INIT_CWD ?? process.cwd(),
+        url: options.url ? String(program.opts().url ?? options.url) : undefined,
+        token:
+          options.token ??
+          (program.opts().token as string | undefined) ??
+          process.env.OPENCONTINUE_SERVER_TOKEN,
+        network: options.network,
+      })
+      console.log(
+        options.json ? JSON.stringify({ checks }, null, 2) : formatDoctor(checks),
+      )
+      process.exitCode = doctorExitCode(checks)
+    },
+  )
 
 program
   .command("sessions")
   .description("List sessions from a running server")
   .option("--url <url>", "Server URL", "http://127.0.0.1:8787")
-  .action((options: { url?: string }) =>
-    sessionsCommand({ url: String(program.opts().url ?? options.url) }),
+  .option("--token <token>", "Bearer token for the server")
+  .action((options: { url?: string; token?: string }) =>
+    sessionsCommand({
+      url: String(program.opts().url ?? options.url),
+      token:
+        options.token ??
+        (program.opts().token as string | undefined) ??
+        process.env.OPENCONTINUE_SERVER_TOKEN,
+    }),
   )
 
 try {

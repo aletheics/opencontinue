@@ -1,6 +1,5 @@
 import { serve, type ServerType } from "@hono/node-server"
 import { Hono } from "hono"
-import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
 
 import { createSessionStore, type SessionStore } from "@opencontinue/core"
@@ -28,6 +27,13 @@ import {
 } from "@opencontinue/runtime"
 import { ToolRegistry } from "@opencontinue/tools"
 
+import { followSession } from "./event-stream.js"
+import {
+  bearerAuthorized,
+  originAllowed,
+  resolveServerToken,
+} from "./security.js"
+
 export type StartServerOptions = {
   store?: SessionStore
   port?: number
@@ -38,6 +44,10 @@ export type StartServerOptions = {
   permissionMode?: PermissionMode
   reasoningEffort?: ReasoningEffort
   workspace?: string
+  /** Fixed local bearer token; otherwise generated for this process. */
+  token?: string
+  /** Exact browser origins allowed in addition to same-host requests. */
+  cors?: string[]
 }
 
 export type RunningServer = {
@@ -49,6 +59,7 @@ export type RunningServer = {
   permissionMode: PermissionMode
   reasoningEffort: ReasoningEffort
   workspace: string
+  token: string
   warning?: string
 }
 
@@ -60,11 +71,36 @@ export function createApp(
   permissions: PermissionBroker,
   workspace: string,
   reasoning: { effort: ReasoningEffort },
+  security: { token: string; cors?: readonly string[] },
 ): Hono {
   const app = new Hono()
   const activeRuns = new Map<string, AbortController>()
+  const allowedOrigins = security.cors ?? []
 
-  app.use("*", cors())
+  app.use("*", async (c, next) => {
+    const origin = c.req.header("origin")
+    if (!originAllowed(origin, c.req.header("host"), allowedOrigins)) {
+      return c.json({ error: "origin not allowed" }, 403)
+    }
+
+    if (origin) {
+      c.header("access-control-allow-origin", origin)
+      c.header("vary", "Origin")
+    }
+
+    if (c.req.method === "OPTIONS") {
+      c.header("access-control-allow-methods", "GET,POST,OPTIONS")
+      c.header("access-control-allow-headers", "authorization,content-type")
+      c.header("access-control-max-age", "600")
+      return c.body(null, 204)
+    }
+
+    if (!bearerAuthorized(c.req.header("authorization"), security.token)) {
+      return c.json({ error: "unauthorized" }, 401)
+    }
+
+    await next()
+  })
 
   app.get("/health", (c) =>
     c.json({
@@ -214,35 +250,60 @@ export function createApp(
     const rawAfter = Number(c.req.query("after") ?? "-1")
     const after = Number.isFinite(rawAfter) ? rawAfter : -1
 
+    c.header("cache-control", "no-cache, no-transform")
+    c.header("x-accel-buffering", "no")
+
     return streamSSE(c, async (stream) => {
       let closed = false
+      let unsubscribe: (() => void) | undefined
       let resolveDone: () => void = () => {}
+      let chain = Promise.resolve()
       const done = new Promise<void>((resolve) => {
         resolveDone = resolve
       })
 
-      const send = async (event: SessionEvent) => {
-        if (closed) return
-        await stream.writeSSE({
-          event: "session",
-          id: String(event.seq),
-          data: JSON.stringify(event),
-        })
+      const write = (payload: string): void => {
+        chain = chain
+          .then(async () => {
+            if (closed) return
+            await stream.write(payload)
+          })
+          .catch(() => {})
       }
 
-      for (const event of store.events(sessionId, after)) await send(event)
+      const send = (event: SessionEvent): void => {
+        write(
+          `event: session\nid: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`,
+        )
+      }
 
-      const unsubscribe = store.subscribe(sessionId, (event) => {
-        void send(event)
-      })
+      const heartbeat = setInterval(() => {
+        write(": heartbeat\n\n")
+      }, 15_000)
 
       stream.onAbort(() => {
         closed = true
-        unsubscribe()
+        clearInterval(heartbeat)
+        unsubscribe?.()
         resolveDone()
       })
 
+      try {
+        unsubscribe = await followSession(store, sessionId, after, send)
+      } catch {
+        closed = true
+        clearInterval(heartbeat)
+        resolveDone()
+        return
+      }
+
+      if (closed) {
+        unsubscribe()
+        return
+      }
+
       await done
+      clearInterval(heartbeat)
     })
   })
 
@@ -272,7 +333,7 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
   const reasoning = {
     effort: options.reasoningEffort ?? settings.reasoningEffort ?? "auto",
   }
-
+  const token = resolveServerToken(options.token)
   const app = createApp(
     store,
     selection.provider,
@@ -281,6 +342,7 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     permissions,
     workspace,
     reasoning,
+    { token, cors: options.cors },
   )
   const port = options.port ?? Number(process.env.OPENCONTINUE_PORT ?? 8787)
   const server = serve({
@@ -300,6 +362,7 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     permissionMode,
     reasoningEffort: reasoning.effort,
     workspace,
+    token,
     warning: selection.warning,
   }
 }

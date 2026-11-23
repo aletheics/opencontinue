@@ -17,6 +17,7 @@ export type DoctorCheck = {
 export type DoctorOptions = {
   workspace: string
   url?: string
+  token?: string
   network?: boolean
 }
 
@@ -126,7 +127,10 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorCheck[]> 
   }
 
   if (options.url) {
-    const client = new HttpSessionClient({ baseUrl: options.url })
+    const client = new HttpSessionClient({
+      baseUrl: options.url,
+      token: options.token,
+    })
     try {
       const health = await client.health()
       const sessions = await client.listSessions()

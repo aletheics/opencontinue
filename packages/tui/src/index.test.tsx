@@ -1546,7 +1546,12 @@ describe("TUI", () => {
     const address = server.address() as AddressInfo
 
     const { stdin, lastFrame, frames, unmount } = render(
-      <App options={{ url: `http://127.0.0.1:${address.port}` }} />,
+      <App
+        options={{
+          url: `http://127.0.0.1:${address.port}`,
+          token: running.token,
+        }}
+      />,
     )
 
     try {

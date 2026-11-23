@@ -59,19 +59,21 @@ OPENCONTINUE_MODEL=gpt-6.2
 
 ## Usage
 
-`opencontinue` starts the inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `↳` calls tools, and the status line always shows the active mode: `◈ Confirm` (default), `◎ Plan`, or `⟳ Auto`. `shift+tab` cycles modes, `ctrl+t` toggles the task list, `?` opens help, `/resume` switches sessions, `/diff` shows the working tree, `/checkpoints` lists run boundaries, `/rewind` forks the conversation from a checkpoint (working tree unchanged), `/permissions` shows the effective allow/ask/deny rules, `/tui fullscreen` switches to the alternate-screen renderer (`PgUp`/`PgDn` scroll, `/tui default` returns to inline), `@` completes workspace files, `ctrl+r` searches input history, and `ctrl+o` opens the expanded transcript. Multi-step work gets a model-maintained task panel above the prompt; each run ends with changed-file/command evidence and a `◆ Checkpoint saved` notice.
+`opencontinue` starts the inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `↳` calls tools, and the status line always shows the active mode: `◈ Manual` (default), `◎ Plan`, or `⟳ Auto`. `shift+tab` cycles modes, `ctrl+t` toggles the task list, `?` opens help, `/resume` switches sessions, `/diff` shows the working tree, `/checkpoints` lists run boundaries, `/rewind` forks the conversation from a checkpoint (working tree unchanged), `/permissions` shows the effective allow/ask/deny rules, `/tui fullscreen` switches to the alternate-screen renderer (`PgUp`/`PgDn` scroll, `/tui default` returns to inline), `@` completes workspace files, `ctrl+r` searches input history, and `ctrl+o` opens the expanded transcript. Multi-step work gets a model-maintained task panel above the prompt; each run ends with changed-file/command evidence and a `◆ Checkpoint saved` notice.
 
 ```bash
 opencontinue                    # TUI
 onc                             # same, shorter
 opencontinue --auto -p "fix tests"
-opencontinue --url http://127.0.0.1:8787   # attach the TUI to a server
+opencontinue --url http://127.0.0.1:8787 --token <token>   # attach to a server
 opencontinue --plan -p "review"
 opencontinue check --base main
 opencontinue serve --port 8787
 ```
 
-Flags: `--auto`, `--plan`, `--readonly` (alias for `--plan`), `--fullscreen`, `--resume <id>`, `--url <url>`, `--port <port>`.
+Flags: `--auto`, `--plan`, `--readonly` (alias for `--plan`), `--fullscreen`, `--resume <id>`, `--url <url>`, `--token <token>`, `--port <port>`.
+
+`serve` prints a bearer token; every HTTP request must send it. Set `OPENCONTINUE_SERVER_TOKEN` to use a fixed token. CORS is denied unless an exact origin is passed to the server options.
 
 Sessions persist in `.opencontinue/sessions/sessions.db` (WAL). Set `OPENCONTINUE_DB` to override. Interrupted runs are marked failed on the next start.
 

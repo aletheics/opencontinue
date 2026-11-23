@@ -104,6 +104,7 @@ export type TuiOptions = {
   readonly?: boolean
   resume?: string
   url?: string
+  token?: string
   fullscreen?: boolean
 }
 
@@ -753,7 +754,10 @@ export function App({ options }: { options: TuiOptions }) {
 
   useEffect(() => {
     if (!options.url) return
-    const client = new HttpSessionClient({ baseUrl: options.url })
+    const client = new HttpSessionClient({
+      baseUrl: options.url,
+      token: options.token ?? process.env.OPENCONTINUE_SERVER_TOKEN,
+    })
 
     void (async () => {
       let sessionId = options.resume

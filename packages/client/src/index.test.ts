@@ -44,6 +44,7 @@ type RecordedRequest = {
   method: string
   path: string
   body: string
+  authorization?: string
 }
 
 type Fixture = {
@@ -75,7 +76,12 @@ async function fixture(): Promise<Fixture> {
     let body = ""
     for await (const chunk of request) body += String(chunk)
     const url = new URL(request.url ?? "/", "http://127.0.0.1")
-    requests.push({ method: request.method ?? "GET", path: `${url.pathname}${url.search}`, body })
+    requests.push({
+      method: request.method ?? "GET",
+      path: `${url.pathname}${url.search}`,
+      body,
+      authorization: request.headers.authorization,
+    })
 
     const json = (value: unknown, status = 200) => {
       response.writeHead(status, { "content-type": "application/json" })
@@ -158,6 +164,15 @@ describe("HttpSessionClient", () => {
       body: JSON.stringify({ approved: true }),
     })
 
+    client.close()
+  })
+
+  it("sends a bearer token when configured", async () => {
+    const { baseUrl, requests } = await fixture()
+    const client = new HttpSessionClient({ baseUrl, token: "secret" })
+
+    await client.health()
+    expect(requests[0]?.authorization).toBe("Bearer secret")
     client.close()
   })
 
