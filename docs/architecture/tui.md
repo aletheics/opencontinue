@@ -28,6 +28,18 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/mode`, `/status`, `/exit`.
 - Provider/model pickers and per-provider API keys inside the same frame.
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
+- A line-buffer renderer in `packages/tui/src/render.ts`: timeline items become styled lines, long text wraps to the content width, and the viewport slices by line so scrolling and clipping are exact.
+
+## Rendering contract
+
+The frame must occupy exactly the terminal height. Every text line is one terminal row:
+
+- header: fixed 3 rows, truncated
+- body: fixed height, one `<Text wrap="truncate">` per buffered line
+- input: fixed 3 rows, width-constrained
+- footer: fixed 1 row, truncated
+
+This avoids Ink diff desync caused by terminal auto-wrap and variable-height nested boxes. Scrolling is measured in lines, not timeline items.
 
 ## What OpenContinue does not copy yet
 
@@ -39,7 +51,7 @@ The current TUI uses upstream Ink so the team can keep upgrading it. We copy the
 
 ## Next slices
 
-1. Split the TUI into `components/` (Header, Timeline, ToolBlock, InputBar, Pickers) and a `theme.ts`.
+1. Split the TUI into `components/` (Header, Timeline, InputBar, Pickers) now that `render.ts` and `theme.ts` exist.
 2. Multi-line input, input history search (`Ctrl+R`), `@file` completion.
 3. Markdown rendering and collapsible context.
 4. A typed `packages/client` so the TUI talks to the server instead of running the runtime in-process.

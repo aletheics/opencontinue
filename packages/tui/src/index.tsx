@@ -19,12 +19,9 @@ import {
 import { runAgent } from "@opencontinue/runtime"
 import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
 
-import {
-  reduceTimeline,
-  timelineFromEvents,
-  toolLabel,
-  type TimelineItem,
-} from "./timeline.js"
+import { timelineLines } from "./render.js"
+import { reduceTimeline, timelineFromEvents, type TimelineItem } from "./timeline.js"
+import { theme } from "./theme.js"
 
 export type TuiOptions = {
   auto?: boolean
@@ -93,63 +90,27 @@ class TuiPermissionGate implements PermissionGate {
   }
 }
 
-function formatToolOutput(text: string, columns: number, expanded: boolean): string {
-  const width = Math.max(20, columns - 8)
-  const lines = text.trim().split(/\r?\n/)
-  const maxLines = expanded ? 12 : 2
-  const shown = lines
-    .slice(0, maxLines)
-    .map((line, index) => `${index === 0 ? "  ⎿ " : "    "}${line.slice(0, width)}`)
-  if (lines.length > maxLines) {
-    shown.push(`    … ${lines.length - maxLines} more lines · ctrl+o`)
-  }
-  return shown.join("\n")
-}
-
-function formatDiff(
-  diff: string,
-  columns: number,
-  expanded: boolean,
-): { line: string; color: "green" | "red" | "cyan" | undefined }[] {
-  const width = Math.max(20, columns - 4)
-  const all = diff
-    .split(/\r?\n/)
-    .filter(
-      (line) =>
-        !line.startsWith("Index: ") &&
-        !line.startsWith("===================================================================") &&
-        !line.startsWith("--- ") &&
-        !line.startsWith("+++ "),
-    )
-  const maxLines = expanded ? 20 : 4
-  const shown = all.slice(0, maxLines).map((line) => ({
-    line: line.slice(0, width),
-    color: line.startsWith("+")
-      ? ("green" as const)
-      : line.startsWith("-")
-        ? ("red" as const)
-        : line.startsWith("@@")
-          ? ("cyan" as const)
-          : undefined,
-  }))
-  if (all.length > maxLines) {
-    shown.push({ line: `… ${all.length - maxLines} more diff lines · ctrl+o`, color: undefined })
-  }
-  return shown
-}
-
-function diffStats(diff: string): { added: number; removed: number } {
-  let added = 0
-  let removed = 0
-  for (const line of diff.split(/\r?\n/)) {
-    if (line.startsWith("+") && !line.startsWith("+++")) added++
-    else if (line.startsWith("-") && !line.startsWith("---")) removed++
-  }
-  return { added, removed }
-}
-
 function formatTokens(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
+}
+
+function useTerminalSize(): { columns: number; rows: number } {
+  const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
+  const read = () => ({
+    columns: Math.max(40, (stdout.columns ?? 80) - 1),
+    rows: Math.max(12, (stdout.rows ?? 24) - 1),
+  })
+  const [size, setSize] = useState(read)
+
+  useEffect(() => {
+    const onResize = () => setSize(read())
+    process.stdout.on("resize", onResize)
+    return () => {
+      process.stdout.off("resize", onResize)
+    }
+  }, [])
+
+  return size
 }
 
 function initialProviderIndex(provider: string | undefined): number {
@@ -176,27 +137,31 @@ function Header({
   return (
     <Box
       flexShrink={0}
+      height={3}
       borderStyle="round"
-      borderColor="gray"
+      borderColor={theme.border}
       paddingX={1}
       justifyContent="space-between"
+      overflow="hidden"
     >
-      <Text bold color="cyan">
-        OpenContinue
-      </Text>
-      <Text dimColor>
-        {provider} · model: {model} · {mode}
-        {stats ? ` · ${stats}` : ""}
-      </Text>
+      <Box flexShrink={0}>
+        <Text bold color={theme.brand} wrap="truncate">
+          OpenContinue
+        </Text>
+      </Box>
+      <Box flexShrink={1} overflow="hidden">
+        <Text dimColor wrap="truncate">
+          {provider} · model: {model} · {mode}
+          {stats ? ` · ${stats}` : ""}
+        </Text>
+      </Box>
     </Box>
   )
 }
 
 export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
-  const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
-  const columns = Math.max(40, (stdout.columns ?? 80) - 1)
-  const rows = Math.max(12, (stdout.rows ?? 24) - 1)
+  const { columns, rows } = useTerminalSize()
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
     options.auto ? "auto" : options.readonly ? "readonly" : "ask",
   )
@@ -231,6 +196,7 @@ export function App({ options }: { options: TuiOptions }) {
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const runStartedRef = useRef<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const lineCountRef = useRef(0)
   const gateRef = useRef<TuiPermissionGate | null>(null)
   if (!gateRef.current) {
     gateRef.current = new TuiPermissionGate(permissionMode)
@@ -477,6 +443,9 @@ export function App({ options }: { options: TuiOptions }) {
     const text = value.trim()
     if (!text) return
     if (text.startsWith("/")) {
+      setInput("")
+      setHistory((items) => [...items, text])
+      setHistoryIndex(-1)
       handleCommand(text)
       return
     }
@@ -594,10 +563,11 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     const page = Math.max(1, Math.floor((rows - 9) / 2))
-    const contentCount = timeline.filter((item) => item.kind !== "usage").length
 
     if (key.pageUp) {
-      setScrollOffset((value) => Math.min(Math.max(0, contentCount - page), value + page))
+      setScrollOffset((value) =>
+        Math.min(Math.max(0, lineCountRef.current - page), value + page),
+      )
       return
     }
 
@@ -619,7 +589,7 @@ export function App({ options }: { options: TuiOptions }) {
       : screen === "key" || screen === "baseurl"
         ? "Enter submit · Ctrl+C exit"
         : screen === "chat"
-          ? "/exit to quit · Ctrl+C exit · ctrl+o expand · shift+tab mode · PgUp/PgDn scroll"
+          ? "/exit · ctrl+o expand · shift+tab mode · PgUp/PgDn"
           : screen === "loading"
             ? "Loading models…"
             : "Ctrl+C exit"
@@ -628,12 +598,13 @@ export function App({ options }: { options: TuiOptions }) {
     screen === "chat" && input.startsWith("/")
       ? SLASH_COMMANDS.filter((command) =>
           command.name.startsWith(input.split(/\s+/)[0] ?? "/"),
-        ).slice(0, 4)
+        ).slice(0, 3)
       : []
   const footerText =
     slashMatches.length > 0
-      ? slashMatches.map((command) => `${command.name} ${command.description}`).join("  ")
+      ? slashMatches.map((command) => command.name).join("  ")
       : footer
+  const footerLine = footerText.slice(0, Math.max(10, columns - 2))
 
   const inputHeight = screen === "chat" ? 3 : 0
   const bodyHeight = Math.max(4, rows - 3 - inputHeight - 1)
@@ -652,13 +623,17 @@ export function App({ options }: { options: TuiOptions }) {
 
       return (
         <>
-          <Text dimColor>
+          <Text dimColor wrap="truncate">
             Select a provider ({providerIndex + 1}/{PROVIDER_PRESETS.length})
           </Text>
           {visible.map((item, offset) => {
             const index = start + offset
             return (
-              <Text key={item.id} color={index === providerIndex ? "cyan" : undefined}>
+              <Text
+                key={item.id}
+                color={index === providerIndex ? "cyan" : undefined}
+                wrap="truncate"
+              >
                 {index === providerIndex ? "› " : "  "}
                 {item.label}
                 {item.note ? ` — ${item.note}` : ""}
@@ -672,11 +647,15 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen === "key") {
       return (
         <>
-          <Text bold>{preset?.label} API key</Text>
-          <Box marginTop={1}>
+          <Text bold wrap="truncate">
+            {preset?.label} API key
+          </Text>
+          <Box marginTop={1} width={Math.max(10, columns - 8)} overflow="hidden">
             <TextInput value={keyInput} onChange={setKeyInput} mask="*" onSubmit={submitKey} />
           </Box>
-          <Text dimColor>Stored in ~/.opencontinue/auth.json</Text>
+          <Text dimColor wrap="truncate">
+            Stored in ~/.opencontinue/auth.json
+          </Text>
         </>
       )
     }
@@ -684,8 +663,10 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen === "baseurl") {
       return (
         <>
-          <Text bold>{preset?.label} base URL</Text>
-          <Box marginTop={1}>
+          <Text bold wrap="truncate">
+            {preset?.label} base URL
+          </Text>
+          <Box marginTop={1} width={Math.max(10, columns - 8)} overflow="hidden">
             <TextInput
               value={baseInput}
               onChange={setBaseInput}
@@ -693,20 +674,30 @@ export function App({ options }: { options: TuiOptions }) {
               placeholder="https://example.com/v1"
             />
           </Box>
-          <Text dimColor>Use an OpenAI-compatible endpoint.</Text>
+          <Text dimColor wrap="truncate">
+            Use an OpenAI-compatible endpoint.
+          </Text>
         </>
       )
     }
 
     if (screen === "loading") {
-      return <Text>Loading {preset?.label ?? "provider"} models…</Text>
+      return (
+        <Text wrap="truncate">
+          Loading {preset?.label ?? "provider"} models…
+        </Text>
+      )
     }
 
     if (screen === "error") {
       return (
         <>
-          <Text color="red">{error}</Text>
-          <Text dimColor>Ctrl+C to exit.</Text>
+          <Text color="red" wrap="truncate">
+            {error}
+          </Text>
+          <Text dimColor wrap="truncate">
+            Ctrl+C to exit.
+          </Text>
         </>
       )
     }
@@ -721,13 +712,17 @@ export function App({ options }: { options: TuiOptions }) {
 
       return (
         <>
-          <Text dimColor>
+          <Text dimColor wrap="truncate">
             Select a model · {preset?.label} ({modelIndex + 1}/{models.length})
           </Text>
           {visible.map((item, offset) => {
             const index = start + offset
             return (
-              <Text key={item} color={index === modelIndex ? "cyan" : undefined}>
+              <Text
+                key={item}
+                color={index === modelIndex ? "cyan" : undefined}
+                wrap="truncate"
+              >
                 {index === modelIndex ? "› " : "  "}
                 {item}
               </Text>
@@ -737,93 +732,42 @@ export function App({ options }: { options: TuiOptions }) {
       )
     }
 
-    const contentItems = timeline.filter((item) => item.kind !== "usage")
-    const maxItems = Math.max(1, Math.floor((bodyHeight - 4) / 2))
-    const end = Math.max(0, contentItems.length - scrollOffset)
-    const start = Math.max(0, end - maxItems)
-    const visibleItems = contentItems.slice(start, end)
+    const lines = timelineLines(timeline, Math.max(20, columns - 4), expandAll)
+    lineCountRef.current = lines.length
+    const maxLines = Math.max(1, bodyHeight - 4)
+    const end = Math.max(0, lines.length - scrollOffset)
+    const start = Math.max(0, end - maxLines)
+    const visibleLines = lines.slice(start, end)
     const hiddenAbove = start
-    const hiddenBelow = contentItems.length - end
+    const hiddenBelow = lines.length - end
 
     return (
       <>
         {hiddenAbove > 0 ? (
-          <Text dimColor>… {hiddenAbove} older items · PgUp</Text>
+          <Text dimColor wrap="truncate">
+            … {hiddenAbove} older lines · PgUp
+          </Text>
         ) : null}
-        {visibleItems.length === 0 ? (
-          <Text dimColor>Type a message to start.</Text>
+        {visibleLines.length === 0 ? (
+          <Text dimColor wrap="truncate">
+            Type a message to start.
+          </Text>
         ) : (
-          visibleItems.map((item) => {
-            if (item.kind === "system") {
-              return (
-                <Text key={item.id} dimColor>
-                  {item.text}
-                </Text>
-              )
-            }
-
-            if (item.kind === "user") {
-              return (
-                <Box key={item.id}>
-                  <Text color="green">{"you> "}</Text>
-                  <Text>{item.text}</Text>
-                </Box>
-              )
-            }
-
-            if (item.kind === "assistant") {
-              return item.text ? <Text key={item.id}>{item.text}</Text> : null
-            }
-
-            const stats = item.diff ? diffStats(item.diff) : undefined
-
-            return (
-              <Box key={item.id} flexDirection="column">
-                <Text
-                  color={
-                    item.status === "failed"
-                      ? "red"
-                      : item.status === "running"
-                        ? "yellow"
-                        : "green"
-                  }
-                >
-                  {item.status === "failed" ? "✗" : "●"}{" "}
-                  {toolLabel(item).slice(0, Math.max(20, columns - 8))}
-                  {stats ? (
-                    <Text dimColor>
-                      {"  "}+{stats.added} -{stats.removed}
-                    </Text>
-                  ) : null}
-                </Text>
-                {item.diff
-                  ? formatDiff(item.diff, columns, expandAll).map((line, index) => (
-                      <Text
-                        key={`${item.id}-diff-${index}`}
-                        color={line.color}
-                        dimColor={line.color === undefined}
-                      >
-                        {line.line}
-                      </Text>
-                    ))
-                  : item.output
-                    ? (
-                        <Text dimColor>
-                          {formatToolOutput(item.output, columns, expandAll)}
-                        </Text>
-                      )
-                    : null}
-                {item.error ? (
-                  <Text color="red">
-                    {formatToolOutput(item.error, columns, expandAll)}
-                  </Text>
-                ) : null}
-              </Box>
-            )
-          })
+          visibleLines.map((line, index) => (
+            <Text
+              key={`${start + index}`}
+              color={line.color}
+              dimColor={line.dim}
+              wrap="truncate"
+            >
+              {line.text}
+            </Text>
+          ))
         )}
         {hiddenBelow > 0 ? (
-          <Text dimColor>… {hiddenBelow} newer items · PgDn</Text>
+          <Text dimColor wrap="truncate">
+            … {hiddenBelow} newer lines · PgDn
+          </Text>
         ) : null}
       </>
     )
@@ -849,7 +793,7 @@ export function App({ options }: { options: TuiOptions }) {
         flexShrink={0}
         height={bodyHeight}
         borderStyle="round"
-        borderColor="gray"
+        borderColor={theme.border}
         paddingX={1}
         overflow="hidden"
       >
@@ -860,20 +804,20 @@ export function App({ options }: { options: TuiOptions }) {
           flexShrink={0}
           height={3}
           borderStyle="round"
-          borderColor="cyan"
+          borderColor={theme.inputBorder}
           paddingX={1}
           overflow="hidden"
         >
           {permission ? (
-            <Text color="yellow">
+            <Text color="yellow" wrap="truncate">
               permission: {permission.tool} · Allow? [y/N]
             </Text>
           ) : busy ? (
-            <Text dimColor>
+            <Text dimColor wrap="truncate">
               {spinner} Thinking…
             </Text>
           ) : (
-            <Box>
+            <Box width={Math.max(10, columns - 8)} overflow="hidden">
               <Text color="green">{"you> "}</Text>
               <TextInput
                 value={input}
@@ -886,8 +830,10 @@ export function App({ options }: { options: TuiOptions }) {
           )}
         </Box>
       ) : null}
-      <Box paddingX={1} flexShrink={0}>
-        <Text dimColor>{footerText}</Text>
+      <Box paddingX={1} flexShrink={0} height={1} overflow="hidden">
+        <Text dimColor wrap="truncate">
+          {footerLine}
+        </Text>
       </Box>
     </Box>
   )

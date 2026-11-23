@@ -131,7 +131,7 @@ describe("TUI", () => {
       const frame = lastFrame() ?? ""
       expect(frame.match(/OpenContinue/g)?.length ?? 0).toBe(1)
       expect(frame).toContain("Type a message…")
-      expect(frame).toContain("/exit to quit · Ctrl+C exit")
+      expect(frame).toContain("/exit ·")
       expect(frame.split("\n").length).toBeLessThanOrEqual(24)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -143,6 +143,45 @@ describe("TUI", () => {
       await vi.waitFor(() => {
         expect(lastFrame()).toContain("show commands")
       })
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("keeps a fixed frame after repeated help output", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      for (let index = 0; index < 5; index++) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        stdin.write("/help")
+        await vi.waitFor(() => expect(lastFrame()).toContain("you> /help"))
+        stdin.write("\r")
+        await vi.waitFor(() => expect(lastFrame()).toContain("show commands"))
+      }
+
+      const frame = lastFrame() ?? ""
+      const plain = frame.replace(/\x1b\[[0-9;]*m/g, "")
+      expect(plain.split("\n").length).toBeLessThanOrEqual(24)
+      expect(plain.match(/OpenContinue/g)?.length ?? 0).toBe(1)
+      expect(plain).toContain("Type a message…")
+      expect(plain).toContain("/exit ·")
+      expect(plain).toContain("older lines · PgUp")
+
+      const width = plain.split("\n")[0]?.length ?? 0
+      for (const line of plain.split("\n")) {
+        expect(line.length).toBeLessThanOrEqual(width)
+      }
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
