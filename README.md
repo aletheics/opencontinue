@@ -79,7 +79,7 @@ Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`, `todo`. The `todo` tool 
 
 Execution modes: **Plan** reads and analyzes but never writes or runs shell commands; **Confirm** (default) allows reads and asks before `write`/`bash`; **Auto** (`--auto`) runs protected tools without per-action prompts. `--plan` selects Plan, and `--readonly` remains a compatibility alias. The TUI shows the active mode and cycles with `shift+tab`; the choice is saved to `~/.opencontinue/config.json` and survives restarts. Resolution order is explicit flag, saved preference, project `.opencontinue/opencontinue.json`, then Confirm. Mode changes go through the runtime broker, not a UI-side policy.
 
-Reasoning effort: providers that document OpenAI-compatible `reasoning_effort` (OpenAI o-series, GPT-5/GPT-6) expose `Auto / Low / Medium / High`. Cycle with `shift+R` when the prompt is empty or `/reasoning`. `Auto` sends no parameter; unsupported providers hide the control rather than sending unknown fields. The choice also persists in the global config, and `OPENCONTINUE_REASONING_EFFORT` overrides it for CI.
+Reasoning effort: OpenAI o-series/GPT-5/GPT-6 use `reasoning_effort`; Claude 3.7/4/5 models map `Low / Medium / High` to extended-thinking budgets. Cycle with `shift+R` when the prompt is empty or `/reasoning`. `Auto` sends no parameter; unsupported providers hide the control rather than sending unknown fields. The choice persists in the global config, and `OPENCONTINUE_REASONING_EFFORT` overrides it for CI.
 
 ## Checks
 

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { toAnthropicMessages } from "./anthropic.js"
 import {
+  anthropicThinking,
   createProvider,
   OpenAICompatibleProvider,
   reasoningEffortsFor,
@@ -28,7 +29,54 @@ describe("reasoning effort", () => {
     ])
     expect(reasoningEffortsFor("openai", "o3-mini")).toContain("high")
     expect(reasoningEffortsFor("deepseek", "deepseek-reasoner")).toEqual([])
-    expect(reasoningEffortsFor("anthropic", "claude-sonnet-5-5")).toEqual([])
+    expect(reasoningEffortsFor("anthropic", "claude-sonnet-5-5")).toEqual([
+      "auto",
+      "low",
+      "medium",
+      "high",
+    ])
+    expect(reasoningEffortsFor("anthropic", "claude-haiku-4-5")).toContain("high")
+  })
+
+  it("maps Anthropic effort to thinking budgets", () => {
+    expect(anthropicThinking("auto")).toEqual({ maxTokens: 8_192 })
+    expect(anthropicThinking(undefined)).toEqual({ maxTokens: 8_192 })
+    expect(anthropicThinking("low")).toEqual({
+      thinking: { type: "enabled", budget_tokens: 1_024 },
+      maxTokens: 8_192,
+    })
+    expect(anthropicThinking("high")).toEqual({
+      thinking: { type: "enabled", budget_tokens: 8_192 },
+      maxTokens: 12_288,
+    })
+  })
+
+  it("passes signed thinking blocks back to Anthropic", () => {
+    const { messages } = toAnthropicMessages([
+      {
+        role: "assistant",
+        content: "answer",
+        thinking: [
+          { text: "keep this", signature: "sig" },
+          { text: "drop unsigned" },
+        ],
+      },
+    ])
+
+    const content = messages[0]?.content
+    expect(Array.isArray(content)).toBe(true)
+    expect(content).toContainEqual({
+      type: "thinking",
+      thinking: "keep this",
+      signature: "sig",
+    })
+    expect(
+      Array.isArray(content)
+        ? content.some(
+            (block) => block.type === "thinking" && block.thinking === "drop unsigned",
+          )
+        : false,
+    ).toBe(false)
   })
 
   it("sends reasoning_effort only when the level is supported", async () => {

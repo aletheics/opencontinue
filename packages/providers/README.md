@@ -6,7 +6,7 @@
 
 **Public API:** `createProvider`, `listModels`, `PROVIDER_PRESETS`, `reasoningEffortsFor`, `ChatProvider`, `ChatRequest`, `ChatStreamEvent`.
 
-**Reasoning:** `reasoningEffortsFor(provider, model)` advertises levels only where the API documents `reasoning_effort` (OpenAI o-series / GPT-5 / GPT-6). The OpenAI-compatible transport drops the parameter unless the request level is advertised; `auto` never sends it. Anthropic extended-thinking budgets are not implemented yet, so it advertises none.
+**Reasoning:** `reasoningEffortsFor(provider, model)` advertises levels only where the provider documents the capability. OpenAI o-series / GPT-5 / GPT-6 use `reasoning_effort`; Claude 3.7/4/5 models use extended-thinking budgets via `anthropicThinking` (low 1k, medium 4k, high 8k tokens, with `max_tokens` raised above the budget). `auto` sends nothing; unadvertised levels are dropped. Thinking text is never surfaced as assistant output; signed thinking blocks are preserved across tool steps so multi-step Anthropic runs remain valid.
 
 **Allowed imports:** external packages only.
 

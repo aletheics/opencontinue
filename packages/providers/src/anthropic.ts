@@ -12,6 +12,11 @@ import type {
   ChatRequest,
   ChatStreamEvent,
 } from "./index.js"
+import {
+  anthropicThinking,
+  reasoningEffortsFor,
+  type ReasoningEffort,
+} from "./reasoning.js"
 
 export type AnthropicOptions = {
   apiKey: string
@@ -57,6 +62,14 @@ export function toAnthropicMessages(messages: ChatMessage[]): {
 
     if (message.role === "assistant") {
       const content: ContentBlockParam[] = []
+      for (const block of message.thinking ?? []) {
+        if (!block.signature) continue
+        content.push({
+          type: "thinking",
+          thinking: block.text,
+          signature: block.signature,
+        })
+      }
       if (message.content) content.push({ type: "text", text: message.content })
       for (const call of message.toolCalls ?? []) {
         content.push({
@@ -97,12 +110,12 @@ export function toAnthropicMessages(messages: ChatMessage[]): {
 export class AnthropicProvider implements ChatProvider {
   readonly id = "anthropic"
   readonly model: string
-  /** Extended-thinking budgets are not implemented yet; hide the control. */
-  readonly reasoningEfforts = [] as const
+  readonly reasoningEfforts: readonly ReasoningEffort[]
   private readonly client: Anthropic
 
   constructor(options: AnthropicOptions) {
     this.model = options.model
+    this.reasoningEfforts = reasoningEffortsFor("anthropic", options.model)
     const baseURL = options.baseUrl?.replace(/\/v1\/?$/, "")
     this.client = new Anthropic({
       apiKey: options.apiKey,
@@ -128,18 +141,27 @@ export class AnthropicProvider implements ChatProvider {
         input_schema: tool.parameters as Tool["input_schema"],
       })) ?? []
 
+    const effort = this.reasoningEfforts.includes(
+      request.reasoningEffort ?? "auto",
+    )
+      ? request.reasoningEffort
+      : undefined
+    const thinking = anthropicThinking(effort)
+
     const stream = this.client.messages.stream(
       {
         model: request.model || this.model,
-        max_tokens: 8192,
+        max_tokens: thinking.maxTokens,
         ...(system ? { system } : {}),
         messages,
         ...(tools.length > 0 ? { tools } : {}),
+        ...(thinking.thinking ? { thinking: thinking.thinking } : {}),
       },
       request.signal ? { signal: request.signal } : undefined,
     )
 
     const toolBlocks = new Map<number, { id: string; name: string; json: string }>()
+    const thinkingBlocks = new Map<number, { text: string; signature: string }>()
     let inputTokens = 0
     let outputTokens = 0
 
@@ -154,21 +176,47 @@ export class AnthropicProvider implements ChatProvider {
         continue
       }
 
-      if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
-        toolBlocks.set(event.index, {
-          id: event.content_block.id,
-          name: event.content_block.name,
-          json: "",
-        })
-        continue
+      if (event.type === "content_block_start") {
+        if (event.content_block.type === "thinking") {
+          thinkingBlocks.set(event.index, { text: "", signature: "" })
+          continue
+        }
+        if (event.content_block.type === "tool_use") {
+          toolBlocks.set(event.index, {
+            id: event.content_block.id,
+            name: event.content_block.name,
+            json: "",
+          })
+          continue
+        }
       }
 
       if (event.type === "content_block_delta") {
         if (event.delta.type === "text_delta") {
           yield { type: "text", text: event.delta.text }
+        } else if (event.delta.type === "thinking_delta") {
+          const block = thinkingBlocks.get(event.index)
+          if (block) block.text += event.delta.thinking
+        } else if (event.delta.type === "signature_delta") {
+          const block = thinkingBlocks.get(event.index)
+          if (block) block.signature += event.delta.signature
         } else if (event.delta.type === "input_json_delta") {
           const block = toolBlocks.get(event.index)
           if (block) block.json += event.delta.partial_json
+        }
+      }
+
+      if (event.type === "content_block_stop") {
+        const block = thinkingBlocks.get(event.index)
+        if (block) {
+          thinkingBlocks.delete(event.index)
+          yield {
+            type: "thinking",
+            block: {
+              text: block.text,
+              ...(block.signature ? { signature: block.signature } : {}),
+            },
+          }
         }
       }
     }

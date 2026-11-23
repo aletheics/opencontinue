@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import type { SessionStore } from "@opencontinue/core"
 import type {
+  AssistantThinkingBlock,
   ChatMessage,
   ChatProvider,
   ReasoningEffort,
@@ -50,6 +51,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
     for (let step = 0; step < maxSteps; step++) {
       let text = ""
       const calls: ToolCall[] = []
+      const thinking: AssistantThinkingBlock[] = []
 
       for await (const event of provider.streamChat({
         model: provider.model,
@@ -61,6 +63,8 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
         if (event.type === "text") {
           text += event.text
           store.append(sessionId, { type: "message.assistant.delta", runId, text: event.text })
+        } else if (event.type === "thinking") {
+          thinking.push(event.block)
         } else if (event.type === "tool_call") {
           calls.push(event.call)
         } else {
@@ -82,6 +86,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
         role: "assistant",
         content: text,
         ...(calls.length ? { toolCalls: calls } : {}),
+        ...(thinking.length ? { thinking } : {}),
       }
       history.push(assistant)
 

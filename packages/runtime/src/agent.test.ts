@@ -62,6 +62,60 @@ describe("runAgent", () => {
     expect(types).toContain("run.completed")
   })
 
+  it("passes signed thinking blocks to the next tool step", async () => {
+    const workspace = await makeWorkspace()
+    const store = new MemorySessionStore()
+    const session = store.create()
+    store.append(session.id, { type: "message.user", text: "write a.txt" })
+
+    let step = 0
+    const seen: ChatMessage[][] = []
+    const provider: ChatProvider = {
+      id: "fake",
+      model: "fake",
+      async *streamChat(request) {
+        seen.push(request.messages)
+        step++
+        if (step === 1) {
+          yield {
+            type: "thinking",
+            block: { text: "plan the write", signature: "sig-1" },
+          }
+          yield {
+            type: "tool_call",
+            call: {
+              id: "call_1",
+              name: "write",
+              arguments: JSON.stringify({ path: "a.txt", content: "hello" }),
+            },
+          }
+          return
+        }
+        yield { type: "text", text: "done" }
+      },
+    }
+
+    await runAgent({
+      store,
+      sessionId: session.id,
+      provider,
+      tools: new ToolRegistry(),
+      permissions: allowAll,
+      workspace,
+    })
+
+    const assistant = seen[1]!.find(
+      (message) => message.role === "assistant" && message.thinking?.length,
+    )
+    expect(assistant).toMatchObject({
+      role: "assistant",
+      thinking: [{ text: "plan the write", signature: "sig-1" }],
+    })
+    await expect(readFile(path.join(workspace, "a.txt"), "utf8")).resolves.toBe(
+      "hello",
+    )
+  })
+
   it("executes a tool call and continues the conversation", async () => {
     const workspace = await makeWorkspace()
     const store = new MemorySessionStore()

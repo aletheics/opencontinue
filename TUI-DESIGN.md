@@ -343,11 +343,12 @@ Show the effective setting only when known. If unsupported, omit the
 reasoning label rather than showing a misleading default.
 
 Implementation: `reasoningEffortsFor(provider, model)` advertises levels
-only for OpenAI-compatible models that document `reasoning_effort`
-(o-series, GPT-5, GPT-6). `auto` sends no parameter. The TUI reads the
-effective level and supported levels from `health()`, persists the user's
-choice in `~/.opencontinue/config.json`, and hides the control when the
-list is empty. Anthropic extended-thinking budgets remain future work.
+for OpenAI models documenting `reasoning_effort` (o-series, GPT-5, GPT-6)
+and for Claude 3.7/4/5 models using extended-thinking budgets. `auto`
+sends no parameter. The TUI reads the effective level and supported levels
+from `health()`, persists the user's choice in `~/.opencontinue/config.json`,
+and hides the control when the list is empty. Thinking text is not shown;
+signed blocks are preserved across tool steps.
 
 ## 7. Task workflow and progress
 

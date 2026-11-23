@@ -4,32 +4,17 @@ import { findProviderPreset } from "./catalog.js"
 export { AnthropicProvider } from "./anthropic.js"
 export { PROVIDER_PRESETS, type ProviderPreset } from "./catalog.js"
 
-export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "max"
+export {
+  anthropicThinking,
+  REASONING_EFFORTS,
+  reasoningEffortsFor,
+  type ReasoningEffort,
+} from "./reasoning.js"
 
-export const REASONING_EFFORTS: readonly ReasoningEffort[] = [
-  "auto",
-  "low",
-  "medium",
-  "high",
-  "max",
-]
-
-/**
- * Only providers/models that document an OpenAI-compatible reasoning_effort
- * parameter advertise levels. Everything else hides the control rather than
- * sending an unknown field.
- */
-export function reasoningEffortsFor(
-  provider: string | undefined,
-  model: string | undefined,
-): ReasoningEffort[] {
-  const id = (provider ?? "").toLowerCase()
-  const name = model ?? ""
-  if (id === "openai" && /^(o[1-9]|gpt-5|gpt-6)/i.test(name)) {
-    return ["auto", "low", "medium", "high"]
-  }
-  return []
-}
+import {
+  reasoningEffortsFor,
+  type ReasoningEffort,
+} from "./reasoning.js"
 
 export type ChatRole = "system" | "user" | "assistant" | "tool"
 
@@ -45,13 +30,25 @@ export type ToolDefinition = {
   parameters: unknown
 }
 
+export type AssistantThinkingBlock = {
+  text: string
+  /** Anthropic signature required to pass the block back on tool turns. */
+  signature?: string
+}
+
 export type ChatMessage =
   | { role: "system" | "user"; content: string }
-  | { role: "assistant"; content: string; toolCalls?: ToolCall[] }
+  | {
+      role: "assistant"
+      content: string
+      toolCalls?: ToolCall[]
+      thinking?: AssistantThinkingBlock[]
+    }
   | { role: "tool"; content: string; toolCallId: string; name?: string }
 
 export type ChatStreamEvent =
   | { type: "text"; text: string }
+  | { type: "thinking"; block: AssistantThinkingBlock }
   | { type: "tool_call"; call: ToolCall }
   | {
       type: "usage"
