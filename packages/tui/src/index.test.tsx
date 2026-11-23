@@ -133,6 +133,16 @@ describe("TUI", () => {
       expect(frame).toContain("Type a message…")
       expect(frame).toContain("/exit to quit · Ctrl+C exit")
       expect(frame.split("\n").length).toBeLessThanOrEqual(24)
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/help")
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain("you> /help")
+      })
+      stdin.write("\r")
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain("show commands")
+      })
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

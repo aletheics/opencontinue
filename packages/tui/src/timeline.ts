@@ -33,11 +33,18 @@ export type UsageTimelineItem = {
   totalTokens: number
 }
 
+export type SystemTimelineItem = {
+  kind: "system"
+  id: string
+  text: string
+}
+
 export type TimelineItem =
   | UserTimelineItem
   | AssistantTimelineItem
   | ToolTimelineItem
   | UsageTimelineItem
+  | SystemTimelineItem
 
 export function reduceTimeline(items: TimelineItem[], event: SessionEvent): TimelineItem[] {
   if (event.type === "message.user") {

@@ -33,6 +33,7 @@ export type TuiOptions = {
 }
 
 type Screen = "provider" | "key" | "baseurl" | "loading" | "models" | "chat" | "error"
+type PermissionMode = "ask" | "auto" | "readonly"
 
 type PermissionRequest = {
   tool: string
@@ -40,23 +41,38 @@ type PermissionRequest = {
   resolve: (approved: boolean) => void
 }
 
+const SLASH_COMMANDS = [
+  { name: "/help", description: "show commands" },
+  { name: "/clear", description: "new session" },
+  { name: "/model", description: "change model" },
+  { name: "/provider", description: "change provider" },
+  { name: "/mode", description: "cycle permissions" },
+  { name: "/status", description: "session status" },
+  { name: "/exit", description: "quit" },
+]
+
+const HELP_TEXT = SLASH_COMMANDS.map((command) => `${command.name} — ${command.description}`).join(
+  "\n",
+)
+
 class TuiPermissionGate implements PermissionGate {
   pending: PermissionRequest | null = null
   private listener: (() => void) | undefined
 
-  constructor(
-    private readonly auto: boolean,
-    private readonly readonlyMode: boolean,
-  ) {}
+  constructor(private mode: PermissionMode) {}
+
+  setMode(mode: PermissionMode): void {
+    this.mode = mode
+  }
 
   onChange(listener: () => void): void {
     this.listener = listener
   }
 
   async authorize(tool: Tool, input: unknown): Promise<boolean> {
-    if (this.auto) return true
+    if (this.mode === "auto") return true
     if (tool.capability === "read") return true
-    if (this.readonlyMode) return false
+    if (this.mode === "readonly") return false
 
     return new Promise<boolean>((resolve) => {
       this.pending = {
@@ -181,7 +197,9 @@ export function App({ options }: { options: TuiOptions }) {
   const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
   const columns = Math.max(40, (stdout.columns ?? 80) - 1)
   const rows = Math.max(12, (stdout.rows ?? 24) - 1)
-  const mode = options.auto ? "auto" : options.readonly ? "readonly" : "ask"
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
+    options.auto ? "auto" : options.readonly ? "readonly" : "ask",
+  )
 
   const initial = useMemo(() => resolveProviderSettings(), [])
   const [screen, setScreen] = useState<Screen>("provider")
@@ -203,15 +221,19 @@ export function App({ options }: { options: TuiOptions }) {
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [lastDurationMs, setLastDurationMs] = useState<number | null>(null)
   const [permission, setPermission] = useState<PermissionRequest | null>(null)
+  const [history, setHistory] = useState<string[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const [scrollOffset, setScrollOffset] = useState(0)
 
   const storeRef = useRef<SessionStore | null>(null)
   const sessionRef = useRef<string | null>(null)
   const providerRef = useRef<ChatProvider | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const runStartedRef = useRef<number | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const gateRef = useRef<TuiPermissionGate | null>(null)
   if (!gateRef.current) {
-    gateRef.current = new TuiPermissionGate(Boolean(options.auto), Boolean(options.readonly))
+    gateRef.current = new TuiPermissionGate(permissionMode)
   }
   const gate = gateRef.current
 
@@ -315,6 +337,101 @@ export function App({ options }: { options: TuiOptions }) {
     setScreen("loading")
   }
 
+  const cycleMode = () => {
+    const next: PermissionMode =
+      permissionMode === "ask" ? "auto" : permissionMode === "auto" ? "readonly" : "ask"
+    setPermissionMode(next)
+    gate.setMode(next)
+  }
+
+  const appendSystem = (text: string) => {
+    setTimeline((items) => [
+      ...items,
+      {
+        kind: "system",
+        id: `system:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        text,
+      },
+    ])
+  }
+
+  const attachSession = (store: SessionStore, sessionId: string) => {
+    storeRef.current = store
+    sessionRef.current = sessionId
+    setTimeline(timelineFromEvents(store.events(sessionId)))
+    setScrollOffset(0)
+    unsubscribeRef.current?.()
+    unsubscribeRef.current = store.subscribe(sessionId, (event) => {
+      setTimeline((items) => reduceTimeline(items, event))
+      if (event.type === "run.completed" || event.type === "run.failed") {
+        const started = runStartedRef.current
+        if (started !== null) setLastDurationMs(Date.now() - started)
+        runStartedRef.current = null
+        setRunStartedAt(null)
+        abortRef.current = null
+        setBusy(false)
+      }
+    })
+  }
+
+  const clearSession = () => {
+    if (!providerRef.current) return
+    abortRef.current?.abort()
+    unsubscribeRef.current?.()
+    storeRef.current?.close()
+
+    const store = createSessionStore({ workspace: process.env.INIT_CWD ?? process.cwd() })
+    const session = store.create("OpenContinue TUI")
+    attachSession(store, session.id)
+    setBusy(false)
+    appendSystem("Started a new session.")
+  }
+
+  const handleCommand = (text: string): boolean => {
+    const name = text.split(/\s+/)[0]
+    switch (name) {
+      case "/help":
+        appendSystem(HELP_TEXT)
+        return true
+      case "/clear":
+        clearSession()
+        return true
+      case "/model":
+        setScreen(models.length > 0 ? "models" : "provider")
+        return true
+      case "/provider":
+        setScreen("provider")
+        return true
+      case "/mode":
+        cycleMode()
+        return true
+      case "/status": {
+        const tokens = timeline.reduce(
+          (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
+          0,
+        )
+        appendSystem(
+          [
+            `session: ${sessionRef.current ?? "-"}`,
+            `provider: ${preset?.label ?? "-"}`,
+            `model: ${model}`,
+            `mode: ${permissionMode}`,
+            `tokens: ${tokens}`,
+            `workspace: ${process.env.INIT_CWD ?? process.cwd()}`,
+          ].join("\n"),
+        )
+        return true
+      }
+      case "/exit":
+      case "/quit":
+        exit()
+        return true
+      default:
+        appendSystem(`Unknown command: ${name}\n\n${HELP_TEXT}`)
+        return true
+    }
+  }
+
   const chooseModel = () => {
     if (!preset) return
     const chosen = models[modelIndex]
@@ -336,29 +453,19 @@ export function App({ options }: { options: TuiOptions }) {
         apiKey: apiKey || settings.apiKey,
         model: chosen,
       }).provider
+      providerRef.current = provider
+      setModel(chosen)
+
+      if (storeRef.current && sessionRef.current) {
+        setScreen("chat")
+        return
+      }
+
       const store = createSessionStore({ workspace: process.env.INIT_CWD ?? process.cwd() })
       const session = (options.resume ? store.get(options.resume) : undefined) ?? store.create(
         "OpenContinue TUI",
       )
-
-      storeRef.current = store
-      sessionRef.current = session.id
-      providerRef.current = provider
-      setModel(chosen)
-      setTimeline(timelineFromEvents(store.events(session.id)))
-
-      unsubscribeRef.current?.()
-      unsubscribeRef.current = store.subscribe(session.id, (event) => {
-        setTimeline((items) => reduceTimeline(items, event))
-        if (event.type === "run.completed" || event.type === "run.failed") {
-          const started = runStartedRef.current
-          if (started !== null) setLastDurationMs(Date.now() - started)
-          runStartedRef.current = null
-          setRunStartedAt(null)
-          setBusy(false)
-        }
-      })
-
+      attachSession(store, session.id)
       setScreen("chat")
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -369,8 +476,8 @@ export function App({ options }: { options: TuiOptions }) {
   const send = (value: string) => {
     const text = value.trim()
     if (!text) return
-    if (text === "/exit" || text === "/quit") {
-      exit()
+    if (text.startsWith("/")) {
+      handleCommand(text)
       return
     }
 
@@ -380,11 +487,19 @@ export function App({ options }: { options: TuiOptions }) {
     if (!store || !sessionId || !provider || busy) return
 
     setInput("")
+    setHistory((items) => [...items, text])
+    setHistoryIndex(-1)
+    setScrollOffset(0)
     setBusy(true)
     setLastDurationMs(null)
+
     const started = Date.now()
     setRunStartedAt(started)
     runStartedRef.current = started
+
+    const controller = new AbortController()
+    abortRef.current = controller
+
     store.append(sessionId, { type: "message.user", text })
 
     void runAgent({
@@ -396,7 +511,9 @@ export function App({ options }: { options: TuiOptions }) {
       workspace: process.env.INIT_CWD ?? process.cwd(),
       systemPrompt:
         "You are OpenContinue, a concise coding assistant. Be concrete. Answer in the user's language.",
+      signal: controller.signal,
     }).catch(() => {
+      abortRef.current = null
       setBusy(false)
     })
   }
@@ -404,6 +521,11 @@ export function App({ options }: { options: TuiOptions }) {
   useInput((character, key) => {
     if (key.ctrl && character === "c") {
       exit()
+      return
+    }
+
+    if (key.tab && key.shift) {
+      cycleMode()
       return
     }
 
@@ -427,7 +549,9 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
-    if (screen === "chat" && permission) {
+    if (screen !== "chat") return
+
+    if (permission) {
       if (character.toLowerCase() === "y") {
         gate.answer(true)
         setPermission(null)
@@ -435,6 +559,51 @@ export function App({ options }: { options: TuiOptions }) {
         gate.answer(false)
         setPermission(null)
       }
+      return
+    }
+
+    if (key.escape && busy) {
+      abortRef.current?.abort()
+      return
+    }
+
+    if (key.ctrl && character === "d" && input.length === 0) {
+      exit()
+      return
+    }
+
+    if (key.upArrow) {
+      if (history.length === 0) return
+      const next = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1)
+      setHistoryIndex(next)
+      setInput(history[next] ?? "")
+      return
+    }
+
+    if (key.downArrow) {
+      if (historyIndex < 0) return
+      const next = historyIndex + 1
+      if (next >= history.length) {
+        setHistoryIndex(-1)
+        setInput("")
+      } else {
+        setHistoryIndex(next)
+        setInput(history[next] ?? "")
+      }
+      return
+    }
+
+    const page = Math.max(1, Math.floor((rows - 9) / 2))
+    const contentCount = timeline.filter((item) => item.kind !== "usage").length
+
+    if (key.pageUp) {
+      setScrollOffset((value) => Math.min(Math.max(0, contentCount - page), value + page))
+      return
+    }
+
+    if (key.pageDown) {
+      setScrollOffset((value) => Math.max(0, value - page))
+      return
     }
   })
 
@@ -450,10 +619,21 @@ export function App({ options }: { options: TuiOptions }) {
       : screen === "key" || screen === "baseurl"
         ? "Enter submit · Ctrl+C exit"
         : screen === "chat"
-          ? "/exit to quit · Ctrl+C exit · ctrl+o expand"
+          ? "/exit to quit · Ctrl+C exit · ctrl+o expand · shift+tab mode · PgUp/PgDn scroll"
           : screen === "loading"
             ? "Loading models…"
             : "Ctrl+C exit"
+
+  const slashMatches =
+    screen === "chat" && input.startsWith("/")
+      ? SLASH_COMMANDS.filter((command) =>
+          command.name.startsWith(input.split(/\s+/)[0] ?? "/"),
+        ).slice(0, 4)
+      : []
+  const footerText =
+    slashMatches.length > 0
+      ? slashMatches.map((command) => `${command.name} ${command.description}`).join("  ")
+      : footer
 
   const inputHeight = screen === "chat" ? 3 : 0
   const bodyHeight = Math.max(4, rows - 3 - inputHeight - 1)
@@ -559,16 +739,29 @@ export function App({ options }: { options: TuiOptions }) {
 
     const contentItems = timeline.filter((item) => item.kind !== "usage")
     const maxItems = Math.max(1, Math.floor((bodyHeight - 4) / 2))
-    const visibleItems = contentItems.slice(-maxItems)
-    const hidden = contentItems.length - visibleItems.length
+    const end = Math.max(0, contentItems.length - scrollOffset)
+    const start = Math.max(0, end - maxItems)
+    const visibleItems = contentItems.slice(start, end)
+    const hiddenAbove = start
+    const hiddenBelow = contentItems.length - end
 
     return (
       <>
-        {hidden > 0 ? <Text dimColor>… {hidden} earlier items hidden</Text> : null}
+        {hiddenAbove > 0 ? (
+          <Text dimColor>… {hiddenAbove} older items · PgUp</Text>
+        ) : null}
         {visibleItems.length === 0 ? (
           <Text dimColor>Type a message to start.</Text>
         ) : (
           visibleItems.map((item) => {
+            if (item.kind === "system") {
+              return (
+                <Text key={item.id} dimColor>
+                  {item.text}
+                </Text>
+              )
+            }
+
             if (item.kind === "user") {
               return (
                 <Box key={item.id}>
@@ -629,6 +822,9 @@ export function App({ options }: { options: TuiOptions }) {
             )
           })
         )}
+        {hiddenBelow > 0 ? (
+          <Text dimColor>… {hiddenBelow} newer items · PgDn</Text>
+        ) : null}
       </>
     )
   })()
@@ -647,7 +843,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   return (
     <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
-      <Header provider={headerProvider} model={headerModel} mode={mode} stats={stats} />
+      <Header provider={headerProvider} model={headerModel} mode={permissionMode} stats={stats} />
       <Box
         flexDirection="column"
         flexShrink={0}
@@ -684,13 +880,14 @@ export function App({ options }: { options: TuiOptions }) {
                 onChange={setInput}
                 onSubmit={send}
                 placeholder="Type a message…"
+                focus={!busy && !permission}
               />
             </Box>
           )}
         </Box>
       ) : null}
       <Box paddingX={1} flexShrink={0}>
-        <Text dimColor>{footer}</Text>
+        <Text dimColor>{footerText}</Text>
       </Box>
     </Box>
   )
