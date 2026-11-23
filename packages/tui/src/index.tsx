@@ -22,6 +22,7 @@ import {
   createProvider,
   listModels,
   PROVIDER_PRESETS,
+  type ChatProvider,
   type ProviderPreset,
 } from "@opencontinue/providers"
 import type {
@@ -249,6 +250,7 @@ export function App({ options }: { options: TuiOptions }) {
   const subscriptionRef = useRef<SessionSubscription | null>(null)
   const runStartedRef = useRef<number | null>(null)
   const lineCountRef = useRef(0)
+  const autoStartedRef = useRef(false)
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   const allowedToolsRef = useRef<Set<string>>(new Set())
   permissionModeRef.current = permissionMode
@@ -589,6 +591,41 @@ export function App({ options }: { options: TuiOptions }) {
     subscriptionRef.current = subscription
   }
 
+  const openLocalSession = (
+    provider: ChatProvider,
+    modelName: string,
+    providerLabel: string,
+    resumeId?: string,
+  ) => {
+    const store = storeRef.current ?? createSessionStore({ workspace })
+    storeRef.current = store
+    const client = new LocalSessionClient({
+      store,
+      provider,
+      workspace,
+      permissionMode: "ask",
+    })
+
+    void (async () => {
+      let sessionId = resumeId
+      if (sessionId) {
+        try {
+          await client.getSession(sessionId)
+        } catch {
+          sessionId = undefined
+        }
+      }
+      const session = sessionId
+        ? { id: sessionId }
+        : await client.createSession("OpenContinue TUI")
+      attachSession(client, session.id, modelName, providerLabel)
+      setScreen("chat")
+    })().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause))
+      setScreen("error")
+    })
+  }
+
   useEffect(() => {
     if (!options.url) return
     const client = new HttpSessionClient({ baseUrl: options.url })
@@ -614,6 +651,34 @@ export function App({ options }: { options: TuiOptions }) {
     })
 
     return () => client.close()
+  }, [])
+
+  useEffect(() => {
+    if (options.url || autoStartedRef.current) return
+    autoStartedRef.current = true
+    if (!initial.provider || !initial.model) return
+
+    const savedPreset = PROVIDER_PRESETS.find((item) => item.id === initial.provider)
+    if (savedPreset?.needsKey && !initial.apiKey) return
+
+    try {
+      const selection = createProvider(initial)
+      if (selection.fallback && initial.provider !== "echo") return
+
+      setPreset(savedPreset ?? null)
+      setApiKey(initial.apiKey ?? "")
+      setBaseUrl(initial.baseUrl ?? savedPreset?.baseUrl ?? "")
+      setModel(initial.model)
+      setScreen("loading")
+      openLocalSession(
+        selection.provider,
+        initial.model,
+        savedPreset?.label ?? initial.provider,
+        options.resume,
+      )
+    } catch {
+      // Stay on the provider picker.
+    }
   }, [])
 
   const clearSession = () => {
@@ -783,38 +848,7 @@ export function App({ options }: { options: TuiOptions }) {
         return
       }
 
-      const store = storeRef.current ?? createSessionStore({ workspace })
-      storeRef.current = store
-      const client = new LocalSessionClient({
-        store,
-        provider,
-        workspace,
-        permissionMode: "ask",
-      })
-
-      void (async () => {
-        let sessionId = options.resume
-        if (sessionId) {
-          try {
-            await client.getSession(sessionId)
-          } catch {
-            sessionId = undefined
-          }
-        }
-        const session = sessionId
-          ? { id: sessionId }
-          : await client.createSession("OpenContinue TUI")
-        attachSession(
-          client,
-          session.id,
-          chosen,
-          preset.label,
-        )
-        setScreen("chat")
-      })().catch((cause) => {
-        setError(cause instanceof Error ? cause.message : String(cause))
-        setScreen("error")
-      })
+      openLocalSession(provider, chosen, preset.label, options.resume)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
       setScreen("error")

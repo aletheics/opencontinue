@@ -33,7 +33,7 @@ npm run link
 opencontinue
 ```
 
-On first launch, choose a provider inside the TUI: OpenAI (GPT), DeepSeek, Kimi (Moonshot), Claude (Anthropic), OpenRouter, Ollama, Custom, or Echo. Type to filter the provider and model lists. Enter that provider's key, then choose a model. The model is saved to `~/.opencontinue/config.json`; the key is stored per provider in `~/.opencontinue/auth.json` (mode `0600`).
+On first launch, choose a provider inside the TUI: OpenAI (GPT), DeepSeek, Kimi (Moonshot), Claude (Anthropic), OpenRouter, Ollama, Custom, or Echo. Type to filter the provider and model lists. Enter that provider's key, then choose a model. The model is saved to `~/.opencontinue/config.json`; the key is stored per provider in `~/.opencontinue/auth.json` (mode `0600`). Later launches with a saved provider and key go straight to the chat banner.
 
 Use `opencontinue` as the primary command. `onc` is the short alias; `oc` would collide with OpenCode.
 

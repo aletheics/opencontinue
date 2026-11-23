@@ -277,6 +277,11 @@ describe("TUI", () => {
     const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
 
     try {
+      await ready(lastFrame)
+      stdin.write("/model")
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /model"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a provider"))
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), {
         timeout: 5000,
@@ -309,9 +314,6 @@ describe("TUI", () => {
     )
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -348,9 +350,6 @@ describe("TUI", () => {
     )
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -382,9 +381,6 @@ describe("TUI", () => {
     const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -416,9 +412,6 @@ describe("TUI", () => {
     const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -450,9 +443,6 @@ describe("TUI", () => {
     const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -485,9 +475,6 @@ describe("TUI", () => {
     const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
       expect(lastFrame()).toContain(path.basename(home))
       expect(lastFrame()).toContain("main")
@@ -508,9 +495,6 @@ describe("TUI", () => {
     const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -541,9 +525,6 @@ describe("TUI", () => {
     )
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       for (const [index, text] of ["alpha", "beta"].entries()) {
@@ -589,15 +570,6 @@ describe("TUI", () => {
     )
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(
-        () => {
-          expect(lastFrame()).toContain("Select a model")
-        },
-        { timeout: 5000 },
-      )
-
-      stdin.write("\r")
       await ready(lastFrame)
       expect(output(frames)).toContain("OpenContinue v0.0.1")
       expect(output(frames)).toContain("gpt-6.2 · OpenAI (GPT)")
@@ -646,9 +618,6 @@ describe("TUI", () => {
     )
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -713,9 +682,6 @@ describe("TUI", () => {
     )
 
     try {
-      stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
-      stdin.write("\r")
       await ready(lastFrame)
 
       for (let index = 0; index < 5; index++) {
