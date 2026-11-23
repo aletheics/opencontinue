@@ -15,6 +15,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/checkpoints", description: "list run checkpoints" },
   { name: "/rewind", description: "fork from a checkpoint" },
   { name: "/permissions", description: "show permission rules" },
+  { name: "/tui", description: "switch default or fullscreen renderer" },
   { name: "/status", description: "session status" },
   { name: "/exit", description: "quit" },
 ]
@@ -24,6 +25,7 @@ const KEY_HELP = [
   "Shift+R    cycle reasoning effort (empty prompt)",
   "Ctrl+O     expanded transcript",
   "Ctrl+T     show or hide the task list",
+  "PgUp/PgDn  scroll the fullscreen transcript",
   "Ctrl+R     search input history",
   "Esc        interrupt a run or close a menu",
   "Ctrl+C     exit",

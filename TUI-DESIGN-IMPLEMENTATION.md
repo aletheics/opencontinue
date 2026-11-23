@@ -376,7 +376,10 @@ Do not implement every feature at once. Ship one vertical slice at a time.
     list; the hidden state keeps a `Tasks done/total` line.
 - [x] Clear permission approval UI.
 - [x] Completion summary based only on real file/test results.
-- [ ] Optional fullscreen renderer after inline mode is reliable.
+- [x] Optional fullscreen renderer after inline mode is reliable.
+    `--fullscreen` / `/tui fullscreen` uses the alternate screen, a fixed
+    header, a tail-following transcript viewport (`PgUp`/`PgDn`), and a
+    pinned composer/footer; `/tui default` returns to inline scrollback.
 
 ## 11. Verification matrix
 

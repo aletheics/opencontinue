@@ -907,6 +907,86 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("runs the fullscreen renderer and switches back with /tui", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ fullscreen: true }} />,
+    )
+
+    try {
+      await ready(lastFrame)
+      expect(lastFrame()).toContain("◈ OpenContinue")
+      expect(lastFrame()).toContain("Type a message…")
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("hi")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› hi"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(output(frames)).toContain("hello from tui"), {
+        timeout: 5000,
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/tui default")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /tui default"))
+      stdin.write("\r")
+      await vi.waitFor(() =>
+        expect(output(frames)).toContain("Inline renderer enabled."),
+      )
+      await vi.waitFor(() => expect(lastFrame()).toContain("hello from tui"))
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/tui fullscreen")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /tui fullscreen"))
+      stdin.write("\r")
+      await vi.waitFor(() =>
+        expect(output(frames)).toContain("Fullscreen renderer enabled"),
+      )
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 25000)
+
+  it("scrolls the fullscreen transcript with PgUp and PgDn", async () => {
+    const { server, url } = await fakeLineProvider(30)
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ fullscreen: true }} />,
+    )
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("stream")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› stream"))
+      stdin.write("\r")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("line 29"), {
+        timeout: 5000,
+      })
+      await vi.waitFor(() => expect(output(frames)).toContain("Completed in"), {
+        timeout: 5000,
+      })
+      expect(lastFrame()).toContain("line 29")
+
+      stdin.write("\u001b[5~")
+      await vi.waitFor(() => expect(lastFrame()).not.toContain("line 29"))
+      expect(lastFrame()).toContain("line 5")
+
+      stdin.write("\u001b[6~")
+      await vi.waitFor(() => expect(lastFrame()).toContain("line 29"))
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 25000)
+
   it("does not label a long model wait as failed", async () => {
     const { server, url } = await fakeSlowProvider(2_000)
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })

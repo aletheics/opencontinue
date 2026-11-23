@@ -10,6 +10,7 @@
 - `TodoPanel.tsx` — the model-maintained task list above the prompt: `✓` completed, `▸` in progress, `○` pending, with an `◈ Tasks · done/total` header.
 - `SpinnerLine.tsx` — live turn status: a 120ms Braille spinner, a shimmering working-blue verb, the working-blue-to-danger-red stall fade, the 30-second timer/token gate, and the `  ⎿  Tip:` line.
 - `LineText.tsx` — renders a formatted line, including inline markdown spans (code, bold, italic, strikethrough, links).
+- `FullscreenTranscript.tsx` — fixed-height alternate-screen transcript window that follows the tail or a scrolled offset.
 - `Prompt.tsx` — borderless prompt composed with `composer/editor/Input.tsx`.
 - `SlashMenu.tsx` — borderless command palette above the prompt.
 - `PermissionPrompt.tsx` — inline permission card with `? Permission required`, the exact operation and target, working directory for bash, preview diff, and y/a/n choices.

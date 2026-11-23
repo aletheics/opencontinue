@@ -32,6 +32,7 @@ type ChatOptions = {
   auto?: boolean
   readonly?: boolean
   plan?: boolean
+  fullscreen?: boolean
 }
 
 class ConversationClient {
@@ -317,6 +318,7 @@ async function startTui(options: {
   plan?: boolean
   resume?: string
   url?: string
+  fullscreen?: boolean
 }): Promise<void> {
   if (options.auto && (options.readonly || options.plan)) {
     throw new Error("--auto cannot be combined with --plan or --readonly")
@@ -359,6 +361,7 @@ program
   .option("--auto", "Auto mode: allow write and shell tools without approval")
   .option("--plan", "Plan mode: read and analyze only; deny write and shell tools")
   .option("--readonly", "Alias for --plan")
+  .option("--fullscreen", "Use the fullscreen TUI renderer")
   .action(async (prompt: string | undefined, options: ChatOptions) => {
     if (options.auto && (options.plan || options.readonly)) {
       throw new Error("--auto cannot be combined with --plan or --readonly")
@@ -370,6 +373,7 @@ program
         plan: options.plan || options.readonly,
         resume: options.resume,
         url: options.url,
+        fullscreen: options.fullscreen,
       })
     } else await chat(options)
   })
@@ -377,7 +381,7 @@ program
 program
   .command("serve")
   .description("Start the HTTP/SSE server")
-  .addHelpText("after", "\nGlobal flags: --port <port>, --auto, --plan, --readonly")
+  .addHelpText("after", "\nGlobal flags: --port <port>, --auto, --plan, --readonly, --fullscreen")
   .action(() =>
     serveCommand({
       port: String(program.opts().port ?? "8787"),
@@ -396,6 +400,7 @@ program
       plan: Boolean(program.opts().plan || program.opts().readonly),
       resume: program.opts().resume as string | undefined,
       url: program.opts().url as string | undefined,
+      fullscreen: Boolean(program.opts().fullscreen),
     }),
   )
 

@@ -4,16 +4,25 @@ import { glyphs } from "../glyphs.js"
 import { todoProgress, type Todo } from "../session/todos.js"
 import { theme } from "../theme.js"
 
-export function TodoPanel({ todos }: { todos: Todo[] }) {
+export function TodoPanel({
+  todos,
+  maxItems,
+}: {
+  todos: Todo[]
+  maxItems?: number
+}) {
   if (todos.length === 0) return null
   const { done, total } = todoProgress(todos)
+  const visible =
+    maxItems && todos.length > maxItems ? todos.slice(0, maxItems) : todos
+  const hidden = todos.length - visible.length
 
   return (
     <Box flexDirection="column" paddingX={2} marginTop={1}>
       <Text dimColor wrap="truncate">
         {glyphs.brand} Tasks · {done}/{total}
       </Text>
-      {todos.map((todo, index) => {
+      {visible.map((todo, index) => {
         const marker =
           todo.status === "completed"
             ? glyphs.done
@@ -42,6 +51,11 @@ export function TodoPanel({ todos }: { todos: Todo[] }) {
           </Text>
         )
       })}
+      {hidden > 0 ? (
+        <Text dimColor wrap="truncate">
+          {"  "}… +{hidden} more
+        </Text>
+      ) : null}
     </Box>
   )
 }

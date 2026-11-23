@@ -33,12 +33,13 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
   - `Shift+Tab` cycle execution mode (`Plan` → `Confirm` → `Auto`; starts at `Confirm`)
   - `Shift+R` cycle reasoning effort when the input is empty and the provider advertises levels
   - `Ctrl+T` show or hide the model task list; hidden tasks leave a compact `Tasks done/total · ctrl+t to show` line
+  - `PgUp`/`PgDn` scroll the fullscreen transcript
   - `?` show help when the input is empty
   - `Esc` abort the active run
   - `Up`/`Down` input history
   - `Ctrl+D` exit when input is empty
   - Terminal scrollback handles normal scrolling; the transcript view adds `↑/↓` and `PgUp`/`PgDn`.
-- Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/reasoning`, `/diff`, `/checkpoints`, `/rewind`, `/permissions`, `/status`, `/exit`.
+- Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/reasoning`, `/diff`, `/checkpoints`, `/rewind`, `/permissions`, `/tui`, `/status`, `/exit`.
 - `/rewind` opens a checkpoint picker (newest first) and forks the conversation through the chosen event seq into a new session. The runtime `SessionStore.fork` copies events and leaves the source session untouched; the working tree is not restored, and the picker says so. HTTP exposes the same operation at `/v1/sessions/:id/fork`.
 - `/permissions` reads `health()` and prints the effective mode plus the runtime broker's allow/ask/deny lists, including tools remembered with `a` during the session. It is inspection only; editing rule files stays a manual, source-controlled action.
 - Slash menu above the prompt: borderless, filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
@@ -62,7 +63,8 @@ packages/tui/src/
   providers/       provider/model picker filtering
   permissions/     approval decision and prompt controller
   hooks/           terminal integration hooks
-  status/          token and duration formatting
+  status/          activity state, footer layout, tips, formatting
+  fullscreen/      transcript viewport windows and height allocation
   components/      presentational Ink components
   transcript/format/  wrap, markdown, diff, tool, transcript lines
   timeline.ts      durable event -> timeline reducer
@@ -73,13 +75,21 @@ A folder's README states why it exists. New pure logic goes beside its test in a
 
 ## Rendering contract
 
-The TUI is an inline Ink app:
+The TUI has two explicit renderers:
 
+**Inline (default)**
 - `<Static>` owns committed transcript items and prints each once; never mutate a committed item.
 - The live area below it renders only the unfinished streaming tail, running tools, queued notices, spinner, menus, permission card, and prompt. Completed streamed lines are in scrollback.
 - Every rendered line must be truncated or pre-wrapped so the terminal cannot auto-wrap. Wrapping measures terminal display width, so CJK and fullwidth characters count as two columns, and it breaks at spaces before hard-splitting a long word. Terminal scrollback is the scrollback; do not replace it with a fixed-height viewport.
 - The expanded `Ctrl+O` transcript is the only scrolling viewport and is rendered on demand.
 - The permission prompt is an inline card, matching the transcript. Picker and setup screens stay borderless.
+
+**Fullscreen (optional)**
+- Enters the alternate screen (`?1049h`); cleanup restores it. `--fullscreen` or `OPENCONTINUE_FULLSCREEN=1` selects it at startup; `/tui fullscreen|default` switches at runtime.
+- Fixed two-line header, a fixed-height transcript viewport, pinned activity/todo/composer/footer. The transcript follows the tail unless `PgUp` scrolls up; `PgDn` returns toward the tail.
+- No `<Static>` in fullscreen. The transcript is projected from the durable timeline; the banner is replaced by the fixed header. Switching back to inline clears the alternate-screen shadow and reprints the inline transcript once.
+- `fullscreen/layout.ts` owns tail-following windows, clamping, and height allocation; it is pure and tested.
+- The permission card replaces the transcript viewport so a blocking decision is never scrolled away.
 
 ## What OpenContinue does not copy yet
 

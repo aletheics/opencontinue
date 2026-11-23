@@ -45,6 +45,7 @@ import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
 import type { PermissionMode } from "./permissions/types.js"
 import { useTerminalSize } from "./hooks/use-terminal-size.js"
 import { TAGLINE } from "./brand.js"
+import { FullscreenTranscript } from "./components/FullscreenTranscript.js"
 import { glyphs } from "./glyphs.js"
 import { LineText } from "./components/LineText.js"
 import { Picker } from "./components/Picker.js"
@@ -54,6 +55,11 @@ import { SlashMenu } from "./components/SlashMenu.js"
 import { SpinnerLine } from "./components/SpinnerLine.js"
 import { TodoPanel } from "./components/TodoPanel.js"
 import { Transcript, TranscriptItem } from "./components/Transcript.js"
+import { Welcome } from "./components/Welcome.js"
+import {
+  fullscreenViewportHeight,
+  scrollViewport,
+} from "./fullscreen/layout.js"
 import {
   filterModels,
   filterProviders,
@@ -97,6 +103,7 @@ export type TuiOptions = {
   readonly?: boolean
   resume?: string
   url?: string
+  fullscreen?: boolean
 }
 
 type Screen =
@@ -151,6 +158,11 @@ export function App({ options }: { options: TuiOptions }) {
   const [rewindList, setRewindList] = useState<Checkpoint[]>([])
   const [checkpointIndex, setCheckpointIndex] = useState(0)
   const [showTodos, setShowTodos] = useState(true)
+  const [fullscreen, setFullscreen] = useState(
+    options.fullscreen ?? process.env.OPENCONTINUE_FULLSCREEN === "1",
+  )
+  const [viewportScroll, setViewportScroll] = useState(0)
+  const fullscreenViewportRef = useRef({ total: 0, height: 3 })
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
@@ -196,6 +208,7 @@ export function App({ options }: { options: TuiOptions }) {
   )
   const activityLimits = useMemo(() => activityThresholds(), [])
   const reducedMotion = process.env.OPENCONTINUE_REDUCED_MOTION === "1"
+  const manualAltExitRef = useRef(false)
   const lastActivityRef = useRef(Date.now())
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   permissionModeRef.current = permissionMode
@@ -216,6 +229,21 @@ export function App({ options }: { options: TuiOptions }) {
     const timer = setInterval(() => setTick((value) => value + 1), 500)
     return () => clearInterval(timer)
   }, [busy])
+
+  /** Alternate-screen lifecycle for the fullscreen renderer. */
+  useEffect(() => {
+    if (!process.stdout.isTTY) return
+    if (!fullscreen) return
+
+    process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H")
+    return () => {
+      if (manualAltExitRef.current) {
+        manualAltExitRef.current = false
+        return
+      }
+      process.stdout.write("\x1b[?1049l\x1b[H")
+    }
+  }, [fullscreen])
 
   /**
    * Stream completed lines into scrollback instead of holding the whole
@@ -536,6 +564,7 @@ export function App({ options }: { options: TuiOptions }) {
     streamRef.current = new Map()
     setStreamChunks([])
     interruptedRef.current = false
+    setViewportScroll(0)
     checkpointsRef.current = []
     runStartsRef.current = new Map()
     setTimeline([
@@ -951,6 +980,32 @@ export function App({ options }: { options: TuiOptions }) {
       case "/rewind":
         openRewind()
         return true
+      case "/tui": {
+        const mode = text.split(/\s+/)[1]
+        if (mode === "fullscreen" || mode === "default") {
+          if (
+            mode === "default" &&
+            fullscreen &&
+            process.stdout.isTTY
+          ) {
+            // Leave the alternate screen and clear its shadow before the
+            // inline Static view reprints the transcript once.
+            process.stdout.write("\x1b[?1049l\x1b[2J\x1b[3J\x1b[H")
+            manualAltExitRef.current = true
+          }
+          setFullscreen(mode === "fullscreen")
+          setViewportScroll(0)
+          setTranscriptKey((key) => key + 1)
+          appendSystem(
+            mode === "fullscreen"
+              ? "Fullscreen renderer enabled. PgUp/PgDn scroll."
+              : "Inline renderer enabled.",
+          )
+        } else {
+          appendSystem("Usage: /tui fullscreen | /tui default")
+        }
+        return true
+      }
       case "/permissions": {
         const client = clientRef.current
         if (!client) {
@@ -1290,6 +1345,23 @@ export function App({ options }: { options: TuiOptions }) {
 
     if (key.ctrl && character === "t") {
       setShowTodos((value) => !value)
+      return
+    }
+
+    if (
+      fullscreen &&
+      !permission &&
+      !menuOpen &&
+      !fileMenuOpen &&
+      !historySearch &&
+      (key.pageUp || key.pageDown)
+    ) {
+      const view = fullscreenViewportRef.current
+      const page = Math.max(1, view.height - 2)
+      const delta = key.pageUp ? page : -page
+      setViewportScroll((scroll) =>
+        scrollViewport(scroll, view.total, view.height, delta),
+      )
       return
     }
 
@@ -1700,21 +1772,93 @@ export function App({ options }: { options: TuiOptions }) {
   const transcriptStart = Math.max(0, transcriptEnd - transcriptPage)
   const visibleTranscript = transcriptLines.slice(transcriptStart, transcriptEnd)
 
+  const fullscreenLines = useMemo(
+    () =>
+      fullscreen
+        ? timelineLines(
+            timeline.filter((item) => item.kind !== "banner"),
+            Math.max(20, columns - 2),
+            false,
+            workspace,
+          )
+        : [],
+    [fullscreen, timeline, columns, workspace],
+  )
+  const promptRows = Math.min(6, Math.max(1, input.split("\n").length))
+  const menuRows = menuOpen
+    ? Math.min(slashMatches.length, 8)
+    : fileMenuOpen
+      ? Math.min(fileMatches.length, 8)
+      : historySearch
+        ? Math.min(historyMatches.length, 8) + 1
+        : 0
+  const visibleTodoRows = Math.min(todos.length, 5)
+  const todoRows =
+    showTodos && todos.length > 0
+      ? 2 + visibleTodoRows + (todos.length > visibleTodoRows ? 1 : 0)
+      : !showTodos && todos.length > 0
+        ? 2
+        : 0
+  const activityRows = busy && !permission ? 3 : 0
+  const queuedRows = queued.length > 0 ? 1 : 0
+  const fullscreenHeight =
+    fullscreen && screen === "chat" && !permission
+      ? fullscreenViewportHeight({
+          rows,
+          header: 2,
+          activity: activityRows,
+          todos: todoRows,
+          queued: queuedRows,
+          composer: 3 + promptRows,
+          menus: menuRows,
+          footer: 1,
+        })
+      : 0
+  fullscreenViewportRef.current = {
+    total: fullscreenLines.length,
+    height: Math.max(1, fullscreenHeight),
+  }
+  const footerLeftText =
+    fullscreen && viewportScroll > 0
+      ? `${footerLeft} · ↑${viewportScroll}`
+      : footerLeft
+
   return (
-    <Box flexDirection="column">
-      <Static key={transcriptKey} items={committed}>
-        {(item, index) => (
-          <TranscriptItem
-            key={item.id}
-            item={item}
-            columns={columns}
-            expanded={false}
-            leading={index > 0}
-            permissionMode={permissionMode}
-            workspace={workspace}
-          />
-        )}
-      </Static>
+    <Box
+      flexDirection="column"
+      height={fullscreen ? rows : undefined}
+      overflow={fullscreen ? "hidden" : undefined}
+    >
+      {fullscreen && !transcriptMode && screen === "chat" ? (
+        <Welcome
+          version={VERSION}
+          model={options.url ? "remote" : model}
+          provider={
+            options.url
+              ? "server"
+              : (preset?.label ?? initial.provider ?? "configured provider")
+          }
+          workspace={workspace}
+          branch={workspaceStatus.branch ?? undefined}
+          columns={columns}
+        />
+      ) : null}
+
+      {!fullscreen ? (
+        <Static key={transcriptKey} items={committed}>
+          {(item, index) => (
+            <TranscriptItem
+              key={item.id}
+              item={item}
+              columns={columns}
+              expanded={false}
+              leading={index > 0}
+              permissionMode={permissionMode}
+              workspace={workspace}
+            />
+          )}
+        </Static>
+      ) : null}
 
       {transcriptMode ? (
         <Box flexDirection="column" height={rows} paddingX={1}>
@@ -1732,7 +1876,15 @@ export function App({ options }: { options: TuiOptions }) {
         </Box>
       ) : (
         <>
-          {live.length > 0 ? (
+          {fullscreen ? (
+            screen === "chat" && !permission ? (
+              <FullscreenTranscript
+                lines={fullscreenLines}
+                height={Math.max(3, fullscreenHeight)}
+                scrollFromBottom={viewportScroll}
+              />
+            ) : null
+          ) : live.length > 0 ? (
             <Transcript
               items={live}
               columns={columns}
@@ -1768,7 +1920,10 @@ export function App({ options }: { options: TuiOptions }) {
               ) : null}
 
               {showTodos ? (
-                <TodoPanel todos={todos} />
+                <TodoPanel
+                  todos={todos}
+                  maxItems={fullscreen ? 5 : undefined}
+                />
               ) : todos.length > 0 ? (
                 <Box paddingX={2} marginTop={1}>
                   <Text dimColor wrap="truncate">
@@ -1860,7 +2015,7 @@ export function App({ options }: { options: TuiOptions }) {
 
           <Box paddingX={2} justifyContent="space-between" overflow="hidden">
             <Text color={footerTint} dimColor={footerTint === undefined} wrap="truncate">
-              {footerLeft}
+              {footerLeftText}
             </Text>
             {footerRight ? (
               <Text dimColor wrap="truncate">
