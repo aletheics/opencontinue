@@ -7,6 +7,7 @@ import { createSessionStore, type SessionStore } from "@opencontinue/core"
 import {
   CreateSessionRequest,
   PermissionDecisionRequest,
+  PermissionMode as PermissionModeSchema,
   SendMessageRequest,
   type SessionEvent,
 } from "@opencontinue/protocol"
@@ -56,7 +57,39 @@ export function createApp(
 
   app.use("*", cors())
 
-  app.get("/health", (c) => c.json({ ok: true }))
+  app.get("/health", (c) =>
+    c.json({ ok: true, permissionMode: permissions.getMode() }),
+  )
+
+  app.post("/v1/permission-mode", async (c) => {
+    const body = await c.req.json().catch(() => ({}))
+    const mode =
+      typeof body === "object" && body !== null
+        ? (body as { mode?: unknown }).mode
+        : undefined
+    const parsed = PermissionModeSchema.safeParse(mode)
+    if (!parsed.success) return c.json({ error: "invalid permission mode" }, 400)
+
+    permissions.setMode(parsed.data)
+    return c.json({ mode: permissions.getMode() })
+  })
+
+  app.post("/v1/sessions/:id/permissions/allow", async (c) => {
+    const sessionId = c.req.param("id")
+    if (!store.get(sessionId)) return c.json({ error: "session not found" }, 404)
+
+    const body = await c.req.json().catch(() => ({}))
+    const tool =
+      typeof body === "object" && body !== null
+        ? (body as { tool?: unknown }).tool
+        : undefined
+    if (typeof tool !== "string" || tool.length === 0) {
+      return c.json({ error: "tool is required" }, 400)
+    }
+
+    permissions.allowForSession(tool)
+    return c.json({ ok: true })
+  })
 
   app.post("/v1/sessions", async (c) => {
     const body = await c.req.json().catch(() => ({}))
@@ -185,7 +218,7 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     ? `${baseSystemPrompt}\n\n${project.instructions}`
     : baseSystemPrompt
   const tools = options.tools ?? new ToolRegistry()
-  const permissionMode = options.permissionMode ?? project.permissionMode ?? "ask"
+  const permissionMode = options.permissionMode ?? project.permissionMode ?? "confirm"
   const permissions = new PermissionBroker(store, permissionMode, project)
 
   const app = createApp(store, selection.provider, systemPrompt, tools, permissions, workspace)

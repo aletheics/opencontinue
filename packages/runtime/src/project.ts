@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 
-import type { PermissionMode } from "./permissions.js"
+import { normalizePermissionMode, type PermissionMode } from "./permissions.js"
 
 export type ProjectConfig = {
   permissionMode?: PermissionMode
@@ -33,9 +33,7 @@ export function loadProjectConfig(workspace: string): ProjectConfig {
   }
 
   const permissions = isRecord(parsed.permissions) ? parsed.permissions : {}
-  const mode = permissions.mode
-  const permissionMode =
-    mode === "ask" || mode === "auto" || mode === "readonly" ? mode : undefined
+  const permissionMode = normalizePermissionMode(permissions.mode)
   const allow = stringList(permissions.allow)
   const ask = stringList(permissions.ask)
   const deny = stringList(permissions.deny)

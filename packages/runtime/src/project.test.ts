@@ -33,7 +33,7 @@ describe("loadProjectConfig", () => {
 
     const config = loadProjectConfig(workspace)
 
-    expect(config.permissionMode).toBe("readonly")
+    expect(config.permissionMode).toBe("plan")
     expect(config.allow).toEqual([])
     expect(config.ask).toEqual([])
     expect(config.deny).toEqual([])

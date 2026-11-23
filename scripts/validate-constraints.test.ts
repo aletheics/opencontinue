@@ -38,7 +38,7 @@ describe(".opencontinue constraints", () => {
       checks?: { agents?: string[] }
     }
 
-    expect(["ask", "auto", "readonly"]).toContain(config.permissions?.mode)
+    expect(["plan", "confirm", "auto"]).toContain(config.permissions?.mode)
     expect(Array.isArray(config.permissions?.allow)).toBe(true)
     expect(Array.isArray(config.permissions?.ask)).toBe(true)
     expect(Array.isArray(config.permissions?.deny)).toBe(true)

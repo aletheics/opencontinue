@@ -443,7 +443,7 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).toContain("› change it"))
       stdin.write("\r")
 
-      await vi.waitFor(() => expect(lastFrame()).toContain("Permission required · write"), {
+      await vi.waitFor(() => expect(lastFrame()).toContain("? Permission required"), {
         timeout: 5000,
       })
       expect(lastFrame()).toContain("note.txt")
@@ -474,11 +474,12 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).toContain("› run it"))
 
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Permission required · bash"), {
+      await vi.waitFor(() => expect(lastFrame()).toContain("? Permission required"), {
         timeout: 5000,
       })
       expect(lastFrame()).toContain("echo hi")
-      expect(lastFrame()).toContain("allow for session")
+      expect(lastFrame()).toContain("Working directory:")
+      expect(lastFrame()).toContain("Always allow this tool for this session")
 
       stdin.write("a")
       await vi.waitFor(() => expect(output(frames)).toContain("done"), { timeout: 5000 })
@@ -596,6 +597,33 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("cycles Plan, Confirm, and Auto and shows the active mode", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      expect(lastFrame()).toContain("◈ Confirm")
+
+      for (const expected of ["⟳ Auto", "◎ Plan", "◈ Confirm"]) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        stdin.write("/mode")
+        await vi.waitFor(() => expect(lastFrame()).toContain("› /mode"))
+        stdin.write("\r")
+        await vi.waitFor(() => expect(lastFrame()).toContain(expected))
+      }
+
+      stdin.write("?")
+      await vi.waitFor(() => expect(output(frames)).toContain("show commands"))
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("searches input history with ctrl+r", async () => {
     const { server, url } = await fakeProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
@@ -656,7 +684,7 @@ describe("TUI", () => {
       expect(output(frames)).toContain("gpt-6.2 · OpenAI (GPT)")
       expect(output(frames)).toContain(home)
       expect(output(frames)).not.toContain("Welcome to OpenContinue")
-      expect(lastFrame()).toContain("← 1 agent")
+      expect(lastFrame()).toContain("Plan")
 
       stdin.write("hi")
       await vi.waitFor(() => {
@@ -673,7 +701,7 @@ describe("TUI", () => {
 
       const frame = lastFrame() ?? ""
       expect(frame).toContain("Type a message…")
-      expect(frame).toContain("readonly mode")
+      expect(frame).toContain("Plan")
       expect(frame.split("\n").length).toBeLessThanOrEqual(24)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -728,7 +756,7 @@ describe("TUI", () => {
       provider: new EchoProvider(),
       port: 0,
       workspace: home,
-      permissionMode: "readonly",
+      permissionMode: "plan",
     })
     const server = running.server as unknown as http.Server
     if (!server.listening) await once(server, "listening")

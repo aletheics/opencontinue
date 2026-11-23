@@ -1,5 +1,6 @@
 import {
   SessionEvent as SessionEventSchema,
+  type PermissionMode,
   type SessionEvent,
   type SessionSnapshot,
   type SessionSummary,
@@ -34,6 +35,10 @@ export interface OpenContinueClient {
     requestId: string,
     approved: boolean,
   ): Promise<void>
+  /** Local transports can change the runtime policy; HTTP transports may not. */
+  setPermissionMode?(mode: PermissionMode): Promise<void> | void
+  /** Remember one tool for the current session, when the transport supports it. */
+  allowToolForSession?(sessionId: string, tool: string): Promise<void> | void
   subscribe(
     sessionId: string,
     after: number,
@@ -100,8 +105,22 @@ export class HttpSessionClient implements OpenContinueClient {
     this.reconnectDelayMs = Math.max(10, options.reconnectDelayMs ?? 500)
   }
 
-  async health(): Promise<{ ok: boolean }> {
+  async health(): Promise<{ ok: boolean; permissionMode?: PermissionMode }> {
     return this.request("/health")
+  }
+
+  async setPermissionMode(mode: PermissionMode): Promise<void> {
+    await this.request("/v1/permission-mode", {
+      method: "POST",
+      body: JSON.stringify({ mode }),
+    })
+  }
+
+  async allowToolForSession(sessionId: string, tool: string): Promise<void> {
+    await this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/permissions/allow`, {
+      method: "POST",
+      body: JSON.stringify({ tool }),
+    })
   }
 
   async listSessions(): Promise<SessionSummary[]> {

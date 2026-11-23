@@ -59,25 +59,25 @@ OPENCONTINUE_MODEL=gpt-6.2
 
 ## Usage
 
-`opencontinue` starts the Claude Code-style inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `●` calls tools, and `⏵⏵` shows the permission mode. Use `/resume` to switch sessions, `@` to complete workspace files, `ctrl+r` to search input history, and `ctrl+o` to open the expanded transcript.
+`opencontinue` starts the inline TUI: enter your API key, choose a model, and chat. Completed output stays in terminal scrollback; `›` is the prompt, `●` calls tools, and the status line always shows the active mode: `◈ Confirm` (default), `◎ Plan`, or `⟳ Auto`. `shift+tab` cycles modes, `?` opens help, `/resume` switches sessions, `@` completes workspace files, `ctrl+r` searches input history, and `ctrl+o` opens the expanded transcript.
 
 ```bash
 opencontinue                    # TUI
 onc                             # same, shorter
 opencontinue --auto -p "fix tests"
 opencontinue --url http://127.0.0.1:8787   # attach the TUI to a server
-opencontinue --readonly -p "review"
+opencontinue --plan -p "review"
 opencontinue check --base main
 opencontinue serve --port 8787
 ```
 
-Flags: `--auto`, `--readonly`, `--resume <id>`, `--url <url>`, `--port <port>`.
+Flags: `--auto`, `--plan`, `--readonly` (alias for `--plan`), `--resume <id>`, `--url <url>`, `--port <port>`.
 
 Sessions persist in `.opencontinue/sessions/sessions.db` (WAL). Set `OPENCONTINUE_DB` to override. Interrupted runs are marked failed on the next start.
 
 Tools: `read`, `write`, `edit`, `glob`, `grep`, `bash`.
 
-Permissions: read-only tools are always allowed. `write` and `bash` ask interactively, are denied in headless read-only mode, and are allowed with `--auto`.
+Execution modes: **Plan** reads and analyzes but never writes or runs shell commands; **Confirm** (default) allows reads and asks before `write`/`bash`; **Auto** (`--auto`) runs protected tools without per-action prompts. `--plan` selects Plan, and `--readonly` remains a compatibility alias. The TUI shows the active mode and cycles with `shift+tab`; session mode changes go through the runtime broker, not a UI-side policy.
 
 ## Checks
 

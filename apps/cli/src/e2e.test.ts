@@ -56,7 +56,7 @@ describe("client/server e2e", () => {
       provider: new EchoProvider(),
       port: 0,
       workspace: directory,
-      permissionMode: "readonly",
+      permissionMode: "plan",
     })
     const server = running.server as unknown as HttpServer
     if (!server.listening) await once(server, "listening")
@@ -107,6 +107,38 @@ describe("client/server e2e", () => {
     }
   }, 15000)
 
+  it("reads and updates the permission mode over HTTP", async () => {
+    const directory = await workspace()
+    const store = createSessionStore({ workspace: directory })
+    const running = startServer({
+      store,
+      provider: new EchoProvider(),
+      port: 0,
+      workspace: directory,
+      permissionMode: "plan",
+    })
+    const server = running.server as unknown as HttpServer
+    if (!server.listening) await once(server, "listening")
+    const address = server.address() as AddressInfo
+    const client = new HttpSessionClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+    })
+
+    try {
+      await expect(client.health()).resolves.toMatchObject({ permissionMode: "plan" })
+      await client.setPermissionMode("auto")
+      await expect(client.health()).resolves.toMatchObject({ permissionMode: "auto" })
+      await client.setPermissionMode("confirm")
+      await expect(client.health()).resolves.toMatchObject({
+        permissionMode: "confirm",
+      })
+    } finally {
+      client.close()
+      await closeServer(running.server)
+      store.close()
+    }
+  }, 15000)
+
   it("aborts a running session through the HTTP contract", async () => {
     const directory = await workspace()
     const store = createSessionStore({ workspace: directory })
@@ -115,7 +147,7 @@ describe("client/server e2e", () => {
       provider: new BlockingProvider(),
       port: 0,
       workspace: directory,
-      permissionMode: "readonly",
+      permissionMode: "plan",
     })
     const server = running.server as unknown as HttpServer
     if (!server.listening) await once(server, "listening")

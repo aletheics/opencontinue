@@ -4,7 +4,12 @@ import { z } from "zod"
 import { MemorySessionStore } from "@opencontinue/core"
 import type { Tool, ToolContext } from "@opencontinue/tools"
 
-import { permissionDetail, PermissionBroker, type PermissionPolicy } from "./permissions.js"
+import {
+  normalizePermissionMode,
+  permissionDetail,
+  PermissionBroker,
+  type PermissionPolicy,
+} from "./permissions.js"
 
 const writeTool: Tool = {
   name: "write",
@@ -42,7 +47,7 @@ const previewTool: Tool = {
   },
 }
 
-function setup(mode: "ask" | "auto" | "readonly", policy?: PermissionPolicy) {
+function setup(mode: "plan" | "confirm" | "auto", policy?: PermissionPolicy) {
   const store = new MemorySessionStore()
   const session = store.create()
   const context: ToolContext = { workspace: process.cwd(), sessionId: session.id }
@@ -51,17 +56,45 @@ function setup(mode: "ask" | "auto" | "readonly", policy?: PermissionPolicy) {
 
 describe("PermissionBroker", () => {
   it("allows read tools without asking", async () => {
-    const { broker, context } = setup("ask")
+    const { broker, context } = setup("confirm")
     await expect(broker.authorize(readTool, {}, context)).resolves.toBe(true)
   })
 
-  it("denies write tools in readonly mode", async () => {
-    const { broker, context } = setup("readonly")
+  it("denies write tools in plan mode without prompting", async () => {
+    const { store, session, broker, context } = setup("plan")
     await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(false)
+    expect(
+      store.events(session.id).some((event) => event.type === "permission.requested"),
+    ).toBe(false)
+  })
+
+  it("normalizes legacy mode names", () => {
+    expect(normalizePermissionMode("readonly")).toBe("plan")
+    expect(normalizePermissionMode("ask")).toBe("confirm")
+    expect(normalizePermissionMode("auto")).toBe("auto")
+    expect(normalizePermissionMode("unknown")).toBeUndefined()
+  })
+
+  it("changes policy when the mode changes", async () => {
+    const { store, session, broker, context } = setup("confirm")
+    broker.setMode("auto")
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(true)
+
+    broker.setMode("plan")
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(false)
+    expect(
+      store.events(session.id).some((event) => event.type === "permission.requested"),
+    ).toBe(false)
+  })
+
+  it("remembers a tool for the session", async () => {
+    const { broker, context } = setup("confirm")
+    broker.allowForSession("write")
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(true)
   })
 
   it("honors project allow and deny lists", async () => {
-    const allowed = setup("ask", { allow: ["write"], ask: [], deny: [] })
+    const allowed = setup("confirm", { allow: ["write"], ask: [], deny: [] })
     await expect(allowed.broker.authorize(writeTool, {}, allowed.context)).resolves.toBe(true)
 
     const denied = setup("auto", { allow: [], ask: [], deny: ["read"] })
@@ -88,7 +121,7 @@ describe("PermissionBroker", () => {
     expect(permissionDetail("bash", { command: "npm   test" })).toBe("npm test")
     expect(permissionDetail("write", { path: "a.txt" })).toBe("a.txt")
 
-    const { store, session, context, broker } = setup("ask")
+    const { store, session, context, broker } = setup("confirm")
     const pending = broker.authorize(previewTool, { path: "a.txt" }, context)
 
     await vi.waitFor(() => {
@@ -112,7 +145,7 @@ describe("PermissionBroker", () => {
   })
 
   it("asks and resolves a write request", async () => {
-    const { store, session, context, broker } = setup("ask")
+    const { store, session, context, broker } = setup("confirm")
     const pending = broker.authorize(writeTool, { path: "a.txt" }, context)
 
     const request = store

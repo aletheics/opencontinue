@@ -7,7 +7,7 @@ import { Command } from "commander"
 import { HttpSessionClient } from "@opencontinue/client"
 import { resolveProviderSettings } from "@opencontinue/config"
 import { createSessionStore } from "@opencontinue/core"
-import type { SessionEvent } from "@opencontinue/protocol"
+import type { PermissionMode, SessionEvent } from "@opencontinue/protocol"
 import { createProvider } from "@opencontinue/providers"
 import { closeServer, startServer } from "@opencontinue/server"
 
@@ -22,7 +22,6 @@ import { doctorExitCode, formatDoctor, runDoctor } from "./doctor.js"
 import { importCommand } from "./import.js"
 import { configCommand, setupCommand } from "./setup.js"
 
-type PermissionMode = "ask" | "auto" | "readonly"
 type PermissionRequestEvent = Extract<SessionEvent, { type: "permission.requested" }>
 
 type ChatOptions = {
@@ -32,6 +31,7 @@ type ChatOptions = {
   resume?: string
   auto?: boolean
   readonly?: boolean
+  plan?: boolean
 }
 
 class ConversationClient {
@@ -119,8 +119,8 @@ class ConversationClient {
 
 function permissionMode(options: ChatOptions, headless = false): PermissionMode | undefined {
   if (options.auto) return "auto"
-  if (options.readonly) return "readonly"
-  return headless ? "readonly" : undefined
+  if (options.plan || options.readonly) return "plan"
+  return headless ? "plan" : undefined
 }
 
 async function withServer(
@@ -218,14 +218,17 @@ async function serveCommand(options: {
   port?: string
   auto?: boolean
   readonly?: boolean
+  plan?: boolean
 }): Promise<void> {
-  if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
+  if (options.auto && (options.readonly || options.plan)) {
+    throw new Error("--auto cannot be combined with --plan or --readonly")
+  }
 
   const port = Number(options.port ?? process.env.OPENCONTINUE_PORT ?? 8787)
   const mode: PermissionMode | undefined = options.auto
     ? "auto"
-    : options.readonly
-      ? "readonly"
+    : options.plan || options.readonly
+      ? "plan"
       : undefined
   const workspace = process.env.INIT_CWD ?? process.cwd()
   const store = createSessionStore({ workspace })
@@ -311,10 +314,13 @@ async function checkCommand(options: CheckCommandOptions): Promise<void> {
 async function startTui(options: {
   auto?: boolean
   readonly?: boolean
+  plan?: boolean
   resume?: string
   url?: string
 }): Promise<void> {
-  if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
+  if (options.auto && (options.readonly || options.plan)) {
+    throw new Error("--auto cannot be combined with --plan or --readonly")
+  }
   if (!process.stdin.isTTY) {
     throw new Error("TUI requires a TTY. Use `opencontinue -p \"...\"` or `--url` in non-interactive environments.")
   }
@@ -350,15 +356,18 @@ program
   .option("--url <url>", "Connect to a running server")
   .option("--port <port>", "Port for the embedded server", "8787")
   .option("--resume <id>", "Resume an existing session")
-  .option("--auto", "Allow write and shell tools without approval")
-  .option("--readonly", "Deny write and shell tools")
+  .option("--auto", "Auto mode: allow write and shell tools without approval")
+  .option("--plan", "Plan mode: read and analyze only; deny write and shell tools")
+  .option("--readonly", "Alias for --plan")
   .action(async (prompt: string | undefined, options: ChatOptions) => {
-    if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
+    if (options.auto && (options.plan || options.readonly)) {
+      throw new Error("--auto cannot be combined with --plan or --readonly")
+    }
     if (options.print || prompt) await printOnce(prompt ?? "", options)
     else if (process.stdin.isTTY) {
       await startTui({
         auto: options.auto,
-        readonly: options.readonly,
+        plan: options.plan || options.readonly,
         resume: options.resume,
         url: options.url,
       })
@@ -368,11 +377,12 @@ program
 program
   .command("serve")
   .description("Start the HTTP/SSE server")
-  .addHelpText("after", "\nGlobal flags: --port <port>, --auto, --readonly")
+  .addHelpText("after", "\nGlobal flags: --port <port>, --auto, --plan, --readonly")
   .action(() =>
     serveCommand({
       port: String(program.opts().port ?? "8787"),
       auto: Boolean(program.opts().auto),
+      plan: Boolean(program.opts().plan),
       readonly: Boolean(program.opts().readonly),
     }),
   )
@@ -383,7 +393,7 @@ program
   .action(() =>
     startTui({
       auto: Boolean(program.opts().auto),
-      readonly: Boolean(program.opts().readonly),
+      plan: Boolean(program.opts().plan || program.opts().readonly),
       resume: program.opts().resume as string | undefined,
       url: program.opts().url as string | undefined,
     }),

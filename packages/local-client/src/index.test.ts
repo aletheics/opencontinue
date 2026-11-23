@@ -32,7 +32,7 @@ function setup(): { store: MemorySessionStore; client: LocalSessionClient } {
     store,
     provider: new EchoProvider(),
     workspace: process.cwd(),
-    permissionMode: "readonly",
+    permissionMode: "plan",
   })
   return { store, client }
 }
@@ -86,7 +86,7 @@ describe("LocalSessionClient", () => {
       store,
       provider: new BlockingProvider(),
       workspace: process.cwd(),
-      permissionMode: "readonly",
+      permissionMode: "plan",
     })
     const session = await client.createSession("abort")
     const events: string[] = []

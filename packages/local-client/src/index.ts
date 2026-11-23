@@ -60,7 +60,7 @@ export class LocalSessionClient implements OpenContinueClient {
       : base
     this.permissions = new PermissionBroker(
       options.store,
-      options.permissionMode ?? project.permissionMode ?? "ask",
+      options.permissionMode ?? project.permissionMode ?? "confirm",
       options.permissionPolicy ?? {
         allow: project.allow,
         ask: project.ask,
@@ -71,6 +71,14 @@ export class LocalSessionClient implements OpenContinueClient {
 
   setProvider(provider: ChatProvider): void {
     this.provider = provider
+  }
+
+  setPermissionMode(mode: PermissionMode): void {
+    this.permissions.setMode(mode)
+  }
+
+  allowToolForSession(_sessionId: string, tool: string): void {
+    this.permissions.allowForSession(tool)
   }
 
   async health(): Promise<{ ok: boolean }> {

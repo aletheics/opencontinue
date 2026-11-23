@@ -11,7 +11,7 @@
 - `LineText.tsx` — renders a formatted line, including inline markdown spans (code, bold, italic, strikethrough, links).
 - `Prompt.tsx` — borderless prompt composed with `composer/editor/Input.tsx`.
 - `SlashMenu.tsx` — borderless command palette above the prompt.
-- `PermissionPrompt.tsx` — bordered permission dialog with the tool detail, preview diff, and y/a/n choices.
+- `PermissionPrompt.tsx` — inline permission card with `? Permission required`, the exact operation and target, working directory for bash, preview diff, and y/a/n choices.
 
 **Rule:** components are presentational. Sessions, providers, permissions, commands, and keybindings stay in `index.tsx`. A component receives already-computed data and callbacks.
 

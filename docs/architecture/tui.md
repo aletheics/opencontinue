@@ -14,20 +14,21 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 ## What OpenContinue adopts
 
 - **Inline Claude Code-style transcript**, not a full-screen dashboard. A startup banner matches Claude Code's condensed layout: a three-row coral block mark beside a bold name with a dim version, a dim `model · provider` line (split onto two lines on narrow terminals), and a dim workspace path. There is no extra welcome line. A saved provider/model auto-starts chat, while a first run shows the picker.
-- The mode line ends with `· ← 1 agent` while a session is attached. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
-- No header bar, no bordered transcript, no bordered input. The only box is the permission dialog.
+- The status line always names the active execution mode. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
+- No header bar, no bordered transcript, no bordered input, no bordered permission prompt. Modal screens (provider/model/session pickers, setup) may use separation, but the chat surface stays borderless.
 - Tool blocks: `● Tool(args)` with wrapped continuation indented two spaces, dim `⎿` gutters with normal-brightness output, colored diff lines, and `… +N lines (ctrl+o to expand)`. Done tools with no output show `⎿ (No output)`. Bash adds `⎿ (timeout 2m)` and, after a `cd`, `⎿ Shell cwd was reset to <workspace>`.
 - User prompts: `› text` with two-space continuation. Assistant blocks use a white `●` dot followed by a two-column content area: continuation lines indent two spaces, headings are bold white, list items use `-` or `1.` with hanging indents, quotes use `▎`, and rules render as `---`. Inline markdown becomes colored spans: code is blue (`#5769F7`), bold, italic, strikethrough, and links are styled, and wrapped lines keep their span styling. Fenced code renders without a border or language label, using a small highlight.js-style tokenizer: keywords cyan, strings green, numbers magenta, comments gray, literals yellow, calls blue. Code hard-wraps at the display width instead of at spaces.
 - Live spinner: `✻ Scampering…` followed by `(15m 57s · ↓ 45.5k tokens)` once the run passes 30 seconds, with a dim `  ⎿  Tip: …` line below. The glyph cycles through `· ✢ * ✶ ✻ ✽` forward and backward at 120ms. The verb is sampled per turn and shimmers in Claude coral (`#D77757`); after 3s without model output it fades to the error red (`rgb(171,43,63)`) over 2s. Active tools suppress the stall, and narrow terminals drop the token count before the timer.
 - Completion line: `✻ Churned for 3.2s · done 16:01`, using the eight past-tense completion verbs (`Baked`, `Brewed`, `Churned`, `Cogitated`, `Cooked`, `Crunched`, `Sautéed`, `Worked`) sampled independently of the spinner verb.
-- Bottom mode line: `⏵⏵ auto mode on (shift+tab to cycle)` in yellow, `⛔ readonly mode …` in red, or `? for shortcuts …` dim; busy adds `esc to interrupt`; workspace, branch, model, duration, and tokens sit dim on the right when width allows.
+- Bottom mode line: `◈ Confirm · approve writes/bash · shift+tab to cycle` (default), `◎ Plan · read-only …`, or `⟳ Auto · no per-action prompts …`; busy adds `esc to interrupt`; workspace, branch, model, duration, tokens, and `? help` sit dim on the right when width allows.
 - The live assistant is clipped to the viewport tail. Completed output is printed once from `Static`, which prevents long streaming responses from scrolling part of the live frame into scrollback and then reprinting it.
 - Slash, file, and history menus render below the prompt. File completion uses a `+ path` list and includes directories with the platform separator (`.github\` on Windows); completing a directory keeps the menu open at the trailing slash. Slash completion uses name/description columns.
 - Prompt input submitted while a run is active is queued and sent when the run finishes.
 - Keybindings:
   - `Ctrl+C` exit
   - `Ctrl+O` open/close the expanded transcript view
-  - `Shift+Tab` cycle permission mode (`ask` → `auto` → `readonly`)
+  - `Shift+Tab` cycle execution mode (`Plan` → `Confirm` → `Auto`; starts at `Confirm`)
+  - `?` show help when the input is empty
   - `Esc` abort the active run
   - `Up`/`Down` input history
   - `Ctrl+D` exit when input is empty
@@ -35,7 +36,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/status`, `/exit`.
 - Slash menu above the prompt: borderless, filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
 - Session picker via `/resume`: sorted by recency, type-to-filter by title or id, `Esc` returns to chat. Sessions with the generic default title are labeled by their first user message.
-- Permission dialog: bordered, shows the tool name and a readable detail (command, path, or pattern); write/edit tools also show a dry-run diff before approval. `y` allows once, `a` remembers the tool for the session, `n` denies. Permissions arrive as protocol events; the TUI answers through the client. Previews come from the tool's optional `preview` method via `PermissionBroker`.
+- Permission card: inline, titled `? Permission required`, with the exact operation and target (command, path, or pattern), the working directory for bash, and a dry-run diff for write/edit before approval. `y` allows once, `a` asks the runtime broker to remember the tool for the session, `n` denies. The runtime `PermissionBroker` is the authorization source of truth; the TUI never re-implements Plan/Confirm/Auto policy. Previews come from the tool's optional `preview` method.
 - Provider/model pickers with type-to-filter search, `Esc` to clear or return, and per-provider API keys.
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
 - Formatting in `packages/tui/src/transcript/format/`: one file each for wrapping, markdown, diffs, tool headers/output, and transcript lines.
@@ -71,7 +72,7 @@ The TUI is an inline Ink app:
 - The live area below it renders the streaming assistant item, running tools, queued notices, spinner, menus, permission dialog, and prompt.
 - Every rendered line must be truncated or pre-wrapped so the terminal cannot auto-wrap. Wrapping measures terminal display width, so CJK and fullwidth characters count as two columns, and it breaks at spaces before hard-splitting a long word. Terminal scrollback is the scrollback; do not replace it with a fixed-height viewport.
 - The expanded `Ctrl+O` transcript is the only scrolling viewport and is rendered on demand.
-- Permission dialogs, pickers, and the provider setup screens may use borders, but the main transcript and prompt do not.
+- The permission prompt is an inline card, matching the transcript. Picker and setup screens stay borderless.
 
 ## What OpenContinue does not copy yet
 

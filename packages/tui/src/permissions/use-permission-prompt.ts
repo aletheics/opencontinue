@@ -1,23 +1,26 @@
 import type { OpenContinueClient } from "@opencontinue/client"
 import type { SessionEvent } from "@opencontinue/protocol"
-import { useRef, useState } from "react"
+import { useState } from "react"
 
-import { permissionDecision } from "./decision.js"
-import type { PermissionMode, PermissionPromptState } from "./types.js"
+import type { PermissionPromptState } from "./types.js"
 
 export type PermissionControllerOptions = {
   getClient: () => OpenContinueClient | null
   getSessionId: () => string | null
-  getMode: () => PermissionMode
+  getWorkspace?: () => string
 }
 
+/**
+ * The runtime broker owns authorization. When it decides a request needs
+ * approval it emits permission.requested; this controller only presents that
+ * request and returns the user's answer.
+ */
 export function usePermissionPrompt({
   getClient,
   getSessionId,
-  getMode,
+  getWorkspace,
 }: PermissionControllerOptions) {
   const [permission, setPermission] = useState<PermissionPromptState | null>(null)
-  const allowedToolsRef = useRef<Set<string>>(new Set())
 
   const resolve = (requestId: string, approved: boolean): void => {
     const client = getClient()
@@ -30,7 +33,13 @@ export function usePermissionPrompt({
   const answer = (approved: boolean, remember = false): void => {
     const request = permission
     if (!request) return
-    if (approved && remember) allowedToolsRef.current.add(request.tool)
+    if (approved && remember) {
+      const client = getClient()
+      const sessionId = getSessionId()
+      if (client && sessionId) {
+        void client.allowToolForSession?.(sessionId, request.tool)
+      }
+    }
     resolve(request.requestId, approved)
     setPermission(null)
   }
@@ -38,24 +47,22 @@ export function usePermissionPrompt({
   const handleRequest = (
     event: Extract<SessionEvent, { type: "permission.requested" }>,
   ): void => {
-    const decision = permissionDecision(
-      getMode(),
-      event.tool,
-      allowedToolsRef.current,
-    )
-    if (decision === "allow") {
-      resolve(event.requestId, true)
-      return
-    }
-    if (decision === "deny") {
-      resolve(event.requestId, false)
-      return
-    }
+    const input =
+      typeof event.input === "object" && event.input !== null
+        ? (event.input as Record<string, unknown>)
+        : {}
+    const cwd =
+      event.tool === "bash"
+        ? typeof input.cwd === "string"
+          ? input.cwd
+          : getWorkspace?.()
+        : undefined
 
     setPermission({
       requestId: event.requestId,
       tool: event.tool,
       detail: event.detail ?? JSON.stringify(event.input).slice(0, 200),
+      cwd,
       diff: event.diff,
     })
   }
@@ -69,7 +76,6 @@ export function usePermissionPrompt({
   }
 
   const reset = (): void => {
-    allowedToolsRef.current = new Set()
     setPermission(null)
   }
 

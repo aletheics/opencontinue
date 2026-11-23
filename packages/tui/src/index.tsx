@@ -70,6 +70,8 @@ const VERSION = "0.0.1"
 
 export type TuiOptions = {
   auto?: boolean
+  plan?: boolean
+  /** Legacy alias for plan. */
   readonly?: boolean
   resume?: string
   url?: string
@@ -88,7 +90,7 @@ export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
   const { columns, rows } = useTerminalSize()
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
-    options.auto ? "auto" : options.readonly ? "readonly" : "ask",
+    options.auto ? "auto" : options.plan || options.readonly ? "plan" : "confirm",
   )
 
   const initial = useMemo(() => resolveProviderSettings(), [])
@@ -160,7 +162,7 @@ export function App({ options }: { options: TuiOptions }) {
   } = usePermissionPrompt({
     getClient: () => clientRef.current,
     getSessionId: () => sessionRef.current,
-    getMode: () => permissionModeRef.current,
+    getWorkspace: () => workspace,
   })
 
   useEffect(() => {
@@ -326,15 +328,38 @@ export function App({ options }: { options: TuiOptions }) {
     setScreen("loading")
   }
 
-  const cycleMode = () => {
-    const next: PermissionMode =
-      permissionMode === "ask" ? "auto" : permissionMode === "auto" ? "readonly" : "ask"
+  const applyMode = (next: PermissionMode) => {
     setPermissionMode(next)
     permissionModeRef.current = next
     if (permission) {
       if (next === "auto") answerPermission(true)
-      else if (next === "readonly") answerPermission(false)
+      else if (next === "plan") answerPermission(false)
     }
+  }
+
+  const cycleMode = () => {
+    const next: PermissionMode =
+      permissionMode === "plan"
+        ? "confirm"
+        : permissionMode === "confirm"
+          ? "auto"
+          : "plan"
+    const client = clientRef.current
+    if (!client) {
+      applyMode(next)
+      return
+    }
+    if (!client.setPermissionMode) {
+      appendSystem("Permission mode is managed by the server.")
+      return
+    }
+    void Promise.resolve(client.setPermissionMode(next))
+      .then(() => applyMode(next))
+      .catch((error) => {
+        appendSystem(
+          `Could not change permission mode: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      })
   }
 
   const appendSystem = (text: string) => {
@@ -433,7 +458,7 @@ export function App({ options }: { options: TuiOptions }) {
       store,
       provider,
       workspace,
-      permissionMode: "ask",
+      permissionMode: permissionModeRef.current,
     })
 
     void (async () => {
@@ -475,6 +500,11 @@ export function App({ options }: { options: TuiOptions }) {
       attachSession(client, session.id, "remote", "server")
       setModel("remote")
       setScreen("chat")
+      const health = await client.health().catch(() => null)
+      if (health?.permissionMode) {
+        setPermissionMode(health.permissionMode)
+        permissionModeRef.current = health.permissionMode
+      }
     })().catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause))
       setScreen("error")
@@ -790,6 +820,11 @@ export function App({ options }: { options: TuiOptions }) {
       if (filesLoading) return
     }
     if (menuOpen) {
+      const typed = value.trim()
+      if (slashMatches.some((command) => command.name === typed)) {
+        send(typed)
+        return
+      }
       const chosen = slashMatches[activeSlashIndex]
       if (chosen) {
         send(chosen.name)
@@ -928,6 +963,17 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (
+      character === "?" &&
+      input.length === 0 &&
+      !busy &&
+      !menuOpen &&
+      !fileMenuOpen
+    ) {
+      appendSystem(HELP_TEXT)
+      return
+    }
+
     if (key.ctrl && character === "r") {
       startHistorySearch()
       return
@@ -1056,10 +1102,10 @@ export function App({ options }: { options: TuiOptions }) {
 
   const modeText =
     permissionMode === "auto"
-      ? "⏵⏵ auto mode on (shift+tab to cycle)"
-      : permissionMode === "readonly"
-        ? "⛔ readonly mode (shift+tab to cycle)"
-        : "? for shortcuts · shift+tab to cycle modes"
+      ? "⟳ Auto · no per-action prompts · shift+tab to cycle"
+      : permissionMode === "plan"
+        ? "◎ Plan · read-only · shift+tab to cycle"
+        : "◈ Confirm · approve writes/bash · shift+tab to cycle"
 
   const menuHint = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
@@ -1069,23 +1115,20 @@ export function App({ options }: { options: TuiOptions }) {
         ? "↑/↓ select · Tab complete · Enter run · Esc close"
         : null
 
-  const agentHint = sessionRef.current ? " · ← 1 agent" : ""
   const busyHint = busy ? " · esc to interrupt" : ""
   const footerTint =
     screen === "chat" && !transcriptMode && !menuHint && !permission
       ? permissionMode === "auto"
         ? theme.tool
-        : permissionMode === "readonly"
-          ? theme.error
-          : undefined
+        : theme.brand
       : undefined
   const footerLeft = transcriptMode
     ? "↑/↓ scroll · PgUp/PgDn page · ctrl+o close"
     : screen === "chat"
       ? (menuHint ??
         (permission
-          ? "y allow · a allow for session · n deny"
-          : `${modeText}${agentHint}${busyHint}`))
+          ? "y allow once · a always allow this tool · n deny"
+          : `${modeText}${busyHint}`))
       : screen === "provider" || screen === "models" || screen === "sessions"
         ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
         : screen === "key" || screen === "baseurl"
@@ -1103,6 +1146,7 @@ export function App({ options }: { options: TuiOptions }) {
     `model: ${options.url ? "remote" : model}`,
     durationText,
     tokenText,
+    "? help",
   ]
     .filter(Boolean)
     .join(" · ")

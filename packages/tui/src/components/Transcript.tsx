@@ -1,3 +1,4 @@
+import type { PermissionMode } from "@opencontinue/protocol"
 import { Box, Text } from "ink"
 
 import {
@@ -12,8 +13,6 @@ import { theme } from "../theme.js"
 import type { TimelineItem, ToolTimelineItem } from "../timeline.js"
 import { LineText } from "./LineText.js"
 import { Welcome } from "./Welcome.js"
-
-type PermissionMode = "ask" | "auto" | "readonly"
 
 type TranscriptItemProps = {
   item: TimelineItem

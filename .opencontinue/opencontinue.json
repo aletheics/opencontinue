@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "mode": "ask",
+    "mode": "confirm",
     "allow": ["read", "glob", "grep"],
     "ask": ["write", "edit", "bash"],
     "deny": []

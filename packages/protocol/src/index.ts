@@ -6,6 +6,10 @@ export type SessionId = z.infer<typeof SessionId>
 export const EventSeq = z.number().int().nonnegative()
 export type EventSeq = z.infer<typeof EventSeq>
 
+/** Execution permission policy: plan (read-only), confirm, or auto. */
+export const PermissionMode = z.enum(["plan", "confirm", "auto"])
+export type PermissionMode = z.infer<typeof PermissionMode>
+
 const eventBase = {
   sessionId: SessionId,
   seq: EventSeq,

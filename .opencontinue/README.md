@@ -15,7 +15,7 @@ CLI flags override `permissions.mode`:
 ```bash
 opencontinue                   # project default (ask)
 opencontinue --auto "..."
-opencontinue --readonly "..."
+opencontinue --plan "..."
 ```
 
 Headless runs default to `readonly` regardless of project config unless `--auto` is passed.
