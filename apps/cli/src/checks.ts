@@ -398,6 +398,71 @@ function buildPrompt(agent: CheckAgent, base: string, diff: string, files: strin
     .join("\n\n")
 }
 
+const SECRET_ENV =
+  /(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|AUTH|SESSION|COOKIE|CONNECTION_STRING|_URL|_DSN)/i
+
+export type CheckSandbox = {
+  env: NodeJS.ProcessEnv
+  blockedPaths: string[]
+}
+
+/**
+ * Defense-in-depth for check agents: scrub secret-like env vars, point HOME and
+ * temp directories at the worktree parent, disable global git config, and
+ * block shell references to the source repo/home. This is not an OS sandbox.
+ */
+export async function createCheckSandbox(
+  workspaceDir: string,
+  repo: string,
+): Promise<CheckSandbox> {
+  const parent = path.dirname(workspaceDir)
+  const home = path.join(parent, "home")
+  const tmp = path.join(parent, "tmp")
+  const appData = path.join(home, "AppData", "Roaming")
+  const localAppData = path.join(home, "AppData", "Local")
+  const gitConfig = path.join(home, ".gitconfig")
+
+  await Promise.all([
+    fs.mkdir(home, { recursive: true }),
+    fs.mkdir(tmp, { recursive: true }),
+    fs.mkdir(appData, { recursive: true }),
+    fs.mkdir(localAppData, { recursive: true }),
+    fs.mkdir(path.join(home, ".config"), { recursive: true }),
+    fs.mkdir(path.join(home, ".cache"), { recursive: true }),
+  ])
+  await fs.writeFile(gitConfig, "", "utf8")
+
+  const env: NodeJS.ProcessEnv = {}
+  for (const [name, value] of Object.entries(process.env)) {
+    if (value === undefined || SECRET_ENV.test(name)) continue
+    env[name] = value
+  }
+
+  Object.assign(env, {
+    HOME: home,
+    USERPROFILE: home,
+    APPDATA: appData,
+    LOCALAPPDATA: localAppData,
+    XDG_CONFIG_HOME: path.join(home, ".config"),
+    XDG_CACHE_HOME: path.join(home, ".cache"),
+    OPENCONTINUE_HOME: home,
+    TMP: tmp,
+    TEMP: tmp,
+    TMPDIR: tmp,
+    GIT_CONFIG_GLOBAL: gitConfig,
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_TERMINAL_PROMPT: "0",
+    OPENCONTINUE_CHECK: "1",
+  } satisfies NodeJS.ProcessEnv)
+
+  const blocked = new Set<string>([path.resolve(repo), path.resolve(os.homedir())])
+  if (process.env.OPENCONTINUE_HOME) {
+    blocked.add(path.resolve(process.env.OPENCONTINUE_HOME))
+  }
+
+  return { env, blockedPaths: [...blocked] }
+}
+
 async function runOne(
   agent: CheckAgent,
   options: RunChecksOptions,
@@ -413,6 +478,7 @@ async function runOne(
 
   try {
     workspace = await createCheckWorkspace(options.repo, options.base, gitOptions)
+    const sandbox = await createCheckSandbox(workspace.dir, options.repo)
 
     const store = new MemorySessionStore()
     const session = store.create(agent.name)
@@ -430,6 +496,8 @@ async function runOne(
       workspace: workspace.dir,
       systemPrompt: "You are OpenContinue running a source-controlled check.",
       signal: controller.signal,
+      env: sandbox.env,
+      blockedPaths: sandbox.blockedPaths,
     })
 
     const failed = store.events(session.id).find((event) => event.type === "run.failed")

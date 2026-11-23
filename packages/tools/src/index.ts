@@ -23,6 +23,10 @@ export type ToolContext = {
   workspace: string
   sessionId: string
   signal?: AbortSignal
+  /** Sanitized child-process environment; defaults to process.env. */
+  env?: NodeJS.ProcessEnv
+  /** Absolute roots a shell command must not reference. */
+  blockedPaths?: readonly string[]
 }
 
 export type ToolOutput =
@@ -445,6 +449,52 @@ export const todoTool: Tool = {
   },
 }
 
+function inside(root: string, candidate: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate))
+  return (
+    relative === "" ||
+    (!relative.startsWith("..") && !path.isAbsolute(relative))
+  )
+}
+
+/**
+ * Best-effort guard against shell commands that name a protected absolute
+ * path. This is defense-in-depth, not an OS sandbox; scripts can still build
+ * paths at runtime.
+ */
+function assertAllowedCommand(
+  command: string,
+  workspace: string,
+  blockedPaths: readonly string[],
+): void {
+  if (blockedPaths.length === 0) return
+
+  const tokens = new Set<string>()
+  const patterns = [
+    /[A-Za-z]:[\\/][^"'`\s;&|<>]*/g,
+    /\\\\[^"'`\s;&|<>]+/g,
+    /(?:^|[\s"'=])(\/[^"'`\s;&|<>]*)/g,
+    /(?:^|[\s"'=])(\.\.[\\/][^"'`\s;&|<>]*)/g,
+  ]
+
+  for (const pattern of patterns) {
+    for (const match of command.matchAll(pattern)) {
+      const token = (match[1] ?? match[0]).replace(/[),;]+$/, "")
+      if (token) tokens.add(token)
+    }
+  }
+
+  for (const token of tokens) {
+    const candidate = path.isAbsolute(token)
+      ? token
+      : path.resolve(workspace, token)
+    if (inside(workspace, candidate)) continue
+    if (blockedPaths.some((blocked) => inside(blocked, candidate))) {
+      throw new Error(`Command references a protected path: ${token}`)
+    }
+  }
+}
+
 export const bashTool: Tool = {
   name: "bash",
   description: "Run a shell command inside the workspace and return combined stdout/stderr.",
@@ -455,6 +505,7 @@ export const bashTool: Tool = {
     const workdir = await resolveInside(context.workspace, cwd)
 
     if (context.signal?.aborted) throw new Error("Aborted")
+    assertAllowedCommand(command, workdir, context.blockedPaths ?? [])
 
     const shell = resolveShell(command)
     const maxBytes = MAX_OUTPUT_CHARS * 4
@@ -462,7 +513,10 @@ export const bashTool: Tool = {
     return await new Promise<ToolOutput>((resolve, reject) => {
       const child = spawn(shell.file, shell.args, {
         cwd: workdir,
-        env: { ...process.env, OPENCONTINUE_SESSION_ID: context.sessionId },
+        env: {
+          ...(context.env ?? process.env),
+          OPENCONTINUE_SESSION_ID: context.sessionId,
+        },
         windowsHide: true,
         detached: process.platform !== "win32",
         stdio: ["ignore", "pipe", "pipe"],

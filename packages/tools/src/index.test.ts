@@ -180,6 +180,37 @@ describe("tools", () => {
     )
   })
 
+  it("blocks shell commands that name a protected path", async () => {
+    const workspace = await makeWorkspace()
+    const outside = await mkdtemp(path.join(os.tmpdir(), "opencontinue-protected-"))
+    temporary.push(outside)
+    await writeFile(path.join(outside, "secret.txt"), "secret\n")
+
+    await expect(
+      bashTool.execute(
+        { command: `cat "${path.join(outside, "secret.txt")}"` },
+        { ...context(workspace), blockedPaths: [outside] },
+      ),
+    ).rejects.toThrow(/protected path/)
+  })
+
+  it("uses the provided sanitized environment", async () => {
+    const workspace = await makeWorkspace()
+    const env: NodeJS.ProcessEnv = { ...process.env, TEST_ONLY: "sandbox" }
+    delete env.OPENCONTINUE_API_KEY
+
+    const result = await bashTool.execute(
+      {
+        command: `node -e "console.log((process.env.TEST_ONLY ?? '') + '|' + (process.env.OPENCONTINUE_API_KEY ?? 'missing'))"`,
+      },
+      { ...context(workspace), env },
+    )
+
+    expect(typeof result === "string" ? result : result.output).toContain(
+      "sandbox|missing",
+    )
+  })
+
   it("times out and kills descendant processes", async () => {
     const workspace = await makeWorkspace()
 

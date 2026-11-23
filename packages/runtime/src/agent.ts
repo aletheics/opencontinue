@@ -28,6 +28,10 @@ export type RunAgentOptions = {
   signal?: AbortSignal
   maxSteps?: number
   reasoningEffort?: ReasoningEffort
+  /** Sanitized environment for child processes, such as checks. */
+  env?: NodeJS.ProcessEnv
+  /** Absolute roots shell commands must not reference. */
+  blockedPaths?: readonly string[]
 }
 
 /**
@@ -117,7 +121,13 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
         const result = await tools.execute(
           call.name,
           call.arguments,
-          { workspace, sessionId, signal },
+          {
+            workspace,
+            sessionId,
+            signal,
+            env: options.env,
+            blockedPaths: options.blockedPaths,
+          },
           permissions,
         )
         throwIfAborted(signal)

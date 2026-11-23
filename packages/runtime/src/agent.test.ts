@@ -238,6 +238,52 @@ describe("runAgent", () => {
     ])
   })
 
+  it("passes the configured child environment to tools", async () => {
+    const workspace = await makeWorkspace()
+    const store = new MemorySessionStore()
+    const session = store.create()
+    store.append(session.id, { type: "message.user", text: "env" })
+
+    let step = 0
+    const provider: ChatProvider = {
+      id: "fake",
+      model: "fake",
+      async *streamChat() {
+        step++
+        if (step === 1) {
+          yield {
+            type: "tool_call",
+            call: {
+              id: "call_1",
+              name: "bash",
+              arguments: JSON.stringify({
+                command: `node -e "console.log(process.env.TEST_ONLY ?? 'missing')"`,
+              }),
+            },
+          }
+          return
+        }
+        yield { type: "text", text: "done" }
+      },
+    }
+
+    await runAgent({
+      store,
+      sessionId: session.id,
+      provider,
+      tools: new ToolRegistry(),
+      permissions: allowAll,
+      workspace,
+      env: { ...process.env, TEST_ONLY: "agent-env" },
+    })
+
+    expect(
+      store
+        .events(session.id)
+        .find((event) => event.type === "tool.completed"),
+    ).toMatchObject({ output: "agent-env" })
+  })
+
   it("records a non-zero shell exit as a failed tool inside a completed run", async () => {
     const workspace = await makeWorkspace()
     const store = new MemorySessionStore()

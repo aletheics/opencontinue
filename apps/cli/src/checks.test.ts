@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import {
   capturePatch,
+  createCheckSandbox,
   createCheckWorkspace,
   discoverAgents,
   parseAgentFile,
@@ -55,6 +56,30 @@ describe("checks", () => {
     const agents = await discoverAgents(repo)
     expect(agents).toHaveLength(1)
     expect(agents[0]).toMatchObject({ name: "security", description: "Security review" })
+  })
+
+  it("creates a scrubbed check sandbox", async () => {
+    const repo = await makeRepo()
+    const parent = await mkdtemp(path.join(os.tmpdir(), "opencontinue-sandbox-"))
+    temporary.push(parent)
+    const worktree = path.join(parent, "worktree")
+    await mkdir(worktree, { recursive: true })
+
+    const previous = process.env.OPENCONTINUE_API_KEY
+    process.env.OPENCONTINUE_API_KEY = "secret"
+    try {
+      const sandbox = await createCheckSandbox(worktree, repo)
+
+      expect(sandbox.env.OPENCONTINUE_API_KEY).toBeUndefined()
+      expect(sandbox.env.HOME).toBe(path.join(parent, "home"))
+      expect(sandbox.env.TMP).toBe(path.join(parent, "tmp"))
+      expect(sandbox.env.GIT_CONFIG_NOSYSTEM).toBe("1")
+      expect(sandbox.env.OPENCONTINUE_CHECK).toBe("1")
+      expect(sandbox.blockedPaths).toContain(path.resolve(repo))
+    } finally {
+      if (previous === undefined) delete process.env.OPENCONTINUE_API_KEY
+      else process.env.OPENCONTINUE_API_KEY = previous
+    }
   })
 
   it("times out and aborts a hanging process", async () => {

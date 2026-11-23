@@ -2,7 +2,7 @@
 
 **Why:** one entrypoint for `opencontinue` and `onc`.
 
-**Owns:** command parsing, TUI launch, setup/config/import commands, environment diagnostics (`doctor`), checks command composition, headless mode. Checks run git and agent commands with a bounded timeout and process-tree cleanup.
+**Owns:** command parsing, TUI launch, setup/config/import commands, environment diagnostics (`doctor`), checks command composition, headless mode. Checks run git and agent commands with a bounded timeout, process-tree cleanup, a scrubbed environment, a temp home, and protected-path shell guards. This is isolation, not an OS sandbox.
 
 **Public API:** the binary only; do not import this package.
 
