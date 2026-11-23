@@ -6,7 +6,8 @@
 
 - `line.ts` — the styled line shape used by every formatter.
 - `wrap.ts` — width wrapping and prefixed continuation.
-- `assistant.ts` — markdown-style assistant output.
+- `assistant.ts` — markdown-style assistant output and top-level block spacing.
+- `table.ts` — GFM tables with display-width column alignment.
 - `diff.ts` — unified diff colors, collapse hint, and stats.
 - `tool.ts` — `● Tool(args)` headers and `⎿` output lines.
 - `lines.ts` — flatten the timeline for the `ctrl+o` transcript.
