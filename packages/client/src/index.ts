@@ -11,12 +11,20 @@ import {
 
 export type FetchLike = typeof fetch
 
+export type ClientEventProblem = {
+  kind: "invalid-json" | "invalid-event"
+  message: string
+  data: string
+}
+
 export type ClientOptions = {
   baseUrl: string
   fetch?: FetchLike
   reconnectDelayMs?: number
   /** Bearer token for a local server that requires authentication. */
   token?: string
+  /** Receives malformed SSE frames without interrupting the subscription. */
+  onEventProblem?: (problem: ClientEventProblem) => void
 }
 
 export type SessionEventListener = (event: SessionEvent) => void
@@ -120,6 +128,9 @@ export class HttpSessionClient implements OpenContinueClient {
   private readonly fetchImpl: FetchLike
   private readonly reconnectDelayMs: number
   private readonly token: string | undefined
+  private readonly onEventProblem:
+    | ((problem: ClientEventProblem) => void)
+    | undefined
   private readonly closeController = new AbortController()
   private readonly subscriptions = new Set<AbortController>()
   private closed = false
@@ -129,6 +140,7 @@ export class HttpSessionClient implements OpenContinueClient {
     this.fetchImpl = options.fetch ?? fetch
     this.reconnectDelayMs = Math.max(10, options.reconnectDelayMs ?? 500)
     this.token = options.token
+    this.onEventProblem = options.onEventProblem
   }
 
   async health(sessionId?: string): Promise<{
@@ -359,9 +371,28 @@ export class HttpSessionClient implements OpenContinueClient {
             const data = sseData(block)
             if (!data) continue
 
-            const parsedJson: unknown = JSON.parse(data)
+            let parsedJson: unknown
+            try {
+              parsedJson = JSON.parse(data)
+            } catch (error) {
+              this.onEventProblem?.({
+                kind: "invalid-json",
+                message:
+                  error instanceof Error ? error.message : String(error),
+                data,
+              })
+              continue
+            }
+
             const parsed = SessionEventSchema.safeParse(parsedJson)
-            if (!parsed.success) continue
+            if (!parsed.success) {
+              this.onEventProblem?.({
+                kind: "invalid-event",
+                message: parsed.error.message,
+                data,
+              })
+              continue
+            }
 
             const event = parsed.data
             if (event.seq <= lastSeq) continue

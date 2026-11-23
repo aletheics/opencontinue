@@ -68,7 +68,9 @@ afterEach(async () => {
   )
 })
 
-async function fixture(): Promise<Fixture> {
+async function fixture(options: {
+  eventFrames?: string[]
+} = {}): Promise<Fixture> {
   const requests: RecordedRequest[] = []
   let eventConnections = 0
 
@@ -110,6 +112,11 @@ async function fixture(): Promise<Fixture> {
       eventConnections++
       const after = Number(url.searchParams.get("after") ?? "-1")
       response.writeHead(200, { "content-type": "text/event-stream" })
+      if (options.eventFrames) {
+        for (const frame of options.eventFrames) response.write(frame)
+        response.end()
+        return
+      }
       const next = events.find((event) => event.seq > after)
       if (next) {
         response.write(`event: session\ndata: ${JSON.stringify(next)}\n\n`)
@@ -216,6 +223,37 @@ describe("HttpSessionClient", () => {
     await done
     expect(received).toEqual([0, 1])
     expect(eventConnections()).toBeGreaterThanOrEqual(2)
+    client.close()
+  })
+
+  it("reports malformed SSE frames and keeps the stream alive", async () => {
+    const { baseUrl } = await fixture({
+      eventFrames: [
+        "data: {not-json}\n\n",
+        'data: {"type":"not.an.event","seq":0}\n\n',
+        `event: session\ndata: ${JSON.stringify(events[0])}\n\n`,
+      ],
+    })
+    const problems: string[] = []
+    const received: number[] = []
+    const client = new HttpSessionClient({
+      baseUrl,
+      onEventProblem: (problem) => problems.push(problem.kind),
+    })
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("timed out")), 2000)
+      const subscription = client.subscribe(sessionId, -1, (event) => {
+        received.push(event.seq)
+        clearTimeout(timer)
+        subscription.close()
+        resolve()
+      })
+      void subscription.ready.catch(reject)
+    })
+
+    expect(received).toEqual([0])
+    expect(problems).toEqual(["invalid-json", "invalid-event"])
     client.close()
   })
 

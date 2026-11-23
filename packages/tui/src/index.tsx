@@ -762,9 +762,15 @@ export function App({ options }: { options: TuiOptions }) {
 
   useEffect(() => {
     if (!options.url) return
+    let warned = false
     const client = new HttpSessionClient({
       baseUrl: options.url,
       token: options.token ?? process.env.OPENCONTINUE_SERVER_TOKEN,
+      onEventProblem: (problem) => {
+        if (warned) return
+        warned = true
+        appendSystem(`Event stream warning: ${problem.message.slice(0, 300)}`)
+      },
     })
 
     void (async () => {
