@@ -1,0 +1,87 @@
+import { once } from "node:events"
+import { mkdtemp, rm } from "node:fs/promises"
+import type { Server as HttpServer } from "node:http"
+import type { AddressInfo } from "node:net"
+import os from "node:os"
+import path from "node:path"
+
+import { HttpSessionClient } from "@opencontinue/client"
+import { createSessionStore } from "@opencontinue/core"
+import { EchoProvider } from "@opencontinue/providers"
+import { closeServer, startServer } from "@opencontinue/server"
+import { afterEach, describe, expect, it } from "vitest"
+
+const temporary: string[] = []
+
+afterEach(async () => {
+  await Promise.all(
+    temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  )
+})
+
+async function workspace(): Promise<string> {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "opencontinue-e2e-"))
+  temporary.push(directory)
+  return directory
+}
+
+describe("client/server e2e", () => {
+  it("creates a session, streams one echo run, and lists it", async () => {
+    const directory = await workspace()
+    const store = createSessionStore({ workspace: directory })
+    const running = startServer({
+      store,
+      provider: new EchoProvider(),
+      port: 0,
+      workspace: directory,
+      permissionMode: "readonly",
+    })
+    const server = running.server as unknown as HttpServer
+    if (!server.listening) await once(server, "listening")
+    const address = server.address() as AddressInfo
+    const client = new HttpSessionClient({
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      reconnectDelayMs: 20,
+    })
+
+    try {
+      const session = await client.createSession("e2e")
+      let output = ""
+
+      const done = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timed out waiting for run")), 5000)
+        const subscription = client.subscribe(session.id, -1, (event) => {
+          if (event.type === "message.assistant.delta") output += event.text
+          if (event.type === "run.completed") {
+            clearTimeout(timer)
+            subscription.close()
+            resolve()
+          }
+          if (event.type === "run.failed") {
+            clearTimeout(timer)
+            subscription.close()
+            reject(new Error(event.error))
+          }
+        })
+        void subscription.ready.catch((error) => {
+          clearTimeout(timer)
+          reject(error)
+        })
+      })
+
+      await client.sendMessage(session.id, "hello")
+      await done
+
+      expect(output).toContain("Echo: hello")
+      await expect(client.listSessions()).resolves.toHaveLength(1)
+      await expect(client.getSession(session.id)).resolves.toMatchObject({
+        id: session.id,
+        lastSeq: expect.any(Number),
+      })
+    } finally {
+      client.close()
+      await closeServer(running.server)
+      store.close()
+    }
+  }, 15000)
+})

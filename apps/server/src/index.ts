@@ -174,12 +174,14 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     port,
     hostname: options.hostname ?? "127.0.0.1",
   })
+  const address = server.address()
+  const boundPort = typeof address === "object" && address !== null ? address.port : port
 
   return {
     app,
     store,
     server,
-    port,
+    port: boundPort,
     provider: selection.provider,
     permissionMode,
     workspace,

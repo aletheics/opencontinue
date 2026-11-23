@@ -10,4 +10,4 @@
 
 **Must not:** hold domain logic needed by the web or desktop client. Move it to a package.
 
-**Tests:** `import.test.ts`, `checks.test.ts`.
+**Tests:** `import.test.ts`, `checks.test.ts`, `e2e.test.ts` (real server + client + echo provider).
