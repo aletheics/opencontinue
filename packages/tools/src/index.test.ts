@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import {
   ToolRegistry,
+  bashTool,
   editTool,
   globTool,
   grepTool,
@@ -93,6 +94,18 @@ describe("tools", () => {
 
     expect(await globTool.execute({ pattern: "**/*.ts" }, context(workspace))).toContain("a.ts")
     expect(await grepTool.execute({ pattern: "needle" }, context(workspace))).toContain("a.ts:1")
+  })
+
+  it("returns bash output without a success exit-code prefix", async () => {
+    const workspace = await makeWorkspace()
+
+    expect(await bashTool.execute({ command: "echo hi" }, context(workspace))).toBe("hi")
+
+    const failed = await bashTool.execute(
+      { command: 'node -e "process.exit(3)"' },
+      context(workspace),
+    )
+    expect(failed).toContain("Exit code 3")
   })
 
   it("enforces the permission gate", async () => {

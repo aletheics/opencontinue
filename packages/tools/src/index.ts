@@ -341,7 +341,17 @@ export const bashTool: Tool = {
       child.on("close", (code) => {
         clearTimeout(timer)
         context.signal?.removeEventListener("abort", abort)
-        resolve(`exit code: ${code ?? "null"}${timedOut ? " (timed out)" : ""}\n${output}`.trim())
+        const failed = code !== 0 || timedOut
+        resolve(
+          [
+            output.trimEnd(),
+            failed
+              ? `Exit code ${code ?? "null"}${timedOut ? " (timed out)" : ""}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        )
       })
     })
   },
