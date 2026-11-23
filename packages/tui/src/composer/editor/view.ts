@@ -1,8 +1,10 @@
+import { charWidth, textWidth } from "../../transcript/format/wrap.js"
 import { clampCursor } from "./state.js"
 
 export type LineInfo = {
   line: number
   column: number
+  columnWidth: number
   lineStart: number
   lineEnd: number
   lineCount: number
@@ -28,9 +30,48 @@ export function lineInfo(value: string, cursor: number): LineInfo {
   return {
     line,
     column: safe - lineStart,
+    columnWidth: textWidth(before.slice(lineStart)),
     lineStart,
     lineEnd,
     lineCount: value.split("\n").length,
+  }
+}
+
+/**
+ * Render one row of the input using display-cell width, so CJK text scrolls
+ * and truncates on the same boundary the terminal uses.
+ */
+function windowLine(
+  line: string,
+  cursorColumn: number,
+  current: boolean,
+  width: number,
+): ViewLine {
+  let start = 0
+  if (current && textWidth(line.slice(0, cursorColumn)) >= width) {
+    let used = 0
+    start = cursorColumn
+    while (start > 0) {
+      const size = charWidth(line[start - 1] ?? "")
+      if (used + size > width - 1) break
+      used += size
+      start--
+    }
+  }
+
+  let text = ""
+  let used = 0
+  for (let index = start; index < line.length; index++) {
+    const char = line[index] ?? ""
+    const size = charWidth(char)
+    if (used + size > width) break
+    text += char
+    used += size
+  }
+
+  return {
+    text,
+    cursor: current ? cursorColumn - start : -1,
   }
 }
 
@@ -51,14 +92,8 @@ export function inputView(
     .split("\n")
     .slice(startLine, startLine + rowCount)
     .map((line, index) => {
-      const globalLine = startLine + index
-      const current = globalLine === info.line
-      const start = current ? Math.max(0, info.column - safeWidth + 1) : 0
-      const text = line.slice(start, start + safeWidth)
-      return {
-        text,
-        cursor: current ? Math.min(info.column - start, text.length) : -1,
-      }
+      const current = startLine + index === info.line
+      return windowLine(line, info.column, current, safeWidth)
     })
 
   return { startLine, lines }

@@ -3,6 +3,7 @@ import { Box, Text } from "ink"
 import { PRODUCT_NAME, READY_LINE, TAGLINE } from "../brand.js"
 import { glyphs } from "../glyphs.js"
 import { theme } from "../theme.js"
+import { charWidth, textWidth } from "../transcript/format/wrap.js"
 
 const LABEL_WIDTH = 12
 
@@ -14,16 +15,42 @@ export type WelcomeProps = {
   columns: number
 }
 
-/** Keep the root and the tail, inserting an ellipsis in the middle. */
+function takeStart(value: string, width: number): string {
+  let result = ""
+  let used = 0
+  for (const char of value) {
+    const size = charWidth(char)
+    if (used + size > width) break
+    result += char
+    used += size
+  }
+  return result
+}
+
+function takeEnd(value: string, width: number): string {
+  const chars = Array.from(value)
+  let result = ""
+  let used = 0
+  for (let index = chars.length - 1; index >= 0; index--) {
+    const char = chars[index] ?? ""
+    const size = charWidth(char)
+    if (used + size > width) break
+    result = char + result
+    used += size
+  }
+  return result
+}
+
+/** Keep the root and the tail by display width, ellipsis in the middle. */
 export function shortenPath(value: string, width: number): string {
   const limit = Math.max(0, width)
-  if (value.length <= limit) return value
+  if (textWidth(value) <= limit) return value
   if (limit <= 1) return "…"
 
   const keep = limit - 1
   const head = Math.ceil(keep / 2)
   const tail = Math.floor(keep / 2)
-  return `${value.slice(0, head)}…${value.slice(value.length - tail)}`
+  return `${takeStart(value, head)}…${takeEnd(value, tail)}`
 }
 
 function Row({ label, value }: { label: string; value: string }) {

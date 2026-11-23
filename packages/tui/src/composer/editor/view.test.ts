@@ -27,4 +27,17 @@ describe("editor view", () => {
       { text: "c", cursor: 1 },
     ])
   })
+
+  it("scrolls and truncates CJK by display width", () => {
+    expect(inputView("你好世界", 4, 6, 1).lines).toEqual([
+      { text: "世界", cursor: 2 },
+    ])
+    expect(inputView("你好世界", 0, 4, 1).lines).toEqual([
+      { text: "你好", cursor: 0 },
+    ])
+    expect(inputView("a你b好", 2, 4, 1).lines).toEqual([
+      { text: "a你b", cursor: 2 },
+    ])
+    expect(lineInfo("你好", 2).columnWidth).toBe(4)
+  })
 })

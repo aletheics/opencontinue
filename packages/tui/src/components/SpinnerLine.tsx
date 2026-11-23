@@ -8,6 +8,7 @@ import {
   visibleStatusParts,
 } from "../status/spinner.js"
 import { theme } from "../theme.js"
+import { textWidth } from "../transcript/format/wrap.js"
 
 export type SpinnerLineProps = {
   verb: string
@@ -40,7 +41,7 @@ export function SpinnerLine({
   const statusParts = visibleStatusParts(
     elapsedMs,
     tokens,
-    Math.max(0, columns - message.length - 9),
+    Math.max(0, columns - textWidth(message) - 9),
   )
 
   return (

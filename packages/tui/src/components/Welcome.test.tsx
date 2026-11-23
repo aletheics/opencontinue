@@ -39,4 +39,9 @@ describe("Welcome", () => {
     expect(shortenPath("short", 20)).toBe("short")
     expect(shortenPath("abcdef", 1)).toBe("…")
   })
+
+  it("measures CJK paths in display cells", () => {
+    expect(shortenPath("你好世界路径", 10)).toBe("你好…路径")
+    expect(shortenPath("D:\\项目\\alpha", 10)).toBe("D:\\项…lpha")
+  })
 })
