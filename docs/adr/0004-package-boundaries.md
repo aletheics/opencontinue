@@ -14,7 +14,7 @@ OpenCode solves this with applications that compose packages, a runtime independ
 
 Adopt the same direction:
 
-- `packages/protocol`, `config`, `core`, `providers`, `tools`, `runtime`, `tui`
+- `packages/protocol`, `config`, `client`, `core`, `providers`, `tools`, `runtime`, `tui`
 - `apps/cli` is an entrypoint; `apps/server` is an HTTP/SSE adapter
 - packages never import applications
 - clients never import the server
@@ -29,7 +29,8 @@ See [folders.md](../architecture/folders.md) and [dependency-rules.md](../archit
 - The runtime can be used by checks, the server, and future clients.
 - Adding a provider is a catalog entry plus a transport, not a new package.
 - Every boundary is visible and enforceable.
-- The current TUI still runs the runtime in-process. The next slice introduces `packages/client` so TUI, web, and desktop are thin clients over one server.
+- `packages/client` now owns the HTTP/SSE session contract; the CLI uses it.
+- The current TUI still runs the runtime in-process. The next slice puts the in-process adapter and HTTP transport behind the same client interface for TUI, web, and desktop.
 
 ## Alternatives
 

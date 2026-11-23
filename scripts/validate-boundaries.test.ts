@@ -9,18 +9,30 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const RULES: Record<string, ReadonlySet<string>> = {
   protocol: new Set(),
   config: new Set(),
+  client: new Set(["protocol"]),
   core: new Set(["protocol"]),
   providers: new Set(),
   tools: new Set(["providers"]),
   runtime: new Set(["protocol", "core", "providers", "tools"]),
-  tui: new Set(["config", "core", "protocol", "providers", "runtime", "tools"]),
+  tui: new Set(["client", "config", "core", "protocol", "providers", "runtime", "tools"]),
   server: new Set(["config", "core", "protocol", "providers", "runtime", "tools"]),
-  cli: new Set(["config", "core", "protocol", "providers", "runtime", "server", "tools", "tui"]),
+  cli: new Set([
+    "client",
+    "config",
+    "core",
+    "protocol",
+    "providers",
+    "runtime",
+    "server",
+    "tools",
+    "tui",
+  ]),
 }
 
 const SOURCES: Array<{ name: string; dir: string }> = [
   { name: "protocol", dir: "packages/protocol/src" },
   { name: "config", dir: "packages/config/src" },
+  { name: "client", dir: "packages/client/src" },
   { name: "core", dir: "packages/core/src" },
   { name: "providers", dir: "packages/providers/src" },
   { name: "tools", dir: "packages/tools/src" },

@@ -4,9 +4,10 @@ import { createInterface } from "node:readline/promises"
 
 import { Command } from "commander"
 
+import { HttpSessionClient } from "@opencontinue/client"
 import { resolveProviderSettings } from "@opencontinue/config"
 import { createSessionStore } from "@opencontinue/core"
-import type { SessionEvent, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
+import type { SessionEvent } from "@opencontinue/protocol"
 import { createProvider } from "@opencontinue/providers"
 import { closeServer, startServer } from "@opencontinue/server"
 
@@ -32,97 +33,22 @@ type ChatOptions = {
   readonly?: boolean
 }
 
-async function request<T>(baseUrl: string, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: { "content-type": "application/json" },
-  })
-  if (!response.ok) throw new Error(`${response.status} ${await response.text()}`)
-  return (await response.json()) as T
-}
-
-class SessionClient {
-  private lastSeq = -1
-  private connected = false
+class ConversationClient {
   private pending: { resolve: () => void; reject: (error: Error) => void } | null = null
-  private readonly abort = new AbortController()
-  private readonly ready: Promise<void>
-  private resolveReady: () => void = () => {}
-  private rejectReady: (error: Error) => void = () => {}
+  private readonly subscription
 
   constructor(
-    private readonly baseUrl: string,
+    private readonly client: HttpSessionClient,
     private readonly sessionId: string,
     private readonly onDelta: (text: string) => void,
-    private readonly onPermission?: (event: PermissionRequestEvent) => void | Promise<void>,
+    private readonly onPermission?: (
+      event: PermissionRequestEvent,
+    ) => Promise<boolean> | boolean,
   ) {
-    this.ready = new Promise<void>((resolve, reject) => {
-      this.resolveReady = resolve
-      this.rejectReady = reject
-    })
-    this.ready.catch(() => {})
-    void this.loop()
-  }
-
-  private async loop(): Promise<void> {
-    while (!this.abort.signal.aborted) {
-      try {
-        const response = await fetch(
-          `${this.baseUrl}/v1/sessions/${this.sessionId}/events?after=${this.lastSeq}`,
-          {
-            signal: this.abort.signal,
-            headers: { accept: "text/event-stream" },
-          },
-        )
-        if (!response.ok || !response.body) {
-          throw new Error(`SSE failed: ${response.status} ${await response.text()}`)
-        }
-
-        this.connected = true
-        this.resolveReady()
-
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ""
-
-        for (;;) {
-          const { value, done } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-
-          let boundary = buffer.indexOf("\n\n")
-          while (boundary >= 0) {
-            const block = buffer.slice(0, boundary)
-            buffer = buffer.slice(boundary + 2)
-            const data = block
-              .split("\n")
-              .filter((line) => line.startsWith("data:"))
-              .map((line) => line.slice(5).trim())
-              .join("\n")
-            if (data) this.handle(JSON.parse(data) as SessionEvent)
-            boundary = buffer.indexOf("\n\n")
-          }
-        }
-      } catch (error) {
-        if (this.abort.signal.aborted) return
-        const failure = error instanceof Error ? error : new Error(String(error))
-
-        if (!this.connected) {
-          this.rejectReady(failure)
-          return
-        }
-
-        this.pending?.reject(failure)
-        this.pending = null
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-    }
+    this.subscription = client.subscribe(sessionId, -1, (event) => this.handle(event))
   }
 
   private handle(event: SessionEvent): void {
-    if (event.seq <= this.lastSeq) return
-    this.lastSeq = event.seq
-
     if (event.type === "message.assistant.delta") {
       this.onDelta(event.text)
       return
@@ -136,7 +62,7 @@ class SessionClient {
       return
     }
     if (event.type === "permission.requested") {
-      void this.onPermission?.(event)
+      void this.answerPermission(event)
       return
     }
     if (event.type === "run.completed") {
@@ -151,20 +77,42 @@ class SessionClient {
     }
   }
 
+  private async answerPermission(event: PermissionRequestEvent): Promise<void> {
+    let approved = false
+    try {
+      approved = (await this.onPermission?.(event)) ?? false
+    } catch {
+      approved = false
+    }
+
+    try {
+      await this.client.resolvePermission(this.sessionId, event.requestId, approved)
+    } catch {
+      // The run fails closed if the decision cannot be delivered.
+    }
+  }
+
   async send(text: string): Promise<void> {
-    await this.ready
-    const done = new Promise<void>((resolve, reject) => {
+    await this.subscription.ready
+
+    const pending = new Promise<void>((resolve, reject) => {
       this.pending = { resolve, reject }
     })
-    await request(this.baseUrl, `/v1/sessions/${this.sessionId}/messages`, {
-      method: "POST",
-      body: JSON.stringify({ text }),
-    })
-    await done
+    pending.catch(() => {})
+
+    try {
+      await this.client.sendMessage(this.sessionId, text)
+    } catch (error) {
+      this.pending = null
+      throw error
+    }
+
+    await pending
   }
 
   close(): void {
-    this.abort.abort()
+    this.subscription.close()
+    this.client.close()
   }
 }
 
@@ -202,41 +150,23 @@ async function withServer(
 
 async function chat(options: ChatOptions): Promise<void> {
   await withServer(options, permissionMode(options), async (baseUrl) => {
-    let sessionId = options.resume
-    if (!sessionId) {
-      const created = await request<SessionSnapshot>(baseUrl, "/v1/sessions", {
-        method: "POST",
-        body: "{}",
-      })
-      sessionId = created.id
-    }
-    const activeSessionId = sessionId
+    const sessionClient = new HttpSessionClient({ baseUrl })
+    const sessionId = options.resume ?? (await sessionClient.createSession()).id
 
     const rl = createInterface({ input: process.stdin, output: process.stdout })
-    const client = new SessionClient(
-      baseUrl,
-      activeSessionId,
+    const conversation = new ConversationClient(
+      sessionClient,
+      sessionId,
       (text) => process.stdout.write(text),
       async (event) => {
         const answer = await rl.question(
           `\n[permission] ${event.tool} ${JSON.stringify(event.input)}\nAllow? [y/N] `,
         )
-        try {
-          await request(
-            baseUrl,
-            `/v1/sessions/${activeSessionId}/permissions/${event.requestId}`,
-            {
-              method: "POST",
-              body: JSON.stringify({ approved: /^y/i.test(answer.trim()) }),
-            },
-          )
-        } catch {
-          // The run will fail closed if the decision cannot be delivered.
-        }
+        return /^y/i.test(answer.trim())
       },
     )
 
-    console.log(`OpenContinue session ${activeSessionId}`)
+    console.log(`OpenContinue session ${sessionId}`)
     console.log("Type /exit to quit.\n")
 
     try {
@@ -247,14 +177,14 @@ async function chat(options: ChatOptions): Promise<void> {
 
         process.stdout.write("ai> ")
         try {
-          await client.send(line)
+          await conversation.send(line)
         } catch (error) {
           console.error(`\nerror: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
     } finally {
       rl.close()
-      client.close()
+      conversation.close()
     }
   })
 }
@@ -263,28 +193,21 @@ async function printOnce(prompt: string, options: ChatOptions): Promise<void> {
   if (!prompt.trim()) throw new Error("A prompt is required with --print")
 
   await withServer(options, permissionMode(options, true), async (baseUrl) => {
-    const created = await request<SessionSnapshot>(baseUrl, "/v1/sessions", {
-      method: "POST",
-      body: "{}",
-    })
+    const sessionClient = new HttpSessionClient({ baseUrl })
+    const created = await sessionClient.createSession()
     let output = ""
-    const client = new SessionClient(
-      baseUrl,
+    const conversation = new ConversationClient(
+      sessionClient,
       created.id,
       (text) => {
         output += text
       },
-      async (event) => {
-        await request(baseUrl, `/v1/sessions/${created.id}/permissions/${event.requestId}`, {
-          method: "POST",
-          body: JSON.stringify({ approved: false }),
-        }).catch(() => {})
-      },
+      () => false,
     )
     try {
-      await client.send(prompt)
+      await conversation.send(prompt)
     } finally {
-      client.close()
+      conversation.close()
     }
     process.stdout.write(output.endsWith("\n") ? output : `${output}\n`)
   })
@@ -398,14 +321,18 @@ async function startTui(options: {
 }
 
 async function sessionsCommand(options: { url?: string }): Promise<void> {
-  const baseUrl = (options.url ?? "http://127.0.0.1:8787").replace(/\/$/, "")
-  const sessions = await request<SessionSummary[]>(baseUrl, "/v1/sessions")
-  if (sessions.length === 0) {
-    console.log("No sessions.")
-    return
-  }
-  for (const session of sessions) {
-    console.log(`${session.id}  ${session.title}  ${session.updatedAt}`)
+  const client = new HttpSessionClient({ baseUrl: options.url ?? "http://127.0.0.1:8787" })
+  try {
+    const sessions = await client.listSessions()
+    if (sessions.length === 0) {
+      console.log("No sessions.")
+      return
+    }
+    for (const session of sessions) {
+      console.log(`${session.id}  ${session.title}  ${session.updatedAt}`)
+    }
+  } finally {
+    client.close()
   }
 }
 

@@ -37,6 +37,7 @@ CLI / TUI / Web / Desktop / VS Code / CI
 Boundaries:
 
 - `packages/protocol` owns the public event and wire contract.
+- `packages/client` owns the session client contract, HTTP/SSE replay, reconnect, and subscription lifecycle.
 - `packages/core` owns durable sessions and projections.
 - `packages/providers` owns the provider catalog and model transport.
 - `packages/tools` owns local capabilities and the permission gate.
@@ -109,6 +110,8 @@ Rules:
 
 - [x] TUI: API key entry, model selection, streaming chat, permission prompts.
 - [x] TUI: inline Claude Code-style transcript (`❯` prompt, `● Tool(args)`, `⎿` output, `✻` status, `⏵⏵` mode line), scrollback via Ink `Static`, `ctrl+o` expanded transcript, keybindings, filterable slash menu, diffs, usage, type-to-filter pickers, markdown-style assistant output, session resume picker, permission dialog with preview diffs, cursor-aware multi-line input, queued messages, `ctrl+r` history search, `@file` completion, workspace/git status line.
+- [x] `packages/client`: one `OpenContinueClient` contract, HTTP/SSE replay and reconnect, typed errors; CLI uses it.
+- [ ] TUI uses the client contract with an in-process adapter and `--url` HTTP mode.
 - [ ] Minimal web client over the same SSE stream.
 - Out of scope: full IDE features.
 

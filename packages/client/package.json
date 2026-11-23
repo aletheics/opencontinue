@@ -1,0 +1,15 @@
+{
+  "name": "@opencontinue/client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Protocol client and HTTP/SSE transport for OpenContinue sessions.",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@opencontinue/protocol": "0.0.1"
+  }
+}

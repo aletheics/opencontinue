@@ -38,16 +38,17 @@ SQLite is the default store (`node:sqlite`, WAL mode). An in-memory store remain
 Applications compose libraries; libraries do not import applications.
 
 ```
-apps/cli ──> packages/tui
-    │             │
+apps/cli ──> packages/tui ──> packages/client ──> packages/protocol
+    │
     └──> apps/server ──> packages/runtime ──> packages/core
                               │                    │
                               ├──> packages/providers
                               └──> packages/tools
 ```
 
+- `packages/client` owns the session contract, HTTP requests, SSE replay, reconnect, and subscription lifecycle. It depends only on `protocol`.
 - `packages/runtime` owns the agent loop, history projection, permissions, and project context.
-- `packages/tui` depends on `config`, `core`, `providers`, `runtime`, and `tools`; it never imports `apps/cli` or `apps/server`.
+- `packages/tui` may depend on `client`; the remaining direct runtime imports are the in-process adapter gap.
 - `apps/server` is an HTTP/SSE adapter over `runtime`.
 - `apps/cli` is an entrypoint that composes commands, checks, the server, and the TUI.
 

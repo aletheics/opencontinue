@@ -18,4 +18,4 @@
 
 **Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, slash-menu filtering and completion, key entry, session resume labels, the permission dialog with a preview diff, `ctrl+r` history search, `@file` completion, the workspace/git status line, the full provider → model → chat loop, and repeated help output; `src/input.test.ts` covers cursor editing and viewport math; `src/permission-gate.test.ts` covers modes and per-session tool memory; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, tool headers, diff colorization, and output collapsing.
 
-**Known gap:** it currently runs the runtime in-process. The target is `packages/client` over the server.
+**Known gap:** it currently runs the runtime in-process. `packages/client` now owns the HTTP/SSE contract; the next slice puts the TUI behind that interface with an in-process adapter.

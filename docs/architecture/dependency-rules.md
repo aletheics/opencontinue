@@ -8,22 +8,24 @@ The boundary is enforced by [`scripts/validate-boundaries.test.ts`](../../script
 |---|---|---|
 | `protocol` | external only | any internal package |
 | `config` | external only | any internal package |
+| `client` | `protocol` | core, runtime, providers, tools, server, apps |
 | `core` | `protocol` | server, clients, runtime |
 | `providers` | external only | core, runtime, clients |
 | `tools` | `providers` | core runtime, clients |
 | `runtime` | `protocol`, `core`, `providers`, `tools` | server, CLI, TUI |
-| `tui` | `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | server, CLI |
+| `tui` | `client`, `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | server, CLI |
 | `server` | `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | CLI, TUI |
 | `cli` | any package and `apps/server` | none (entrypoint) |
 
 ## Why these directions
 
 - `protocol` and `config` are leaves. Everyone may depend on them; they depend on no one.
+- `client` owns the wire contract in practice: replay cursor, reconnect, subscription lifecycle. It knows protocol, not how a run executes.
 - `core` owns state. It does not know about HTTP or clients.
 - `providers` and `tools` are capabilities. They do not know about sessions or the agent loop.
 - `runtime` composes core, providers, and tools. It does not know how it is transported.
 - `server` is an adapter. It may use the runtime but not a client.
-- `tui` is a client. It may use config and runtime today; the target is a typed `packages/client`.
+- `tui` is a client. It may use `client`; the remaining direct runtime imports are the in-process adapter gap.
 - `cli` is an entrypoint. It composes everything but owns no reusable domain logic.
 
 ## Public API
@@ -39,11 +41,11 @@ Each package has one public entry (`exports` in `package.json`). Deep imports su
 
 ## Next boundary
 
-The TUI currently runs `runtime` in-process. The next slice introduces `packages/client`:
+`packages/client` now owns HTTP/SSE, replay, reconnect, and subscription lifecycle. The CLI uses it. The remaining boundary is the TUI's in-process adapter:
 
 ```
 apps/cli ──> packages/tui ──> packages/client ──> protocol
     └──> apps/server ──> packages/runtime
 ```
 
-`packages/client` owns HTTP/SSE, retries, and session resume. `packages/tui`, `apps/web`, and `apps/desktop` become thin clients. This also makes cross-client continuity a protocol feature instead of a per-client implementation.
+Next, the TUI should implement the same `OpenContinueClient` contract with an in-process adapter for offline startup, then switch to `HttpSessionClient` with `--url`. `apps/web` and `apps/desktop` use the HTTP client directly. Cross-client continuity becomes a protocol feature instead of a per-client implementation.

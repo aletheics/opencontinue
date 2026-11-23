@@ -14,6 +14,7 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
+    "@opencontinue/client": "0.0.1",
     "@opencontinue/config": "0.0.1",
     "@opencontinue/core": "0.0.1",
     "@opencontinue/protocol": "0.0.1",
