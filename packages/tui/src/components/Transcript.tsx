@@ -9,6 +9,7 @@ import {
 } from "../transcript/format/index.js"
 import { theme } from "../theme.js"
 import type { TimelineItem, ToolTimelineItem } from "../timeline.js"
+import { LineText } from "./LineText.js"
 import { Welcome } from "./Welcome.js"
 
 type PermissionMode = "ask" | "auto" | "readonly"
@@ -160,15 +161,7 @@ export function TranscriptItem({
           </Text>
         ) : null}
         {visible.map((line, index) => (
-          <Text
-            key={index}
-            color={line.color}
-            dimColor={line.dim}
-            bold={line.bold}
-            wrap="truncate"
-          >
-            {line.text}
-          </Text>
+          <LineText key={index} line={line} />
         ))}
       </Box>
     )

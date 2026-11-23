@@ -1,26 +1,52 @@
 import { theme } from "../../theme.js"
-import type { Line } from "./line.js"
+import type { Line, Span } from "./line.js"
+import { lineFromSpans, parseInline, spanWidth, wrapSpans } from "./inline.js"
 import { wrapText } from "./wrap.js"
+
+function baseSpan(text: string, color: string = theme.assistant): Span {
+  return { text, color }
+}
+
+function spansOf(line: Line): Span[] {
+  if (line.spans?.length) return line.spans
+  return [
+    {
+      text: line.text,
+      color: line.color,
+      dim: line.dim,
+      bold: line.bold,
+      italic: line.italic,
+      underline: line.underline,
+      strikethrough: line.strikethrough,
+      backgroundColor: line.backgroundColor,
+    },
+  ]
+}
 
 function pushPrefixed(
   lines: Line[],
-  prefix: string,
-  text: string,
+  prefix: Span[],
+  content: Span[],
   width: number,
-  color: string = theme.assistant,
+  fallbackColor: string = theme.assistant,
 ): void {
-  const contentWidth = Math.max(10, width - prefix.length)
-  wrapText(text, contentWidth).forEach((part, index) => {
-    lines.push({
-      text: `${index === 0 ? prefix : " ".repeat(prefix.length)}${part}`,
-      color,
-    })
-  })
+  const contentWidth = Math.max(1, width - spanWidth(prefix))
+  const indent = " ".repeat(spanWidth(prefix))
+  for (const [index, spans] of wrapSpans(content, contentWidth).entries()) {
+    lines.push(
+      lineFromSpans(
+        index === 0
+          ? [...prefix, ...spans]
+          : [baseSpan(indent, fallbackColor), ...spans],
+        fallbackColor,
+      ),
+    )
+  }
 }
 
 /**
- * Markdown-style assistant output. Styling is line-level because the renderer
- * is a line buffer, not a span tree.
+ * Markdown-style assistant output. Styling is line-level with inline spans
+ * for code, bold, italic, strikethrough, and links.
  */
 export function formatAssistantLines(text: string, width: number): Line[] {
   const lines: Line[] = []
@@ -64,12 +90,12 @@ export function formatAssistantLines(text: string, width: number): Line[] {
 
     const heading = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/)
     if (heading) {
-      const markerWidth = (heading[1]?.length ?? 1) + 1
-      for (const part of wrapText(
-        heading[2] ?? "",
-        Math.max(10, width - markerWidth),
-      )) {
-        lines.push({ text: part, color: theme.assistant, bold: true })
+      const content = parseInline(heading[2] ?? "", {
+        color: theme.assistant,
+        bold: true,
+      })
+      for (const spans of wrapSpans(content, Math.max(10, width))) {
+        lines.push(lineFromSpans(spans))
       }
       continue
     }
@@ -85,20 +111,35 @@ export function formatAssistantLines(text: string, width: number): Line[] {
 
     const quote = line.match(/^\s*>\s?(.*)$/)
     if (quote) {
-      pushPrefixed(lines, "▎ ", quote[1] ?? "", width, theme.muted)
+      pushPrefixed(
+        lines,
+        [{ text: "▎ ", color: theme.muted, dim: true }],
+        parseInline(quote[1] ?? "", { italic: true }),
+        width,
+      )
       continue
     }
 
     const task = line.match(/^(\s*)[-*+]\s+\[([ xX])\]\s+(.*)$/)
     if (task) {
       const box = task[2]?.toLowerCase() === "x" ? "[x]" : "[ ]"
-      pushPrefixed(lines, `${task[1] ?? ""}- ${box} `, task[3] ?? "", width)
+      pushPrefixed(
+        lines,
+        [baseSpan(`${task[1] ?? ""}- ${box} `)],
+        parseInline(task[3] ?? ""),
+        width,
+      )
       continue
     }
 
     const bullet = line.match(/^(\s*)[-*+]\s+(.*)$/)
     if (bullet) {
-      pushPrefixed(lines, `${bullet[1] ?? ""}- `, bullet[2] ?? "", width)
+      pushPrefixed(
+        lines,
+        [baseSpan(`${bullet[1] ?? ""}- `)],
+        parseInline(bullet[2] ?? ""),
+        width,
+      )
       continue
     }
 
@@ -106,15 +147,15 @@ export function formatAssistantLines(text: string, width: number): Line[] {
     if (numbered) {
       pushPrefixed(
         lines,
-        `${numbered[1] ?? ""}${numbered[2]} `,
-        numbered[3] ?? "",
+        [baseSpan(`${numbered[1] ?? ""}${numbered[2]} `)],
+        parseInline(numbered[3] ?? ""),
         width,
       )
       continue
     }
 
-    for (const part of wrapText(line, width)) {
-      lines.push({ text: part, color: theme.assistant })
+    for (const spans of wrapSpans(parseInline(line), Math.max(10, width))) {
+      lines.push(lineFromSpans(spans))
     }
   }
 
@@ -132,10 +173,11 @@ export function assistantBlock(text: string, width: number): Line[] {
 
   return body.map((line) => {
     if (line.text.length === 0) return line
+    const content = spansOf(line)
     if (!dotted) {
       dotted = true
-      return { ...line, text: `● ${line.text}` }
+      return lineFromSpans([baseSpan("● "), ...content])
     }
-    return { ...line, text: `  ${line.text}` }
+    return lineFromSpans([baseSpan("  "), ...content])
   })
 }

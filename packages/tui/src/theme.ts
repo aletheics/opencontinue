@@ -3,6 +3,8 @@ export const theme = {
   logo: "#D77757",
   claude: "#D77757",
   claudeShimmer: "#F59575",
+  inlineCode: "#5769F7",
+  link: "#5769F7",
   user: "green",
   userBar: "#3A3A3A",
   assistant: "white",

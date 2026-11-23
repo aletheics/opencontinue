@@ -36,6 +36,7 @@ import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
 import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
 import type { PermissionMode } from "./permissions/types.js"
 import { useTerminalSize } from "./hooks/use-terminal-size.js"
+import { LineText } from "./components/LineText.js"
 import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
@@ -1252,15 +1253,7 @@ export function App({ options }: { options: TuiOptions }) {
             <Text dimColor>(empty)</Text>
           ) : (
             visibleTranscript.map((line, index) => (
-              <Text
-                key={`${transcriptStart + index}`}
-                color={line.color}
-                dimColor={line.dim}
-                bold={line.bold}
-                wrap="truncate"
-              >
-                {line.text}
-              </Text>
+              <LineText key={`${transcriptStart + index}`} line={line} />
             ))
           )}
         </Box>

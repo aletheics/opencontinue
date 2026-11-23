@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { theme } from "../../theme.js"
 import { assistantBlock, formatAssistantLines } from "./assistant.js"
 import { textWidth } from "./wrap.js"
 
@@ -58,5 +59,16 @@ describe("assistant markdown", () => {
     for (const line of lines) {
       expect(textWidth(line.text)).toBeLessThanOrEqual(20)
     }
+  })
+
+  it("styles inline code and bold inside assistant text", () => {
+    const lines = assistantBlock("run `typecheck` and **ship** it", 80)
+    const spans = lines[0]?.spans ?? []
+
+    expect(lines[0]?.text).toBe("● run typecheck and ship it")
+    expect(
+      spans.find((span) => span.text === "typecheck")?.color,
+    ).toBe(theme.inlineCode)
+    expect(spans.find((span) => span.text === "ship")?.bold).toBe(true)
   })
 })

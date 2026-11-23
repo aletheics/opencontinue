@@ -1,6 +1,7 @@
 export { assistantBlock, formatAssistantLines } from "./assistant.js"
 export { diffStats, formatDiffLines } from "./diff.js"
-export type { Line } from "./line.js"
+export { lineFromSpans, parseInline, spanText, spanWidth, wrapSpans } from "./inline.js"
+export type { Line, Span } from "./line.js"
 export { timelineLines } from "./lines.js"
 export {
   formatToolOutputLines,
