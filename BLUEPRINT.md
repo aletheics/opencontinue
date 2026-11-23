@@ -111,6 +111,7 @@ Rules:
 - [x] TUI: API key entry, model selection, streaming chat, permission prompts.
 - [x] TUI: inline Claude Code-style transcript (`❯` prompt, `● Tool(args)`, `⎿` output, `✻` status, `⏵⏵` mode line), scrollback via Ink `Static`, `ctrl+o` expanded transcript, keybindings, filterable slash menu, diffs, usage, type-to-filter pickers, markdown-style assistant output, session resume picker, permission dialog with preview diffs, cursor-aware multi-line input, queued messages, `ctrl+r` history search, `@file` completion, workspace/git status line.
 - [x] `packages/client`: one `OpenContinueClient` contract, HTTP/SSE replay and reconnect, typed errors; CLI uses it.
+- [x] `packages/local-client`: in-process transport behind the same contract, including replay and permission events.
 - [x] Client/server e2e: real server + client + echo provider creates, streams, and lists a session.
 - [x] `opencontinue doctor`: Node, workspace, git, config, auth, provider, sessions, optional server/network checks.
 - [ ] TUI uses the client contract with an in-process adapter and `--url` HTTP mode.

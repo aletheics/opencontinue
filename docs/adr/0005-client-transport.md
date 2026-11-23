@@ -44,8 +44,8 @@ server, or TUI. It knows the wire, not how a run is executed.
 - Protocol changes remain a deliberate package change; clients do not silently
   depend on server internals.
 - The TUI still needs an in-process adapter to keep startup cheap and offline
-  use simple. That adapter belongs behind the same interface, not in the
-  transport package.
+  use simple. That adapter lives in `packages/local-client`, behind the same
+  interface, not in the wire transport package.
 - Publishing can later expose `@opencontinue/client` and generated SDKs without
   exposing the runtime.
 
