@@ -1,5 +1,5 @@
 import { theme } from "../../theme.js"
-import { highlightCodeLine, type HighlightState } from "./highlight.js"
+import { codeLanguageLabel, highlightCodeLine, type HighlightState } from "./highlight.js"
 import type { Line, Span } from "./line.js"
 import { lineFromSpans, parseInline, pushPrefixed, wrapSpans } from "./inline.js"
 import { formatTable, isTableStart } from "./table.js"
@@ -239,19 +239,27 @@ function renderQuote(lines: string[], width: number): Line[] {
 
 function renderCode(language: string, lines: string[], width: number): Line[] {
   const rendered: Line[] = []
+  const rule: Span = { text: "▎ ", color: theme.borderSubtle }
+  const label = codeLanguageLabel(language)
+
+  if (label) {
+    rendered.push(lineFromSpans([rule, { text: label, color: theme.textMuted, dim: true }]))
+  }
+
+  const contentWidth = Math.max(1, width - 2)
   let highlightState: HighlightState = { inBlockComment: false }
 
   for (const line of lines) {
     if (line.length === 0) {
-      rendered.push({ text: "", color: theme.assistant })
+      rendered.push(lineFromSpans([rule]))
       continue
     }
     const highlighted = highlightCodeLine(line, language, highlightState)
     highlightState = highlighted.state
-    for (const spans of wrapSpans(highlighted.spans, Math.max(10, width), {
+    for (const spans of wrapSpans(highlighted.spans, contentWidth, {
       breakWords: false,
     })) {
-      rendered.push(lineFromSpans(spans))
+      rendered.push(lineFromSpans([rule, ...spans]))
     }
   }
 

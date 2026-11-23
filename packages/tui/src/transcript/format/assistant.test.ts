@@ -25,7 +25,8 @@ describe("assistant markdown", () => {
     expect(plain).toContain("- first")
     expect(plain).toContain("1. second")
     expect(plain).toContain("▎ quote")
-    expect(plain).toContain("const x = 1")
+    expect(plain).toContain("▎ ts")
+    expect(plain.some((line) => line.includes("const x = 1"))).toBe(true)
     expect(plain).not.toContain("┌─ ts")
     expect(plain).not.toContain("│ const x = 1")
     expect(plain).not.toContain("└─")
@@ -37,10 +38,10 @@ describe("assistant markdown", () => {
       40,
     )
     const plain = lines.map((line) => line.text)
-    expect(plain).toContain("# not a heading")
-    expect(plain).toContain("- not a bullet")
-    expect(plain).toContain("| a | b |")
-    expect(plain).toContain("| --- | --- |")
+    expect(plain.some((line) => line.includes("# not a heading"))).toBe(true)
+    expect(plain.some((line) => line.includes("- not a bullet"))).toBe(true)
+    expect(plain.some((line) => line.includes("| a | b |"))).toBe(true)
+    expect(plain.some((line) => line.includes("| --- | --- |"))).toBe(true)
   })
 
   it("separates top-level blocks with one blank line", () => {
@@ -54,7 +55,7 @@ describe("assistant markdown", () => {
       "",
       "second",
       "",
-      "const x = 1",
+      "▎ const x = 1",
       "",
       "after",
     ])
@@ -159,7 +160,7 @@ describe("assistant markdown", () => {
       "",
       "▎ quote",
       "",
-      "code",
+      "▎ code",
     ])
   })
 
@@ -219,10 +220,82 @@ describe("assistant markdown", () => {
     const line = lines.find((entry) => entry.text.includes("const answer"))
     const spans = line?.spans ?? []
 
-    expect(line?.text).toBe("const answer = 42 // note")
+    expect(line?.text).toBe("▎ const answer = 42 // note")
     expect(spans.find((span) => span.text === "const")?.color).toBe(theme.syntaxKeyword)
     expect(spans.find((span) => span.text === "42")?.color).toBe(theme.syntaxNumber)
     expect(spans.find((span) => span.text === "// note")?.color).toBe(theme.syntaxComment)
+  })
+
+  it("labels every supported code language", () => {
+    const languages: Array<[string, string]> = [
+      ["ts", "ts"],
+      ["javascript", "js"],
+      ["json", "json"],
+      ["bash", "bash"],
+      ["powershell", "powershell"],
+      ["python", "python"],
+      ["yaml", "yaml"],
+      ["markdown", "markdown"],
+      ["diff", "diff"],
+    ]
+
+    for (const [fence, label] of languages) {
+      const lines = formatAssistantLines(["```" + fence, "sample", "```"].join("\n"), 60)
+
+      expect(lines[0]?.text).toBe(`▎ ${label}`)
+      expect(lines[1]?.text.startsWith("▎ ")).toBe(true)
+    }
+  })
+
+  it("colors diff fences", () => {
+    const lines = formatAssistantLines(
+      [
+        "```diff",
+        "diff --git a/a.ts b/a.ts",
+        "--- a/a.ts",
+        "+++ b/a.ts",
+        "@@ -1 +1 @@",
+        "-old",
+        "+new",
+        " context",
+        "```",
+      ].join("\n"),
+      60,
+    )
+
+    const spanColor = (needle: string) =>
+      lines
+        .find((line) => line.text.includes(needle))
+        ?.spans?.find((span) => span.text.includes(needle))?.color
+
+    expect(spanColor("+new")).toBe(theme.diffAdd)
+    expect(spanColor("-old")).toBe(theme.diffRemove)
+    expect(spanColor("@@ -1 +1 @@")).toBe(theme.diffHunk)
+    expect(spanColor("--- a/a.ts")).toBe(theme.syntaxComment)
+  })
+
+  it("wraps long code lines with the left rule", () => {
+    const lines = formatAssistantLines(
+      ["```ts", "const value = " + "x".repeat(80), "```"].join("\n"),
+      30,
+    )
+
+    for (const line of lines) {
+      expect(textWidth(line.text)).toBeLessThanOrEqual(30)
+    }
+    expect(lines.filter((line) => line.text.startsWith("▎ ")).length).toBeGreaterThan(3)
+  })
+
+  it("wraps CJK code lines by display width", () => {
+    const lines = formatAssistantLines(
+      ["```ts", 'const 名称 = "中文" // 注释', "```"].join("\n"),
+      24,
+    )
+
+    expect(lines.map((line) => line.text).join("\n")).toContain("中文")
+    for (const line of lines) {
+      expect(textWidth(line.text)).toBeLessThanOrEqual(24)
+    }
   })
 
   it("wraps a list item under its marker", () => {
