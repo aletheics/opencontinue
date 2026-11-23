@@ -69,6 +69,7 @@ export function createApp(
     c.json({
       ok: true,
       permissionMode: permissions.getMode(),
+      permissions: permissions.getPolicy(),
       reasoningEffort: reasoning.effort,
       reasoningEfforts: provider.reasoningEfforts ?? [],
     }),

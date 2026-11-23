@@ -468,7 +468,8 @@ Proposed commands (not implemented until shipped):
 
   `/diff`                             Inspect current changes
 
-  `/permissions`                      View or edit permission rules
+  `/permissions`                      View the effective permission rules
+                                      (edit remains manual/source-controlled)
 
   `/checkpoints`                      Browse saved checkpoints
 
@@ -640,7 +641,9 @@ Architecture rules:
     lists run boundaries; restoring to one is not implemented.
 -   [x] Add change awareness and `/diff`. `/diff` runs `git status
     --short` and `git diff --stat` directly, outside the agent gate.
--   [ ] Add permission-rule inspection and management.
+-   [x] Add permission-rule inspection. `/permissions` shows the
+    effective mode and allow/ask/deny lists from `health()`. Editing rules
+    remains a manual, source-controlled action.
 -   [ ] Add richer task timeline only where it improves clarity.
 
 ## 16. Acceptance criteria

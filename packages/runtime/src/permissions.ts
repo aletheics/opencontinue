@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto"
 
 import type { SessionStore } from "@opencontinue/core"
-import type { PermissionMode } from "@opencontinue/protocol"
+import type {
+  PermissionMode,
+  PermissionPolicy,
+} from "@opencontinue/protocol"
 import type { PermissionGate, Tool, ToolContext } from "@opencontinue/tools"
 
-export type { PermissionMode }
+export type { PermissionMode, PermissionPolicy }
 
 export const PERMISSION_MODES: readonly PermissionMode[] = [
   "plan",
@@ -21,12 +24,6 @@ export function normalizePermissionMode(value: unknown): PermissionMode | undefi
   if (value === "confirm" || value === "ask") return "confirm"
   if (value === "auto") return "auto"
   return undefined
-}
-
-export type PermissionPolicy = {
-  allow: string[]
-  ask: string[]
-  deny: string[]
 }
 
 const EMPTY_POLICY: PermissionPolicy = { allow: [], ask: [], deny: [] }
@@ -78,6 +75,14 @@ export class PermissionBroker implements PermissionGate {
 
   getMode(): PermissionMode {
     return this.mode
+  }
+
+  getPolicy(): PermissionPolicy {
+    return {
+      allow: [...this.policy.allow],
+      ask: [...this.policy.ask],
+      deny: [...this.policy.deny],
+    }
   }
 
   /** Remember a tool for the rest of this broker's session. */

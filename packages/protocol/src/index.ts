@@ -14,6 +14,14 @@ export type PermissionMode = z.infer<typeof PermissionMode>
 export const ReasoningEffort = z.enum(["auto", "low", "medium", "high", "max"])
 export type ReasoningEffort = z.infer<typeof ReasoningEffort>
 
+/** Effective tool-name rules for the active permission broker. */
+export const PermissionPolicy = z.object({
+  allow: z.array(z.string()),
+  ask: z.array(z.string()),
+  deny: z.array(z.string()),
+})
+export type PermissionPolicy = z.infer<typeof PermissionPolicy>
+
 const eventBase = {
   sessionId: SessionId,
   seq: EventSeq,

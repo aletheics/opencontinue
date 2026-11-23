@@ -36,7 +36,8 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
   - `Up`/`Down` input history
   - `Ctrl+D` exit when input is empty
   - Terminal scrollback handles normal scrolling; the transcript view adds `↑/↓` and `PgUp`/`PgDn`.
-- Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/reasoning`, `/diff`, `/checkpoints`, `/status`, `/exit`.
+- Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/reasoning`, `/diff`, `/checkpoints`, `/permissions`, `/status`, `/exit`.
+- `/permissions` reads `health()` and prints the effective mode plus the runtime broker's allow/ask/deny lists, including tools remembered with `a` during the session. It is inspection only; editing rule files stays a manual, source-controlled action.
 - Slash menu above the prompt: borderless, filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
 - Session picker via `/resume`: sorted by recency, type-to-filter by title or id, `Esc` returns to chat. Sessions with the generic default title are labeled by their first user message.
 - Permission card: inline, titled `? Permission required`, with the exact operation and target (command, path, or pattern), the working directory for bash, and a dry-run diff for write/edit before approval. `y` allows once, `a` asks the runtime broker to remember the tool for the session, `n` denies. The runtime `PermissionBroker` is the authorization source of truth; the TUI never re-implements Plan/Confirm/Auto policy. Previews come from the tool's optional `preview` method.

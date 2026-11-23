@@ -40,6 +40,7 @@ import {
 import { historyIndexAfterMove, searchHistory } from "./composer/history.js"
 import { isPrintableInput } from "./composer/keys.js"
 import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
+import { formatPermissions } from "./permissions/format.js"
 import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
 import type { PermissionMode } from "./permissions/types.js"
 import { useTerminalSize } from "./hooks/use-terminal-size.js"
@@ -884,6 +885,29 @@ export function App({ options }: { options: TuiOptions }) {
       case "/checkpoints":
         appendSystem(formatCheckpoints(checkpointsRef.current))
         return true
+      case "/permissions": {
+        const client = clientRef.current
+        if (!client) {
+          appendSystem(formatPermissions(permissionMode))
+          return true
+        }
+        void client
+          .health()
+          .then((result) =>
+            appendSystem(
+              formatPermissions(
+                result.permissionMode ?? permissionMode,
+                result.permissions,
+              ),
+            ),
+          )
+          .catch((error) => {
+            appendSystem(
+              `Could not read permissions: ${error instanceof Error ? error.message : String(error)}`,
+            )
+          })
+        return true
+      }
       case "/status": {
         const tokens = timeline.reduce(
           (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),

@@ -13,6 +13,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/reasoning", description: "cycle reasoning effort" },
   { name: "/diff", description: "show working tree changes" },
   { name: "/checkpoints", description: "list run checkpoints" },
+  { name: "/permissions", description: "show permission rules" },
   { name: "/status", description: "session status" },
   { name: "/exit", description: "quit" },
 ]

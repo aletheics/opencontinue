@@ -1,6 +1,7 @@
 import {
   SessionEvent as SessionEventSchema,
   type PermissionMode,
+  type PermissionPolicy,
   type ReasoningEffort,
   type SessionEvent,
   type SessionSnapshot,
@@ -28,6 +29,7 @@ export interface OpenContinueClient {
   health(): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
+    permissions?: PermissionPolicy
     reasoningEffort?: ReasoningEffort
     reasoningEfforts?: readonly ReasoningEffort[]
   }>
@@ -116,6 +118,7 @@ export class HttpSessionClient implements OpenContinueClient {
   async health(): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
+    permissions?: PermissionPolicy
     reasoningEffort?: ReasoningEffort
     reasoningEfforts?: readonly ReasoningEffort[]
   }> {

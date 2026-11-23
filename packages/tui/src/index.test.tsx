@@ -769,6 +769,46 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("shows the effective permission rules with /permissions", async () => {
+    await mkdir(path.join(home, ".opencontinue"), { recursive: true })
+    await writeFile(
+      path.join(home, ".opencontinue", "opencontinue.json"),
+      JSON.stringify({
+        permissions: {
+          mode: "confirm",
+          allow: ["read", "glob"],
+          ask: ["write", "bash"],
+          deny: ["rm"],
+        },
+      }),
+    )
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/permissions")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /permissions"))
+      stdin.write("\r")
+
+      await vi.waitFor(() =>
+        expect(output(frames)).toContain("◈ Permissions"),
+      )
+      expect(output(frames)).toContain("Mode    Confirm")
+      expect(output(frames)).toContain("Allow   read, glob")
+      expect(output(frames)).toContain("Ask     write, bash")
+      expect(output(frames)).toContain("Deny    rm")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("shows working tree changes with /diff", async () => {
     const git = (args: string[]) =>
       execFileSync("git", args, { cwd: home, stdio: "ignore" })

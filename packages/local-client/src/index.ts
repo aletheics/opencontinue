@@ -87,12 +87,14 @@ export class LocalSessionClient implements OpenContinueClient {
   async health(): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
+    permissions?: { allow: string[]; ask: string[]; deny: string[] }
     reasoningEffort?: ReasoningEffort
     reasoningEfforts?: readonly ReasoningEffort[]
   }> {
     return {
       ok: true,
       permissionMode: this.permissions.getMode(),
+      permissions: this.permissions.getPolicy(),
       reasoningEffort: this.reasoningEffort,
       reasoningEfforts: this.provider.reasoningEfforts ?? [],
     }

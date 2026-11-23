@@ -87,6 +87,22 @@ describe("PermissionBroker", () => {
     ).toBe(false)
   })
 
+  it("reports the effective policy", () => {
+    const { broker } = setup("confirm", {
+      allow: ["read"],
+      ask: ["write"],
+      deny: ["bash"],
+    })
+    expect(broker.getPolicy()).toEqual({
+      allow: ["read"],
+      ask: ["write"],
+      deny: ["bash"],
+    })
+
+    broker.allowForSession("edit")
+    expect(broker.getPolicy().allow).toEqual(["read", "edit"])
+  })
+
   it("remembers a tool for the session", async () => {
     const { broker, context } = setup("confirm")
     broker.allowForSession("write")
