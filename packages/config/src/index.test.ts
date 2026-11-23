@@ -68,6 +68,7 @@ describe("config", () => {
       apiKey: "env-key",
       model: "env-model",
       permissionMode: undefined,
+      reasoningEffort: undefined,
     })
   })
 
@@ -82,5 +83,14 @@ describe("config", () => {
       resolveProviderSettings({ OPENCONTINUE_PERMISSION_MODE: "readonly" })
         .permissionMode,
     ).toBe("plan")
+  })
+
+  it("persists and resolves reasoning effort", () => {
+    saveProviderConfig({ reasoningEffort: "high" })
+    expect(resolveProviderSettings({}).reasoningEffort).toBe("high")
+    expect(
+      resolveProviderSettings({ OPENCONTINUE_REASONING_EFFORT: "low" })
+        .reasoningEffort,
+    ).toBe("low")
   })
 })

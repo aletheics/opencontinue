@@ -10,6 +10,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/provider", description: "change provider" },
   { name: "/resume", description: "resume a session" },
   { name: "/mode", description: "cycle Plan/Confirm/Auto" },
+  { name: "/reasoning", description: "cycle reasoning effort" },
   { name: "/status", description: "session status" },
   { name: "/exit", description: "quit" },
 ]

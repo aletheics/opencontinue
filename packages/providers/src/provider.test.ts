@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
 
 import { toAnthropicMessages } from "./anthropic.js"
-import { createProvider, OpenAICompatibleProvider, type ChatStreamEvent } from "./index.js"
+import {
+  createProvider,
+  OpenAICompatibleProvider,
+  reasoningEffortsFor,
+  type ChatStreamEvent,
+} from "./index.js"
 
 function sseBody(events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
@@ -12,6 +17,69 @@ function sseBody(events: string[]): ReadableStream<Uint8Array> {
     },
   })
 }
+
+describe("reasoning effort", () => {
+  it("advertises levels only for supported OpenAI models", () => {
+    expect(reasoningEffortsFor("openai", "gpt-6.2")).toEqual([
+      "auto",
+      "low",
+      "medium",
+      "high",
+    ])
+    expect(reasoningEffortsFor("openai", "o3-mini")).toContain("high")
+    expect(reasoningEffortsFor("deepseek", "deepseek-reasoner")).toEqual([])
+    expect(reasoningEffortsFor("anthropic", "claude-sonnet-5-5")).toEqual([])
+  })
+
+  it("sends reasoning_effort only when the level is supported", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(sseBody(["data: [DONE]\n\n"]), { status: 200 }),
+    )
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "https://example.test/v1",
+      model: "gpt-6.2",
+      reasoningEfforts: ["auto", "low", "medium", "high"],
+      fetch: fetchMock as unknown as typeof fetch,
+    })
+
+    for await (const _event of provider.streamChat({
+      model: "gpt-6.2",
+      messages: [{ role: "user", content: "hi" }],
+      reasoningEffort: "high",
+    })) {
+      // drain
+    }
+    const highBody = JSON.parse(
+      String(fetchMock.mock.calls[0]?.[1]?.body),
+    ) as Record<string, unknown>
+    expect(highBody.reasoning_effort).toBe("high")
+
+    for await (const _event of provider.streamChat({
+      model: "gpt-6.2",
+      messages: [{ role: "user", content: "hi" }],
+      reasoningEffort: "auto",
+    })) {
+      // drain
+    }
+    const autoBody = JSON.parse(
+      String(fetchMock.mock.calls[1]?.[1]?.body),
+    ) as Record<string, unknown>
+    expect(autoBody.reasoning_effort).toBeUndefined()
+
+    for await (const _event of provider.streamChat({
+      model: "gpt-6.2",
+      messages: [{ role: "user", content: "hi" }],
+      reasoningEffort: "max",
+    })) {
+      // drain
+    }
+    const maxBody = JSON.parse(
+      String(fetchMock.mock.calls[2]?.[1]?.body),
+    ) as Record<string, unknown>
+    expect(maxBody.reasoning_effort).toBeUndefined()
+  })
+})
 
 describe("createProvider", () => {
   it("falls back to echo when the default OpenAI endpoint has no key", () => {

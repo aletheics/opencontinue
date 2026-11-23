@@ -660,6 +660,47 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("cycles and persists reasoning effort when supported", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const first = render(<App options={{}} />)
+    try {
+      await ready(first.lastFrame)
+      await vi.waitFor(() =>
+        expect(first.lastFrame()).toContain("Reasoning: Auto"),
+      )
+
+      for (const expected of [
+        "Reasoning: Low",
+        "Reasoning: Medium",
+        "Reasoning: High",
+        "Reasoning: Auto",
+        "Reasoning: Low",
+      ]) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        first.stdin.write("/reasoning")
+        await vi.waitFor(() => expect(first.lastFrame()).toContain("› /reasoning"))
+        first.stdin.write("\r")
+        await vi.waitFor(() => expect(first.lastFrame()).toContain(expected))
+      }
+    } finally {
+      first.unmount()
+    }
+
+    const second = render(<App options={{}} />)
+    try {
+      await ready(second.lastFrame)
+      await vi.waitFor(() =>
+        expect(second.lastFrame()).toContain("Reasoning: Low"),
+      )
+    } finally {
+      second.unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 25000)
+
   it("commits streamed lines to scrollback instead of hiding them", async () => {
     const { server, url } = await fakeLineProvider(30)
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })

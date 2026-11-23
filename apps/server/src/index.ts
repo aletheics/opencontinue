@@ -8,7 +8,9 @@ import {
   CreateSessionRequest,
   PermissionDecisionRequest,
   PermissionMode as PermissionModeSchema,
+  ReasoningEffort as ReasoningEffortSchema,
   SendMessageRequest,
+  type ReasoningEffort,
   type SessionEvent,
 } from "@opencontinue/protocol"
 import {
@@ -33,6 +35,7 @@ export type StartServerOptions = {
   systemPrompt?: string
   tools?: ToolRegistry
   permissionMode?: PermissionMode
+  reasoningEffort?: ReasoningEffort
   workspace?: string
 }
 
@@ -43,6 +46,7 @@ export type RunningServer = {
   port: number
   provider: ChatProvider
   permissionMode: PermissionMode
+  reasoningEffort: ReasoningEffort
   workspace: string
   warning?: string
 }
@@ -54,6 +58,7 @@ export function createApp(
   tools: ToolRegistry,
   permissions: PermissionBroker,
   workspace: string,
+  reasoning: { effort: ReasoningEffort },
 ): Hono {
   const app = new Hono()
   const activeRuns = new Map<string, AbortController>()
@@ -61,8 +66,27 @@ export function createApp(
   app.use("*", cors())
 
   app.get("/health", (c) =>
-    c.json({ ok: true, permissionMode: permissions.getMode() }),
+    c.json({
+      ok: true,
+      permissionMode: permissions.getMode(),
+      reasoningEffort: reasoning.effort,
+      reasoningEfforts: provider.reasoningEfforts ?? [],
+    }),
   )
+
+  app.post("/v1/reasoning", async (c) => {
+    const body = await c.req.json().catch(() => ({}))
+    const effort =
+      typeof body === "object" && body !== null
+        ? (body as { effort?: unknown }).effort
+        : undefined
+    const parsed = ReasoningEffortSchema.safeParse(effort)
+    if (!parsed.success) return c.json({ error: "invalid reasoning effort" }, 400)
+
+    reasoning.effort = parsed.data
+    saveProviderConfig({ reasoningEffort: parsed.data })
+    return c.json({ effort: reasoning.effort })
+  })
 
   app.post("/v1/permission-mode", async (c) => {
     const body = await c.req.json().catch(() => ({}))
@@ -135,6 +159,7 @@ export function createApp(
       tools,
       permissions,
       workspace,
+      reasoningEffort: reasoning.effort,
       signal: controller.signal,
     }).finally(() => {
       if (activeRuns.get(sessionId) === controller) activeRuns.delete(sessionId)
@@ -229,8 +254,19 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     project.permissionMode ??
     "confirm"
   const permissions = new PermissionBroker(store, permissionMode, project)
+  const reasoning = {
+    effort: options.reasoningEffort ?? settings.reasoningEffort ?? "auto",
+  }
 
-  const app = createApp(store, selection.provider, systemPrompt, tools, permissions, workspace)
+  const app = createApp(
+    store,
+    selection.provider,
+    systemPrompt,
+    tools,
+    permissions,
+    workspace,
+    reasoning,
+  )
   const port = options.port ?? Number(process.env.OPENCONTINUE_PORT ?? 8787)
   const server = serve({
     fetch: app.fetch,
@@ -247,6 +283,7 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     port: boundPort,
     provider: selection.provider,
     permissionMode,
+    reasoningEffort: reasoning.effort,
     workspace,
     warning: selection.warning,
   }

@@ -10,7 +10,7 @@ import type {
   SessionSnapshot,
   SessionSummary,
 } from "@opencontinue/protocol"
-import type { ChatProvider } from "@opencontinue/providers"
+import type { ChatProvider, ReasoningEffort } from "@opencontinue/providers"
 import {
   DEFAULT_SYSTEM_PROMPT,
   loadProjectConfig,
@@ -29,6 +29,7 @@ export type LocalClientOptions = {
   tools?: ToolRegistry
   permissionMode?: PermissionMode
   permissionPolicy?: PermissionPolicy
+  reasoningEffort?: ReasoningEffort
 }
 
 /**
@@ -43,6 +44,7 @@ export class LocalSessionClient implements OpenContinueClient {
   private readonly systemPrompt: string
   private readonly tools: ToolRegistry
   private readonly permissions: PermissionBroker
+  private reasoningEffort: ReasoningEffort
   private readonly subscriptions = new Set<() => void>()
   private readonly activeRuns = new Map<string, AbortController>()
   private closed = false
@@ -52,6 +54,7 @@ export class LocalSessionClient implements OpenContinueClient {
     this.provider = options.provider
     this.workspace = options.workspace
     this.tools = options.tools ?? new ToolRegistry()
+    this.reasoningEffort = options.reasoningEffort ?? "auto"
 
     const project = loadProjectConfig(options.workspace)
     const base = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT
@@ -84,8 +87,19 @@ export class LocalSessionClient implements OpenContinueClient {
   async health(): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
+    reasoningEffort?: ReasoningEffort
+    reasoningEfforts?: readonly ReasoningEffort[]
   }> {
-    return { ok: true, permissionMode: this.permissions.getMode() }
+    return {
+      ok: true,
+      permissionMode: this.permissions.getMode(),
+      reasoningEffort: this.reasoningEffort,
+      reasoningEfforts: this.provider.reasoningEfforts ?? [],
+    }
+  }
+
+  setReasoningEffort(effort: ReasoningEffort): void {
+    this.reasoningEffort = effort
   }
 
   async listSessions(): Promise<SessionSummary[]> {
@@ -119,6 +133,7 @@ export class LocalSessionClient implements OpenContinueClient {
       permissions: this.permissions,
       workspace: this.workspace,
       systemPrompt: this.systemPrompt,
+      reasoningEffort: this.reasoningEffort,
       signal: controller.signal,
     }).finally(() => {
       if (this.activeRuns.get(sessionId) === controller) this.activeRuns.delete(sessionId)

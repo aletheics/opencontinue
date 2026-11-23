@@ -4,6 +4,33 @@ import { findProviderPreset } from "./catalog.js"
 export { AnthropicProvider } from "./anthropic.js"
 export { PROVIDER_PRESETS, type ProviderPreset } from "./catalog.js"
 
+export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "max"
+
+export const REASONING_EFFORTS: readonly ReasoningEffort[] = [
+  "auto",
+  "low",
+  "medium",
+  "high",
+  "max",
+]
+
+/**
+ * Only providers/models that document an OpenAI-compatible reasoning_effort
+ * parameter advertise levels. Everything else hides the control rather than
+ * sending an unknown field.
+ */
+export function reasoningEffortsFor(
+  provider: string | undefined,
+  model: string | undefined,
+): ReasoningEffort[] {
+  const id = (provider ?? "").toLowerCase()
+  const name = model ?? ""
+  if (id === "openai" && /^(o[1-9]|gpt-5|gpt-6)/i.test(name)) {
+    return ["auto", "low", "medium", "high"]
+  }
+  return []
+}
+
 export type ChatRole = "system" | "user" | "assistant" | "tool"
 
 export type ToolCall = {
@@ -38,11 +65,15 @@ export type ChatRequest = {
   messages: ChatMessage[]
   tools?: ToolDefinition[]
   signal?: AbortSignal
+  /** Requested reasoning level; `auto` means omit provider parameters. */
+  reasoningEffort?: ReasoningEffort
 }
 
 export interface ChatProvider {
   readonly id: string
   readonly model: string
+  /** Levels this provider/model can honor. Empty or undefined hides the UI. */
+  readonly reasoningEfforts?: readonly ReasoningEffort[]
   streamChat(request: ChatRequest): AsyncGenerator<ChatStreamEvent, void, unknown>
   listModels?(): Promise<string[]>
 }
@@ -53,6 +84,7 @@ export interface ChatProvider {
 export class EchoProvider implements ChatProvider {
   readonly id = "echo"
   readonly model = "echo"
+  readonly reasoningEfforts: readonly ReasoningEffort[] = []
 
   async listModels(): Promise<string[]> {
     return ["echo"]
@@ -137,6 +169,7 @@ export type OpenAICompatibleOptions = {
   apiKey?: string
   headers?: Record<string, string>
   fetch?: typeof fetch
+  reasoningEfforts?: readonly ReasoningEffort[]
 }
 
 function toOpenAIMessage(message: ChatMessage): Record<string, unknown> {
@@ -172,6 +205,7 @@ function toOpenAIMessage(message: ChatMessage): Record<string, unknown> {
 export class OpenAICompatibleProvider implements ChatProvider {
   readonly id = "openai-compatible"
   readonly model: string
+  readonly reasoningEfforts: readonly ReasoningEffort[]
   private readonly baseUrl: string
   private readonly apiKey: string | undefined
   private readonly headers: Record<string, string>
@@ -183,6 +217,7 @@ export class OpenAICompatibleProvider implements ChatProvider {
     this.apiKey = options.apiKey
     this.headers = options.headers ?? {}
     this.fetchImpl = options.fetch ?? fetch
+    this.reasoningEfforts = options.reasoningEfforts ?? []
   }
 
   async listModels(): Promise<string[]> {
@@ -211,6 +246,14 @@ export class OpenAICompatibleProvider implements ChatProvider {
         ? { stream_options: { include_usage: true } }
         : {}),
     }
+    if (
+      request.reasoningEffort &&
+      request.reasoningEffort !== "auto" &&
+      this.reasoningEfforts.includes(request.reasoningEffort)
+    ) {
+      body.reasoning_effort = request.reasoningEffort
+    }
+
     if (request.tools?.length) {
       body.tools = request.tools.map((tool) => ({
         type: "function",
@@ -401,7 +444,12 @@ export function createProvider(settings: ProviderSettings = {}): ProviderSelecti
   }
 
   return {
-    provider: new OpenAICompatibleProvider({ baseUrl, apiKey: settings.apiKey, model }),
+    provider: new OpenAICompatibleProvider({
+      baseUrl,
+      apiKey: settings.apiKey,
+      model,
+      reasoningEfforts: reasoningEffortsFor(kind, model),
+    }),
     fallback: false,
   }
 }

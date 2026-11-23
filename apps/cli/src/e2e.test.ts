@@ -142,6 +142,13 @@ describe("client/server e2e", () => {
       await client.setPermissionMode("confirm")
       await expect(client.health()).resolves.toMatchObject({
         permissionMode: "confirm",
+        reasoningEffort: "auto",
+        reasoningEfforts: [],
+      })
+
+      await client.setReasoningEffort("high")
+      await expect(client.health()).resolves.toMatchObject({
+        reasoningEffort: "high",
       })
     } finally {
       client.close()

@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto"
 
 import type { SessionStore } from "@opencontinue/core"
-import type { ChatMessage, ChatProvider, ToolCall } from "@opencontinue/providers"
+import type {
+  ChatMessage,
+  ChatProvider,
+  ReasoningEffort,
+  ToolCall,
+} from "@opencontinue/providers"
 import type { PermissionGate, ToolRegistry } from "@opencontinue/tools"
 
 import { projectHistory } from "./history.js"
@@ -21,6 +26,7 @@ export type RunAgentOptions = {
   systemPrompt?: string
   signal?: AbortSignal
   maxSteps?: number
+  reasoningEffort?: ReasoningEffort
 }
 
 /**
@@ -50,6 +56,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
         messages: history,
         tools: tools.definitions(),
         signal,
+        reasoningEffort: options.reasoningEffort,
       })) {
         if (event.type === "text") {
           text += event.text

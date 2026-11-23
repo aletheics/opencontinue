@@ -1,6 +1,7 @@
 import {
   SessionEvent as SessionEventSchema,
   type PermissionMode,
+  type ReasoningEffort,
   type SessionEvent,
   type SessionSnapshot,
   type SessionSummary,
@@ -24,7 +25,12 @@ export type SessionSubscription = {
 
 export interface OpenContinueClient {
   readonly baseUrl: string
-  health(): Promise<{ ok: boolean; permissionMode?: PermissionMode }>
+  health(): Promise<{
+    ok: boolean
+    permissionMode?: PermissionMode
+    reasoningEffort?: ReasoningEffort
+    reasoningEfforts?: readonly ReasoningEffort[]
+  }>
   listSessions(): Promise<SessionSummary[]>
   createSession(title?: string): Promise<SessionSnapshot>
   getSession(sessionId: string): Promise<SessionSnapshot>
@@ -39,6 +45,8 @@ export interface OpenContinueClient {
   setPermissionMode?(mode: PermissionMode): Promise<void> | void
   /** Remember one tool for the current session, when the transport supports it. */
   allowToolForSession?(sessionId: string, tool: string): Promise<void> | void
+  /** Change the provider reasoning effort when the transport supports it. */
+  setReasoningEffort?(effort: ReasoningEffort): Promise<void> | void
   subscribe(
     sessionId: string,
     after: number,
@@ -105,8 +113,20 @@ export class HttpSessionClient implements OpenContinueClient {
     this.reconnectDelayMs = Math.max(10, options.reconnectDelayMs ?? 500)
   }
 
-  async health(): Promise<{ ok: boolean; permissionMode?: PermissionMode }> {
+  async health(): Promise<{
+    ok: boolean
+    permissionMode?: PermissionMode
+    reasoningEffort?: ReasoningEffort
+    reasoningEfforts?: readonly ReasoningEffort[]
+  }> {
     return this.request("/health")
+  }
+
+  async setReasoningEffort(effort: ReasoningEffort): Promise<void> {
+    await this.request("/v1/reasoning", {
+      method: "POST",
+      body: JSON.stringify({ effort }),
+    })
   }
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {

@@ -24,7 +24,11 @@ import {
   type ChatProvider,
   type ProviderPreset,
 } from "@opencontinue/providers"
-import type { SessionEvent, SessionSummary } from "@opencontinue/protocol"
+import type {
+  ReasoningEffort,
+  SessionEvent,
+  SessionSummary,
+} from "@opencontinue/protocol"
 import { listWorkspaceFiles } from "@opencontinue/tools"
 
 import {
@@ -107,6 +111,12 @@ export function App({ options }: { options: TuiOptions }) {
   const [permissionMode, setPermissionMode] = useState<PermissionMode>(
     configuredMode ?? "confirm",
   )
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
+    initial.reasoningEffort ?? "auto",
+  )
+  const [reasoningLevels, setReasoningLevels] = useState<
+    readonly ReasoningEffort[]
+  >([])
   const workspace = useMemo(() => process.env.INIT_CWD ?? process.cwd(), [])
   const workspaceStatus = useMemo(() => workspaceInfo(workspace), [workspace])
   const [screen, setScreen] = useState<Screen>(options.url ? "loading" : "provider")
@@ -423,6 +433,53 @@ export function App({ options }: { options: TuiOptions }) {
       })
   }
 
+  const applyClientCapabilities = (result: {
+    permissionMode?: PermissionMode
+    reasoningEffort?: ReasoningEffort
+    reasoningEfforts?: readonly ReasoningEffort[]
+  }) => {
+    if (result.permissionMode) {
+      setPermissionMode(result.permissionMode)
+      permissionModeRef.current = result.permissionMode
+    }
+
+    const levels = result.reasoningEfforts ?? []
+    setReasoningLevels(levels)
+    if (result.reasoningEffort) {
+      setReasoningEffort(
+        levels.length === 0 || levels.includes(result.reasoningEffort)
+          ? result.reasoningEffort
+          : "auto",
+      )
+    }
+  }
+
+  const cycleReasoning = () => {
+    if (reasoningLevels.length === 0) {
+      appendSystem(
+        "Reasoning effort is not supported by the active provider/model.",
+      )
+      return
+    }
+
+    const index = reasoningLevels.indexOf(reasoningEffort)
+    const next =
+      reasoningLevels[(index + 1) % reasoningLevels.length] ?? "auto"
+    const client = clientRef.current
+    if (!client?.setReasoningEffort) return
+
+    void Promise.resolve(client.setReasoningEffort(next))
+      .then(() => {
+        saveProviderConfig({ reasoningEffort: next })
+        setReasoningEffort(next)
+      })
+      .catch((error) => {
+        appendSystem(
+          `Could not change reasoning effort: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      })
+  }
+
   const appendSystem = (text: string) => {
     setTimeline((items) => [
       ...items,
@@ -515,11 +572,7 @@ export function App({ options }: { options: TuiOptions }) {
 
     void client
       .health()
-      .then((result) => {
-        if (!result.permissionMode) return
-        setPermissionMode(result.permissionMode)
-        permissionModeRef.current = result.permissionMode
-      })
+      .then(applyClientCapabilities)
       .catch(() => {})
   }
 
@@ -536,6 +589,7 @@ export function App({ options }: { options: TuiOptions }) {
       provider,
       workspace,
       permissionMode: configuredMode,
+      reasoningEffort: initial.reasoningEffort ?? "auto",
     })
 
     void (async () => {
@@ -723,6 +777,9 @@ export function App({ options }: { options: TuiOptions }) {
       case "/mode":
         cycleMode()
         return true
+      case "/reasoning":
+        cycleReasoning()
+        return true
       case "/status": {
         const tokens = timeline.reduce(
           (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
@@ -776,6 +833,7 @@ export function App({ options }: { options: TuiOptions }) {
       const existing = clientRef.current
       if (existing instanceof LocalSessionClient) {
         existing.setProvider(provider)
+        void existing.health().then(applyClientCapabilities).catch(() => {})
         setScreen("chat")
         return
       }
@@ -1046,6 +1104,17 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (
+      (character === "R" || (key.shift && character.toLowerCase() === "r")) &&
+      input.length === 0 &&
+      !busy &&
+      !menuOpen &&
+      !fileMenuOpen
+    ) {
+      cycleReasoning()
+      return
+    }
+
     if (key.ctrl && character === "r") {
       startHistorySearch()
       return
@@ -1203,10 +1272,10 @@ export function App({ options }: { options: TuiOptions }) {
 
   const modeText =
     permissionMode === "auto"
-      ? `${glyphs.auto} Auto · no per-action prompts · shift+tab to cycle`
+      ? `${glyphs.auto} Auto · shift+tab`
       : permissionMode === "plan"
-        ? `${glyphs.plan} Plan · read-only · shift+tab to cycle`
-        : `${glyphs.confirm} Confirm · approve writes/bash · shift+tab to cycle`
+        ? `${glyphs.plan} Plan · read-only · shift+tab`
+        : `${glyphs.confirm} Confirm · shift+tab`
 
   const menuHint = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
@@ -1241,7 +1310,12 @@ export function App({ options }: { options: TuiOptions }) {
   const durationText =
     lastDurationMs !== null ? formatDuration(lastDurationMs) : undefined
   const tokenText = totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : undefined
+  const reasoningText =
+    reasoningLevels.length > 0
+      ? `Reasoning: ${reasoningEffort.charAt(0).toUpperCase()}${reasoningEffort.slice(1)}`
+      : undefined
   const rightStatus = [
+    reasoningText,
     workspaceStatus.name,
     workspaceStatus.branch,
     `model: ${options.url ? "remote" : model}`,
@@ -1251,7 +1325,7 @@ export function App({ options }: { options: TuiOptions }) {
   ]
     .filter(Boolean)
     .join(" · ")
-    .slice(0, Math.max(0, Math.floor(columns / 2)))
+    .slice(0, Math.max(0, columns - footerLeft.length - 2))
 
   const pickerWindow = Math.max(4, Math.min(12, rows - 6))
   const rule = "─".repeat(Math.max(1, columns))

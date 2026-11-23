@@ -342,6 +342,13 @@ Provider compatibility requirements:
 Show the effective setting only when known. If unsupported, omit the
 reasoning label rather than showing a misleading default.
 
+Implementation: `reasoningEffortsFor(provider, model)` advertises levels
+only for OpenAI-compatible models that document `reasoning_effort`
+(o-series, GPT-5, GPT-6). `auto` sends no parameter. The TUI reads the
+effective level and supported levels from `health()`, persists the user's
+choice in `~/.opencontinue/config.json`, and hides the control when the
+list is empty. Anthropic extended-thinking budgets remain future work.
+
 ## 7. Task workflow and progress
 
 Use a lightweight timeline for meaningful multi-step work:
@@ -612,10 +619,11 @@ Architecture rules:
 
 ### P2 --- Add provider-aware controls
 
--   [ ] Define provider capability metadata for reasoning effort.
--   [ ] Add Auto / Low / Medium / High / Max only where supported.
--   [ ] Show unsupported capability states honestly.
--   [ ] Add the reasoning shortcut if conflict-free.
+-   [x] Define provider capability metadata for reasoning effort.
+-   [x] Add Auto / Low / Medium / High / Max only where supported.
+-   [x] Show unsupported capability states honestly.
+-   [x] Add the reasoning shortcut if conflict-free. `Shift+R` cycles
+    when the prompt is empty; `/reasoning` is the discoverable command.
 
 ### P3 --- Deepen OpenContinue's identity
 

@@ -4,7 +4,10 @@ import { HELP_TEXT, matchSlashCommands, SLASH_COMMANDS } from "./commands.js"
 
 describe("slash commands", () => {
   it("matches a bare prefix", () => {
-    expect(matchSlashCommands("/re").map((command) => command.name)).toEqual(["/resume"])
+    expect(matchSlashCommands("/re").map((command) => command.name)).toEqual([
+      "/resume",
+      "/reasoning",
+    ])
   })
 
   it("lists commands for a bare slash and closes on arguments", () => {

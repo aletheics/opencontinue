@@ -10,6 +10,10 @@ export type EventSeq = z.infer<typeof EventSeq>
 export const PermissionMode = z.enum(["plan", "confirm", "auto"])
 export type PermissionMode = z.infer<typeof PermissionMode>
 
+/** Provider reasoning effort. `auto` sends no provider parameter. */
+export const ReasoningEffort = z.enum(["auto", "low", "medium", "high", "max"])
+export type ReasoningEffort = z.infer<typeof ReasoningEffort>
+
 const eventBase = {
   sessionId: SessionId,
   seq: EventSeq,

@@ -97,6 +97,8 @@ export function toAnthropicMessages(messages: ChatMessage[]): {
 export class AnthropicProvider implements ChatProvider {
   readonly id = "anthropic"
   readonly model: string
+  /** Extended-thinking budgets are not implemented yet; hide the control. */
+  readonly reasoningEfforts = [] as const
   private readonly client: Anthropic
 
   constructor(options: AnthropicOptions) {

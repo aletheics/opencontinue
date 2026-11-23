@@ -3,6 +3,12 @@ import os from "node:os"
 import path from "node:path"
 
 export type PermissionModeSetting = "plan" | "confirm" | "auto"
+export type ReasoningEffortSetting =
+  | "auto"
+  | "low"
+  | "medium"
+  | "high"
+  | "max"
 
 export type ProviderConfig = {
   provider?: string
@@ -10,6 +16,23 @@ export type ProviderConfig = {
   model?: string
   /** Last execution mode chosen in the TUI. */
   permissionMode?: PermissionModeSetting
+  /** Last reasoning effort chosen in the TUI. */
+  reasoningEffort?: ReasoningEffortSetting
+}
+
+export function normalizeReasoningEffortSetting(
+  value: unknown,
+): ReasoningEffortSetting | undefined {
+  if (
+    value === "auto" ||
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "max"
+  ) {
+    return value
+  }
+  return undefined
 }
 
 export function normalizePermissionModeSetting(
@@ -32,6 +55,7 @@ export type ProviderSettings = {
   apiKey?: string
   model?: string
   permissionMode?: PermissionModeSetting
+  reasoningEffort?: ReasoningEffortSetting
 }
 
 export function configHome(): string {
@@ -99,6 +123,9 @@ export function resolveProviderSettings(env: NodeJS.ProcessEnv = process.env): P
   const permissionMode =
     normalizePermissionModeSetting(env.OPENCONTINUE_PERMISSION_MODE) ??
     normalizePermissionModeSetting(config.permissionMode)
+  const reasoningEffort =
+    normalizeReasoningEffortSetting(env.OPENCONTINUE_REASONING_EFFORT) ??
+    normalizeReasoningEffortSetting(config.reasoningEffort)
 
   return {
     provider,
@@ -106,5 +133,6 @@ export function resolveProviderSettings(env: NodeJS.ProcessEnv = process.env): P
     apiKey: env.OPENCONTINUE_API_KEY ?? env.OPENAI_API_KEY ?? providerKey ?? auth.apiKey,
     model: env.OPENCONTINUE_MODEL ?? env.OPENAI_MODEL ?? config.model,
     permissionMode,
+    reasoningEffort,
   }
 }

@@ -2,9 +2,9 @@
 
 **Why:** provider settings and API keys must survive process restarts and stay out of the repository.
 
-**Owns:** `~/.opencontinue/config.json`, `~/.opencontinue/auth.json`, per-provider keys, the last chosen execution mode, env precedence.
+**Owns:** `~/.opencontinue/config.json`, `~/.opencontinue/auth.json`, per-provider keys, the last chosen execution mode and reasoning effort, env precedence.
 
-**Public API:** `loadProviderConfig`, `saveProviderConfig`, `loadAuthConfig`, `saveAuthConfig`, `resolveProviderSettings`, `normalizePermissionModeSetting`.
+**Public API:** `loadProviderConfig`, `saveProviderConfig`, `loadAuthConfig`, `saveAuthConfig`, `resolveProviderSettings`, `normalizePermissionModeSetting`, `normalizeReasoningEffortSetting`.
 
 **Allowed imports:** external packages only.
 
