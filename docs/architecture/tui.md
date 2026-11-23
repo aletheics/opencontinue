@@ -13,7 +13,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 
 ## What OpenContinue adopts
 
-- **Inline OpenContinue transcript**, not a full-screen dashboard. The startup header follows `TUI-DESIGN.md`: `◈ OpenContinue` with a dim version, the tagline, aligned `Model` / `Provider` / `Workspace` rows (long paths shorten from the middle), and `· Ready. What are we building today?`. A saved provider/model auto-starts chat, while a first run shows the picker.
+- **Inline OpenContinue transcript**, not a full-screen dashboard. The startup header is two compact lines: `◈ OpenContinue  v0.0.1`, then `model · provider · workspace-basename · branch` in display-cell width. Lower-priority metadata drops on narrow terminals; the full workspace path is in `/status`. The tagline appears only on the first-run provider picker. A saved provider/model auto-starts chat.
 - The status line always names the active execution mode. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
 - No header bar, no bordered transcript, no bordered input, no bordered permission prompt. Modal screens (provider/model/session pickers, setup) may use separation, but the chat surface stays borderless.
 - Task panel: the model maintains a `todo` list (read capability, no approval). The TUI projects the newest valid list above the prompt as `◈ Tasks · done/total`, with `✓` completed (green), `▸` in progress (working blue), and `○` pending (dim). Todo tool calls are not rendered as transcript blocks; the panel survives run completion and is rebuilt from the durable timeline on resume.

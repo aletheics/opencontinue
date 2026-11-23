@@ -344,11 +344,11 @@ Do not implement every feature at once. Ship one vertical slice at a time.
 
 ### P1 — Establish the visual system
 
-- [ ] Implement centralized Copper theme tokens.
-- [ ] Apply semantic colors consistently.
-- [ ] Refine header to two compact lines.
-- [ ] Keep user message highlight subtle and assistant response unboxed.
-- [ ] Ensure composer, approval prompt, and transcript have distinct visual roles.
+- [x] Implement centralized Copper theme tokens.
+- [x] Apply semantic colors consistently.
+- [x] Refine header to two compact lines.
+- [x] Keep user message highlight subtle and assistant response unboxed.
+- [x] Ensure composer, approval prompt, and transcript have distinct visual roles.
 
 ### P2 — Event-driven activity and spinner
 

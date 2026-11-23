@@ -21,7 +21,9 @@ describe("assistant markdown", () => {
 
     expect(plain).toContain("Title")
     expect(lines.find((line) => line.text === "Title")?.bold).toBe(true)
-    expect(lines.find((line) => line.text === "Title")?.color).toBe("white")
+    expect(lines.find((line) => line.text === "Title")?.color).toBe(
+      theme.assistant,
+    )
     expect(plain).toContain("- first")
     expect(plain).toContain("1. second")
     expect(plain).toContain("▎ quote")

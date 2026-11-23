@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { theme } from "../../theme.js"
 import { diffStats, formatDiffLines } from "./diff.js"
 
 describe("diff", () => {
@@ -19,7 +20,11 @@ describe("diff", () => {
     expect(plain).toContain("+new")
     expect(plain).toContain("-old")
     expect(plain).toContain("@@ -1 +1 @@")
-    expect(lines.find((line) => line.text === "+new")?.color).toBe("green")
-    expect(lines.find((line) => line.text === "-old")?.color).toBe("red")
+    expect(lines.find((line) => line.text === "+new")?.color).toBe(
+      theme.diffAdd,
+    )
+    expect(lines.find((line) => line.text === "-old")?.color).toBe(
+      theme.diffRemove,
+    )
   })
 })

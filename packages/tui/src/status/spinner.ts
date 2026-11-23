@@ -46,8 +46,8 @@ export const SPINNER_TIPS = [
 ] as const
 
 const COLORS = {
-  working: { r: 96, g: 165, b: 250 },
-  danger: { r: 239, g: 68, b: 68 },
+  working: { r: 217, g: 174, b: 98 },
+  danger: { r: 217, g: 118, b: 124 },
 } as const
 
 const STATUS_AFTER_MS = 30_000
@@ -101,7 +101,7 @@ export function rgbColor(color: Rgb): string {
   return `rgb(${color.r},${color.g},${color.b})`
 }
 
-/** Interpolates the spinner tint from working blue to danger red. */
+/** Interpolates the spinner tint from copper amber to error red. */
 export function stallTint(intensity: number): string {
   return rgbColor(interpolateRgb(COLORS.working, COLORS.danger, intensity))
 }

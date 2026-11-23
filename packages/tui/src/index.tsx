@@ -44,6 +44,7 @@ import { formatPermissions } from "./permissions/format.js"
 import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
 import type { PermissionMode } from "./permissions/types.js"
 import { useTerminalSize } from "./hooks/use-terminal-size.js"
+import { TAGLINE } from "./brand.js"
 import { glyphs } from "./glyphs.js"
 import { LineText } from "./components/LineText.js"
 import { Picker } from "./components/Picker.js"
@@ -542,6 +543,7 @@ export function App({ options }: { options: TuiOptions }) {
         model: bannerModel,
         provider: bannerProvider,
         workspace,
+        branch: workspaceStatus.branch ?? undefined,
       },
     ])
     setTranscriptKey((key) => key + 1)
@@ -1514,17 +1516,28 @@ export function App({ options }: { options: TuiOptions }) {
   const screenBody = (() => {
     if (screen === "provider") {
       return (
-        <Picker
-          header={`Select a provider${providerQuery ? ` · /${providerQuery}/` : ""} (${providerIndex + 1}/${filteredProviders.length})`}
+        <>
+          <Text wrap="truncate">
+            <Text color={theme.brand}>{glyphs.brand}</Text>
+            <Text bold> OpenContinue</Text>
+            <Text color={theme.textMuted}>{"  "}v{VERSION}</Text>
+          </Text>
+          <Text color={theme.textSecondary} wrap="truncate">
+            {TAGLINE}
+          </Text>
+          <Box height={1} />
+          <Picker
+            header={`Select a provider${providerQuery ? ` · /${providerQuery}/` : ""} (${providerIndex + 1}/${filteredProviders.length})`}
           items={filteredProviders.map((item) => ({
             key: item.id,
             label: item.label,
             note: item.note,
           }))}
-          selectedIndex={providerIndex}
-          windowSize={pickerWindow}
-          emptyText={`No providers match “${providerQuery}”`}
-        />
+            selectedIndex={providerIndex}
+            windowSize={pickerWindow}
+            emptyText={`No providers match “${providerQuery}”`}
+          />
+        </>
       )
     }
 

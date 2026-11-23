@@ -2,6 +2,9 @@
 
 > **Status:** Proposed design specification\
 > **Version:** 0.1\
+> **Note:** [TUI-DESIGN-IMPLEMENTATION.md](TUI-DESIGN-IMPLEMENTATION.md)
+> v0.2 supersedes the visual tokens, header, footer, and spinner
+> presentation in this document.\
 > **Audience:** OpenContinue maintainers and contributors\
 > **Product principle:** Keep the terminal interface quiet, fast,
 > keyboard-first, and trustworthy.

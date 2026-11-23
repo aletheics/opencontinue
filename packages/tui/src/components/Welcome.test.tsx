@@ -1,20 +1,21 @@
 import { render } from "ink-testing-library"
 import { describe, expect, it } from "vitest"
 
-import { shortenPath, Welcome } from "./Welcome.js"
+import { Welcome } from "./Welcome.js"
 
 function plain(frame: string | undefined): string {
   return (frame ?? "").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
 }
 
 describe("Welcome", () => {
-  it("renders the OpenContinue brand header", () => {
+  it("renders the two-line compact header", () => {
     const { lastFrame } = render(
       <Welcome
         version="0.0.1"
         model="deepseek-flash[1M]"
         provider="DeepSeek"
         workspace={"D:\\soft\\vscodefiles\\opencontinue"}
+        branch="main"
         columns={80}
       />,
     )
@@ -22,26 +23,26 @@ describe("Welcome", () => {
 
     expect(frame).toContain("◈ OpenContinue")
     expect(frame).toContain("v0.0.1")
-    expect(frame).toContain("The open continuum for AI-assisted engineering.")
-    expect(frame).toContain("Model")
-    expect(frame).toContain("deepseek-flash[1M]")
-    expect(frame).toContain("Provider")
-    expect(frame).toContain("DeepSeek")
-    expect(frame).toContain("Workspace")
-    expect(frame).toContain("D:\\soft\\vscodefiles\\opencontinue")
-    expect(frame).toContain("· Ready. What are we building today?")
-    expect(frame).not.toContain("Welcome to")
-    expect(frame).not.toContain("▄█████▄")
+    expect(frame).toContain(
+      "deepseek-flash[1M] · DeepSeek · opencontinue · main",
+    )
+    expect(frame).not.toContain("The open continuum")
+    expect(frame).not.toContain("Model")
+    expect(frame).not.toContain("D:\\soft\\vscodefiles")
   })
 
-  it("shortens a long workspace path from the middle", () => {
-    expect(shortenPath("abcdefghij", 6)).toBe("abc…ij")
-    expect(shortenPath("short", 20)).toBe("short")
-    expect(shortenPath("abcdef", 1)).toBe("…")
-  })
+  it("drops low-priority metadata on narrow terminals", () => {
+    const { lastFrame } = render(
+      <Welcome
+        version="0.0.1"
+        model="deepseek-flash[1M]"
+        provider="DeepSeek"
+        workspace={"D:\\soft\\vscodefiles\\opencontinue"}
+        branch="feature/long-branch"
+        columns={30}
+      />,
+    )
 
-  it("measures CJK paths in display cells", () => {
-    expect(shortenPath("你好世界路径", 10)).toBe("你好…路径")
-    expect(shortenPath("D:\\项目\\alpha", 10)).toBe("D:\\项…lpha")
+    expect(plain(lastFrame())).toContain("deepseek-flash[1M] · DeepSeek")
   })
 })

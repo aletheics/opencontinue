@@ -42,10 +42,10 @@ describe("spinner", () => {
     expect(stallIntensity(9_000, true)).toBe(0)
   })
 
-  it("fades the spinner from working blue to danger red", () => {
-    expect(stallTint(0)).toBe("rgb(96,165,250)")
-    expect(stallTint(0.5)).toBe("rgb(168,117,159)")
-    expect(stallTint(1)).toBe("rgb(239,68,68)")
+  it("fades the spinner from copper amber to error red", () => {
+    expect(stallTint(0)).toBe("rgb(217,174,98)")
+    expect(stallTint(0.5)).toBe("rgb(217,146,111)")
+    expect(stallTint(1)).toBe("rgb(217,118,124)")
   })
 
   it("sweeps a shimmer highlight across the message", () => {

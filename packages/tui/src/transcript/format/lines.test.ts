@@ -1,6 +1,7 @@
 import type { TimelineItem } from "../../timeline.js"
 import { describe, expect, it } from "vitest"
 
+import { theme } from "../../theme.js"
 import { timelineLines } from "./lines.js"
 
 describe("timeline lines", () => {
@@ -11,7 +12,7 @@ describe("timeline lines", () => {
     ]
     const lines = timelineLines(items, 40, false)
     expect(lines.map((line) => line.text)).toEqual(["› hello", "● hi there"])
-    expect(lines[0]?.color).toBe("white")
+    expect(lines[0]?.color).toBe(theme.assistant)
   })
 
   it("indents assistant continuation lines", () => {
@@ -48,10 +49,14 @@ describe("timeline lines", () => {
     const lines = timelineLines([tool], 60, false)
     expect(lines[0]?.text).toContain("Edit(src/app.ts)")
     expect(
-      lines.some((line) => line.text.endsWith("+new") && line.color === "green"),
+      lines.some(
+        (line) => line.text.endsWith("+new") && line.color === theme.diffAdd,
+      ),
     ).toBe(true)
     expect(
-      lines.some((line) => line.text.endsWith("-old") && line.color === "red"),
+      lines.some(
+        (line) => line.text.endsWith("-old") && line.color === theme.diffRemove,
+      ),
     ).toBe(true)
   })
 

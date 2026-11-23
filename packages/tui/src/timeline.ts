@@ -54,6 +54,7 @@ export type BannerTimelineItem = {
   model: string
   provider: string
   workspace: string
+  branch?: string
 }
 
 export type TimelineItem =

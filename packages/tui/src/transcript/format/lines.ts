@@ -1,5 +1,6 @@
-import { PRODUCT_NAME, READY_LINE, TAGLINE } from "../../brand.js"
+import { PRODUCT_NAME } from "../../brand.js"
 import { glyphs } from "../../glyphs.js"
+import { headerMeta } from "../../header.js"
 import { theme } from "../../theme.js"
 import type { TimelineItem } from "../../timeline.js"
 import { assistantBlock } from "./assistant.js"
@@ -29,16 +30,21 @@ export function timelineLines(
         text: title,
         color: theme.assistant,
         spans: [
-          { text: glyphs.brand, color: theme.brandMark },
+          { text: glyphs.brand, color: theme.brand },
           { text: ` ${PRODUCT_NAME}`, bold: true },
           { text: `  v${item.version}`, dim: true },
         ],
       })
-      lines.push({ text: TAGLINE, dim: true })
-      lines.push({ text: `Model       ${item.model}`, dim: true })
-      lines.push({ text: `Provider    ${item.provider}`, dim: true })
-      lines.push({ text: `Workspace   ${item.workspace}`, dim: true })
-      lines.push({ text: `${glyphs.ready} ${READY_LINE}`, dim: true })
+      lines.push({
+        text: headerMeta(
+          item.model,
+          item.provider,
+          item.workspace,
+          item.branch,
+          width,
+        ),
+        color: theme.textSecondary,
+      })
       lines.push({ text: "", dim: true })
       continue
     }
