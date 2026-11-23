@@ -114,8 +114,7 @@ Rules:
 - [x] `packages/local-client`: in-process transport behind the same contract, including replay and permission events.
 - [x] Client/server e2e: real server + client + echo provider creates, streams, and lists a session; abort is covered over both transports.
 - [x] `opencontinue doctor`: Node, workspace, git, config, auth, provider, sessions, optional server/network checks.
-- [x] TUI uses the client contract through `LocalSessionClient`.
-- [ ] TUI `--url` selection through `HttpSessionClient`.
+- [x] TUI uses the client contract through `LocalSessionClient`, with `--url` selecting `HttpSessionClient`.
 - [ ] Minimal web client over the same SSE stream.
 - Out of scope: full IDE features.
 

@@ -312,6 +312,7 @@ async function startTui(options: {
   auto?: boolean
   readonly?: boolean
   resume?: string
+  url?: string
 }): Promise<void> {
   if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
   if (!process.stdin.isTTY) {
@@ -354,8 +355,13 @@ program
   .action(async (prompt: string | undefined, options: ChatOptions) => {
     if (options.auto && options.readonly) throw new Error("--auto and --readonly cannot be combined")
     if (options.print || prompt) await printOnce(prompt ?? "", options)
-    else if (process.stdin.isTTY && !options.url) {
-      await startTui({ auto: options.auto, readonly: options.readonly, resume: options.resume })
+    else if (process.stdin.isTTY) {
+      await startTui({
+        auto: options.auto,
+        readonly: options.readonly,
+        resume: options.resume,
+        url: options.url,
+      })
     } else await chat(options)
   })
 
@@ -379,6 +385,7 @@ program
       auto: Boolean(program.opts().auto),
       readonly: Boolean(program.opts().readonly),
       resume: program.opts().resume as string | undefined,
+      url: program.opts().url as string | undefined,
     }),
   )
 

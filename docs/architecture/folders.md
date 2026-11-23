@@ -56,7 +56,7 @@ Apps can compose packages. Packages never import apps. The boundary test enforce
 
 These are deliberate next steps, not accidents:
 
-1. **TUI HTTP mode is not wired.** The TUI now runs on `LocalSessionClient` behind `OpenContinueClient`; the remaining client boundary is `--url`/`HttpSessionClient` selection.
+1. **Remote TUI still uses local workspace services.** `--url` shares sessions and runs through `HttpSessionClient`, but `@file` completion still scans the local workspace; a workspace/files endpoint is the next boundary.
 2. **Checks live in `apps/cli`.** When checks need a web or CI UI, extract `packages/checks` with the worktree/patch domain.
 3. **No web or desktop app yet.** When added, they are `apps/web` and `apps/desktop`, composed from `packages/client` and shared UI packages.
 4. **No generated SDK yet.** `packages/protocol` is the source; generated bindings come after the hand-written client contract stabilizes.

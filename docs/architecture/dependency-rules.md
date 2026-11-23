@@ -51,4 +51,4 @@ apps/cli ──> packages/tui ──> packages/client ──> protocol
     └──> apps/server ──> packages/runtime
 ```
 
-The TUI now consumes `OpenContinueClient` through `LocalSessionClient`. Next, add `--url` selection with `HttpSessionClient`; `apps/web` and `apps/desktop` use the HTTP client directly. Cross-client continuity becomes a protocol feature instead of a per-client implementation.
+The TUI consumes `OpenContinueClient`, using `LocalSessionClient` by default and `HttpSessionClient` with `--url`. Next, `apps/web` and `apps/desktop` use the HTTP client directly, and remote workspace services replace local-only `@file` scanning. Cross-client continuity is now a protocol feature instead of a per-client implementation.

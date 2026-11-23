@@ -12,6 +12,7 @@ import {
   saveProviderConfig,
 } from "@opencontinue/config"
 import {
+  HttpSessionClient,
   type OpenContinueClient,
   type SessionSubscription,
 } from "@opencontinue/client"
@@ -52,6 +53,7 @@ export type TuiOptions = {
   auto?: boolean
   readonly?: boolean
   resume?: string
+  url?: string
 }
 
 type Screen =
@@ -189,7 +191,7 @@ export function App({ options }: { options: TuiOptions }) {
   const initial = useMemo(() => resolveProviderSettings(), [])
   const workspace = useMemo(() => process.env.INIT_CWD ?? process.cwd(), [])
   const workspaceStatus = useMemo(() => workspaceInfo(workspace), [workspace])
-  const [screen, setScreen] = useState<Screen>("provider")
+  const [screen, setScreen] = useState<Screen>(options.url ? "loading" : "provider")
   const [providerIndex, setProviderIndex] = useState(() => initialProviderIndex(initial.provider))
   const [providerQuery, setProviderQuery] = useState("")
   const [preset, setPreset] = useState<ProviderPreset | null>(null)
@@ -564,6 +566,33 @@ export function App({ options }: { options: TuiOptions }) {
     subscriptionRef.current = subscription
   }
 
+  useEffect(() => {
+    if (!options.url) return
+    const client = new HttpSessionClient({ baseUrl: options.url })
+
+    void (async () => {
+      let sessionId = options.resume
+      if (sessionId) {
+        try {
+          await client.getSession(sessionId)
+        } catch {
+          sessionId = undefined
+        }
+      }
+      const session = sessionId
+        ? { id: sessionId }
+        : await client.createSession("OpenContinue TUI")
+      attachSession(client, session.id)
+      setModel("remote")
+      setScreen("chat")
+    })().catch((cause) => {
+      setError(cause instanceof Error ? cause.message : String(cause))
+      setScreen("error")
+    })
+
+    return () => client.close()
+  }, [])
+
   const clearSession = () => {
     const client = clientRef.current
     if (!client) return
@@ -634,6 +663,10 @@ export function App({ options }: { options: TuiOptions }) {
         clearSession()
         return true
       case "/model":
+        if (options.url) {
+          appendSystem("Model and provider are managed by the remote server.")
+          return true
+        }
         setModelQuery("")
         setModelIndex(Math.max(0, models.indexOf(model)))
         if (models.length === 0) {
@@ -645,6 +678,10 @@ export function App({ options }: { options: TuiOptions }) {
         }
         return true
       case "/provider":
+        if (options.url) {
+          appendSystem("Model and provider are managed by the remote server.")
+          return true
+        }
         setProviderQuery("")
         setProviderIndex(initialProviderIndex(preset?.id ?? initial.provider))
         setScreen("provider")
@@ -665,7 +702,7 @@ export function App({ options }: { options: TuiOptions }) {
           [
             `session: ${sessionRef.current ?? "-"}`,
             `provider: ${preset?.label ?? "-"}`,
-            `model: ${model}`,
+            `model: ${options.url ? "remote" : model}`,
             `mode: ${permissionMode}`,
             `tokens: ${tokens}`,
             `workspace: ${workspace}`,
@@ -1138,7 +1175,7 @@ export function App({ options }: { options: TuiOptions }) {
   const rightStatus = [
     workspaceStatus.name,
     workspaceStatus.branch,
-    `model: ${model}`,
+    `model: ${options.url ? "remote" : model}`,
     durationText,
     tokenText,
   ]
@@ -1236,7 +1273,9 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen === "loading") {
       return (
         <Text wrap="truncate">
-          Loading {preset?.label ?? "provider"} models…
+          {options.url
+            ? "Connecting to the OpenContinue server…"
+            : `Loading ${preset?.label ?? "provider"} models…`}
         </Text>
       )
     }

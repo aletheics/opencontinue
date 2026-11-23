@@ -7,6 +7,8 @@ import path from "node:path"
 
 import { saveAuthConfig, saveProviderConfig } from "@opencontinue/config"
 import { createSessionStore } from "@opencontinue/core"
+import { EchoProvider } from "@opencontinue/providers"
+import { closeServer, startServer } from "@opencontinue/server"
 import { render } from "ink-testing-library"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -659,6 +661,42 @@ describe("TUI", () => {
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("runs against a remote server with --url", async () => {
+    const store = createSessionStore({ workspace: home })
+    const running = startServer({
+      store,
+      provider: new EchoProvider(),
+      port: 0,
+      workspace: home,
+      permissionMode: "readonly",
+    })
+    const server = running.server as unknown as http.Server
+    if (!server.listening) await once(server, "listening")
+    const address = server.address() as AddressInfo
+
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ url: `http://127.0.0.1:${address.port}` }} />,
+    )
+
+    try {
+      await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), {
+        timeout: 5000,
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("hello")
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ hello"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(output(frames)).toContain("Echo: hello"), {
+        timeout: 5000,
+      })
+    } finally {
+      unmount()
+      await closeServer(running.server)
+      store.close()
     }
   }, 20000)
 

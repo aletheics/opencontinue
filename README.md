@@ -65,6 +65,7 @@ OPENCONTINUE_MODEL=gpt-6.2
 opencontinue                    # TUI
 onc                             # same, shorter
 opencontinue --auto -p "fix tests"
+opencontinue --url http://127.0.0.1:8787   # attach the TUI to a server
 opencontinue --readonly -p "review"
 opencontinue check --base main
 opencontinue serve --port 8787
