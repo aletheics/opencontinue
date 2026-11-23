@@ -1,4 +1,12 @@
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 
@@ -108,6 +116,29 @@ describe("tools", () => {
     await expect(readTool.execute({ path: "../outside.txt" }, context(workspace))).rejects.toThrow(
       /outside the workspace/,
     )
+  })
+
+  it("refuses a symlink or junction that escapes the workspace", async () => {
+    const workspace = await makeWorkspace()
+    const outside = await mkdtemp(path.join(os.tmpdir(), "opencontinue-outside-"))
+    temporary.push(outside)
+    await writeFile(path.join(outside, "secret.txt"), "secret\n")
+
+    await symlink(
+      outside,
+      path.join(workspace, "escape"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
+
+    await expect(
+      readTool.execute({ path: "escape/secret.txt" }, context(workspace)),
+    ).rejects.toThrow(/outside the workspace/)
+    await expect(
+      writeTool.execute(
+        { path: "escape/new.txt", content: "x" },
+        context(workspace),
+      ),
+    ).rejects.toThrow(/outside the workspace/)
   })
 
   it("finds files and greps contents", async () => {

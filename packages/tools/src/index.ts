@@ -79,13 +79,46 @@ const MAX_GLOB = 500
 const MAX_GREP = 200
 const MAX_SEARCH_FILE_BYTES = 512_000
 
-function resolveInside(workspace: string, inputPath: string): string {
-  const root = path.resolve(workspace)
+function missingFile(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  return code === "ENOENT" || code === "ENOTDIR"
+}
+
+/**
+ * Confine a path to the workspace, including symlinks/junctions. The lexical
+ * check runs first; then the nearest existing ancestor (or the target itself
+ * when it exists) is resolved with realpath so a link cannot escape.
+ */
+async function resolveInside(
+  workspace: string,
+  inputPath: string,
+): Promise<string> {
+  const root = await fs.realpath(path.resolve(workspace))
   const target = path.resolve(root, inputPath)
   const relative = path.relative(root, target)
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error(`Path is outside the workspace: ${inputPath}`)
   }
+
+  let probe = target
+  for (;;) {
+    try {
+      const real = await fs.realpath(probe)
+      const inside = path.relative(root, real)
+      if (inside.startsWith("..") || path.isAbsolute(inside)) {
+        throw new Error(`Path is outside the workspace: ${inputPath}`)
+      }
+      break
+    } catch (error) {
+      if (!missingFile(error)) throw error
+      const parent = path.dirname(probe)
+      if (parent === probe) {
+        throw new Error(`Path is outside the workspace: ${inputPath}`)
+      }
+      probe = parent
+    }
+  }
+
   return target
 }
 
@@ -111,7 +144,7 @@ export const readTool: Tool = {
   input: readInput,
   async execute(raw, context) {
     const { path: inputPath, offset = 1, limit = MAX_READ_LINES } = readInput.parse(raw)
-    const target = resolveInside(context.workspace, inputPath)
+    const target = await resolveInside(context.workspace, inputPath)
     const stat = await fs.stat(target)
 
     if (stat.isDirectory()) {
@@ -145,14 +178,14 @@ export const writeTool: Tool = {
   input: writeInput,
   async preview(raw, context) {
     const { path: inputPath, content } = writeInput.parse(raw)
-    const target = resolveInside(context.workspace, inputPath)
+    const target = await resolveInside(context.workspace, inputPath)
     const before = await fs.readFile(target, "utf8").catch(() => "")
     const diff = createTwoFilesPatch(inputPath, inputPath, before, content, "", "")
     return { detail: inputPath, diff: diff.trim() ? diff : undefined }
   },
   async execute(raw, context) {
     const { path: inputPath, content } = writeInput.parse(raw)
-    const target = resolveInside(context.workspace, inputPath)
+    const target = await resolveInside(context.workspace, inputPath)
     const before = await fs.readFile(target, "utf8").catch(() => "")
     await fs.mkdir(path.dirname(target), { recursive: true })
     await fs.writeFile(target, content, "utf8")
@@ -215,7 +248,7 @@ export const editTool: Tool = {
     const { path: inputPath, oldString, newString, replaceAll = false } = editInput.parse(raw)
     if (!oldString || oldString === newString) return { detail: inputPath }
 
-    const target = resolveInside(context.workspace, inputPath)
+    const target = await resolveInside(context.workspace, inputPath)
     const content = await fs.readFile(target, "utf8")
     const replacement = replaceText(content, oldString, newString, replaceAll)
     if (!replacement || (replacement.count > 1 && !replaceAll)) {
@@ -237,7 +270,7 @@ export const editTool: Tool = {
     if (!oldString) throw new Error("oldString must not be empty")
     if (oldString === newString) throw new Error("oldString and newString must differ")
 
-    const target = resolveInside(context.workspace, inputPath)
+    const target = await resolveInside(context.workspace, inputPath)
     const content = await fs.readFile(target, "utf8")
     const replacement = replaceText(content, oldString, newString, replaceAll)
     if (!replacement) throw new Error(`oldString not found in ${inputPath}`)
@@ -271,7 +304,7 @@ export const globTool: Tool = {
   input: globInput,
   async execute(raw, context) {
     const { pattern, path: searchPath = ".", limit = MAX_GLOB } = globInput.parse(raw)
-    const root = resolveInside(context.workspace, searchPath)
+    const root = await resolveInside(context.workspace, searchPath)
     const results: string[] = []
 
     for await (const entry of fs.glob(pattern, {
@@ -311,7 +344,7 @@ export const grepTool: Tool = {
       limit = MAX_GREP,
     } = grepInput.parse(raw)
 
-    const root = resolveInside(context.workspace, searchPath)
+    const root = await resolveInside(context.workspace, searchPath)
     const stat = await fs.stat(root)
 
     const matcher = (() => {
@@ -444,7 +477,7 @@ export const bashTool: Tool = {
   input: bashInput,
   async execute(raw, context) {
     const { command, cwd = ".", timeoutMs = 120_000 } = bashInput.parse(raw)
-    const workdir = resolveInside(context.workspace, cwd)
+    const workdir = await resolveInside(context.workspace, cwd)
 
     if (context.signal?.aborted) throw new Error("Aborted")
 
