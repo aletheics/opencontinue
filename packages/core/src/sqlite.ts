@@ -288,6 +288,7 @@ export class SqliteSessionStore implements SessionStore {
             type: "run.failed",
             runId,
             error: "Recovered after restart",
+            interrupted: true,
           })
         }
       }

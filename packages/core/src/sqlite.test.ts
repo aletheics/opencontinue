@@ -60,7 +60,9 @@ describe("SqliteSessionStore", () => {
 
     const reopened = new SqliteSessionStore(file)
     const events = reopened.events(session.id)
-    expect(events.some((event) => event.type === "run.failed" && event.runId === "r1")).toBe(true)
+    expect(
+      events.find((event) => event.type === "run.failed" && event.runId === "r1"),
+    ).toMatchObject({ interrupted: true })
     expect(reopened.snapshot(session.id)?.messages.at(-1)?.text).toContain("Recovered after restart")
     reopened.close()
   })

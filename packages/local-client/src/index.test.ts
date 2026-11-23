@@ -90,6 +90,7 @@ describe("LocalSessionClient", () => {
     })
     const session = await client.createSession("abort")
     const events: string[] = []
+    let interrupted: boolean | undefined
 
     const failed = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("timed out")), 3000)
@@ -97,6 +98,7 @@ describe("LocalSessionClient", () => {
         events.push(event.type)
         if (event.type === "run.started") void client.abort(session.id)
         if (event.type === "run.failed") {
+          interrupted = event.interrupted
           clearTimeout(timer)
           subscription.close()
           resolve(event.error)
@@ -112,6 +114,7 @@ describe("LocalSessionClient", () => {
     await expect(failed).resolves.toMatch(/abort/i)
     expect(events).toContain("run.started")
     expect(events).toContain("run.failed")
+    expect(interrupted).toBe(true)
     client.close()
   })
 

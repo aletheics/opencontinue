@@ -28,7 +28,7 @@ export type SessionSubscription = {
 
 export interface OpenContinueClient {
   readonly baseUrl: string
-  health(): Promise<{
+  health(sessionId?: string): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
     permissions?: PermissionPolicy
@@ -125,14 +125,17 @@ export class HttpSessionClient implements OpenContinueClient {
     this.token = options.token
   }
 
-  async health(): Promise<{
+  async health(sessionId?: string): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
     permissions?: PermissionPolicy
     reasoningEffort?: ReasoningEffort
     reasoningEfforts?: readonly ReasoningEffort[]
   }> {
-    return this.request("/health")
+    const query = sessionId
+      ? `?sessionId=${encodeURIComponent(sessionId)}`
+      : ""
+    return this.request(`/health${query}`)
   }
 
   async setReasoningEffort(effort: ReasoningEffort): Promise<void> {

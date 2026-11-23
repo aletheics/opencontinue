@@ -23,9 +23,10 @@ export function projectMessages(events: SessionEvent[]): SessionMessage[] {
       continue
     }
     if (event.type === "run.failed") {
+      const label = event.interrupted ? "run interrupted" : "run failed"
       const message = assistants.get(event.runId)
-      if (message) message.text += `\n[run failed: ${event.error}]`
-      else messages.push({ role: "assistant", text: `[run failed: ${event.error}]` })
+      if (message) message.text += `\n[${label}: ${event.error}]`
+      else messages.push({ role: "assistant", text: `[${label}: ${event.error}]` })
     }
   }
 

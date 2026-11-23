@@ -80,11 +80,11 @@ export class LocalSessionClient implements OpenContinueClient {
     this.permissions.setMode(mode)
   }
 
-  allowToolForSession(_sessionId: string, tool: string): void {
-    this.permissions.allowForSession(tool)
+  allowToolForSession(sessionId: string, tool: string): void {
+    this.permissions.allowForSession(sessionId, tool)
   }
 
-  async health(): Promise<{
+  async health(sessionId?: string): Promise<{
     ok: boolean
     permissionMode?: PermissionMode
     permissions?: { allow: string[]; ask: string[]; deny: string[] }
@@ -94,7 +94,7 @@ export class LocalSessionClient implements OpenContinueClient {
     return {
       ok: true,
       permissionMode: this.permissions.getMode(),
-      permissions: this.permissions.getPolicy(),
+      permissions: this.permissions.getPolicy(sessionId),
       reasoningEffort: this.reasoningEffort,
       reasoningEfforts: this.provider.reasoningEfforts ?? [],
     }

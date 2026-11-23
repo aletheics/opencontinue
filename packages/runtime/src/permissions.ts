@@ -90,6 +90,7 @@ export function permissionDetail(name: string, input: unknown): string {
  */
 export class PermissionBroker implements PermissionGate {
   private readonly pending = new Map<string, Pending>()
+  private readonly sessionAllow = new Map<string, Set<string>>()
   private mode: PermissionMode
   private policy: PermissionPolicy
 
@@ -110,18 +111,32 @@ export class PermissionBroker implements PermissionGate {
     return this.mode
   }
 
-  getPolicy(): PermissionPolicy {
+  getPolicy(sessionId?: string): PermissionPolicy {
+    const allow = [...this.policy.allow]
+    if (sessionId) {
+      for (const tool of this.sessionAllow.get(sessionId) ?? []) {
+        if (!allow.includes(tool)) allow.push(tool)
+      }
+    }
     return {
-      allow: [...this.policy.allow],
+      allow,
       ask: [...this.policy.ask],
       deny: [...this.policy.deny],
     }
   }
 
-  /** Remember a tool for the rest of this broker's session. */
-  allowForSession(tool: string): void {
-    if (this.policy.allow.includes(tool)) return
-    this.policy = { ...this.policy, allow: [...this.policy.allow, tool] }
+  /** Remember a tool for one session only. */
+  allowForSession(sessionId: string, tool: string): void {
+    const allowed = this.sessionAllow.get(sessionId) ?? new Set<string>()
+    allowed.add(tool)
+    this.sessionAllow.set(sessionId, allowed)
+  }
+
+  private allowedFor(sessionId: string, tool: string): boolean {
+    return (
+      this.policy.allow.includes(tool) ||
+      this.sessionAllow.get(sessionId)?.has(tool) === true
+    )
   }
 
   async authorize(
@@ -138,7 +153,7 @@ export class PermissionBroker implements PermissionGate {
       return approved ? { approved, reason: "read" } : { approved: false }
     }
 
-    if (this.policy.allow.includes(tool.name)) {
+    if (this.allowedFor(context.sessionId, tool.name)) {
       return { approved: true, reason: "allow" }
     }
 

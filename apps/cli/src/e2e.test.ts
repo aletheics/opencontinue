@@ -238,11 +238,13 @@ describe("client/server e2e", () => {
 
     try {
       const session = await client.createSession("abort")
+      let interrupted: boolean | undefined
       const failed = new Promise<string>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("timed out")), 5000)
         const subscription = client.subscribe(session.id, -1, (event) => {
           if (event.type === "run.started") void client.abort(session.id)
           if (event.type === "run.failed") {
+            interrupted = event.interrupted
             clearTimeout(timer)
             subscription.close()
             resolve(event.error)
@@ -256,6 +258,7 @@ describe("client/server e2e", () => {
 
       await client.sendMessage(session.id, "block")
       await expect(failed).resolves.toMatch(/abort/i)
+      expect(interrupted).toBe(true)
     } finally {
       client.close()
       await closeServer(running.server)

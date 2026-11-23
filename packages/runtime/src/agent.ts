@@ -154,6 +154,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
       type: "run.failed",
       runId,
       error: error instanceof Error ? error.message : String(error),
+      ...(signal?.aborted ? { interrupted: true } : {}),
     })
   }
 }

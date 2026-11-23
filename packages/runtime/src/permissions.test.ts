@@ -120,17 +120,31 @@ describe("PermissionBroker", () => {
       deny: ["bash"],
     })
 
-    broker.allowForSession("edit")
-    expect(broker.getPolicy().allow).toEqual(["read", "edit"])
+    broker.allowForSession("session-a", "edit")
+    expect(broker.getPolicy().allow).toEqual(["read"])
+    expect(broker.getPolicy("session-a").allow).toEqual(["read", "edit"])
+    expect(broker.getPolicy("session-b").allow).toEqual(["read"])
   })
 
-  it("remembers a tool for the session", async () => {
-    const { broker, context } = setup("confirm")
-    broker.allowForSession("write")
+  it("remembers a tool for one session only", async () => {
+    const { store, session, broker, context } = setup("confirm")
+    const other = store.create()
+    const otherContext = { workspace: context.workspace, sessionId: other.id }
+
+    broker.allowForSession(session.id, "write")
     await expect(broker.authorize(writeTool, {}, context)).resolves.toMatchObject({
       approved: true,
       reason: "allow",
     })
+
+    const pending = broker.authorize(writeTool, {}, otherContext)
+    const request = store
+      .events(other.id)
+      .find((event) => event.type === "permission.requested")
+    if (request?.type !== "permission.requested") throw new Error("request missing")
+    broker.resolve(request.requestId, false, other.id)
+    await expect(pending).resolves.toMatchObject({ approved: false })
+    expect(broker.getPolicy(other.id).allow).toEqual([])
   })
 
   it("honors project allow and deny lists", async () => {

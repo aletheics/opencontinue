@@ -18,6 +18,23 @@ describe("MemorySessionStore", () => {
     ])
   })
 
+  it("projects an interrupted run distinctly from a failure", () => {
+    const store = new MemorySessionStore()
+    const session = store.create("test")
+    store.append(session.id, { type: "message.user", text: "hi" })
+    store.append(session.id, { type: "run.started", runId: "r1" })
+    store.append(session.id, {
+      type: "run.failed",
+      runId: "r1",
+      error: "stopped by user",
+      interrupted: true,
+    })
+
+    expect(store.snapshot(session.id)?.messages.at(-1)?.text).toContain(
+      "[run interrupted: stopped by user]",
+    )
+  })
+
   it("replays events after a sequence number", () => {
     const store = new MemorySessionStore()
     const session = store.create()

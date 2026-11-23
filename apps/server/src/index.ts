@@ -106,7 +106,7 @@ export function createApp(
     c.json({
       ok: true,
       permissionMode: permissions.getMode(),
-      permissions: permissions.getPolicy(),
+      permissions: permissions.getPolicy(c.req.query("sessionId")),
       reasoningEffort: reasoning.effort,
       reasoningEfforts: provider.reasoningEfforts ?? [],
     }),
@@ -153,7 +153,7 @@ export function createApp(
       return c.json({ error: "tool is required" }, 400)
     }
 
-    permissions.allowForSession(tool)
+    permissions.allowForSession(sessionId, tool)
     return c.json({ ok: true })
   })
 

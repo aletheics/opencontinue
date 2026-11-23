@@ -136,6 +136,7 @@ describe("HttpSessionClient", () => {
     const client = new HttpSessionClient({ baseUrl })
 
     await expect(client.health()).resolves.toEqual({ ok: true })
+    await expect(client.health("session-1")).resolves.toEqual({ ok: true })
     await expect(client.listSessions()).resolves.toEqual([summary])
     await expect(client.createSession("Test session")).resolves.toEqual(snapshot)
     await expect(client.getSession(sessionId)).resolves.toEqual(snapshot)
@@ -153,6 +154,9 @@ describe("HttpSessionClient", () => {
       path: `/v1/sessions/${sessionId}/messages`,
       body: JSON.stringify({ text: "hello" }),
     })
+    expect(requests.some((request) => request.path === "/health?sessionId=session-1")).toBe(
+      true,
+    )
     expect(requests).toContainEqual({
       method: "POST",
       path: `/v1/sessions/${sessionId}/abort`,

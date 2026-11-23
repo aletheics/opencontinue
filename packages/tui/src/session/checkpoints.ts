@@ -4,7 +4,7 @@ import { formatClock, formatDuration } from "../status/format.js"
 export type Checkpoint = {
   seq: number
   at: string
-  status: "completed" | "failed"
+  status: "completed" | "failed" | "interrupted"
   durationMs?: number
 }
 

@@ -64,6 +64,8 @@ export const SessionEvent = z.discriminatedUnion("type", [
     type: z.literal("run.failed"),
     runId: z.string(),
     error: z.string(),
+    /** The run stopped because its AbortSignal fired, not because of an error. */
+    interrupted: z.boolean().optional(),
   }),
   z.object({
     ...eventBase,

@@ -147,13 +147,14 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
   }
 
   if (event.type === "run.failed") {
+    const label = event.interrupted ? "Run interrupted" : "Run failed"
     return [
       ...items,
       {
         kind: "assistant",
         id: `assistant:${event.runId}:error:${event.seq}`,
         runId: event.runId,
-        text: `Run failed: ${event.error}`,
+        text: `${label}: ${event.error}`,
       },
     ]
   }

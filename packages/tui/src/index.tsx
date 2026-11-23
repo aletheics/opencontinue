@@ -197,7 +197,6 @@ export function App({ options }: { options: TuiOptions }) {
   const sessionRef = useRef<string | null>(null)
   const subscriptionRef = useRef<SessionSubscription | null>(null)
   const runStartedRef = useRef<number | null>(null)
-  const interruptedRef = useRef(false)
   const lineCountRef = useRef(0)
   const autoStartedRef = useRef(false)
   const spinnerTipRef = useRef<string>(pickSpinnerTip())
@@ -572,7 +571,6 @@ export function App({ options }: { options: TuiOptions }) {
     resetPermissions()
     streamRef.current = new Map()
     setStreamChunks([])
-    interruptedRef.current = false
     setViewportScroll(0)
     checkpointsRef.current = []
     runStartsRef.current = new Map()
@@ -659,7 +657,11 @@ export function App({ options }: { options: TuiOptions }) {
             seq: event.seq,
             at: event.at,
             status:
-              event.type === "run.completed" ? "completed" : "failed",
+              event.type === "run.completed"
+                ? "completed"
+                : event.interrupted
+                  ? "interrupted"
+                  : "failed",
             durationMs,
           },
         ]
@@ -668,8 +670,7 @@ export function App({ options }: { options: TuiOptions }) {
         if (started !== null) {
           const elapsed = Date.now() - started
           const interrupted =
-            event.type === "run.failed" && interruptedRef.current
-          interruptedRef.current = false
+            event.type === "run.failed" && event.interrupted === true
           const symbol = interrupted
             ? glyphs.interrupted
             : event.type === "run.completed"
@@ -1025,7 +1026,7 @@ export function App({ options }: { options: TuiOptions }) {
           return true
         }
         void client
-          .health()
+          .health(sessionRef.current ?? undefined)
           .then((result) =>
             appendSystem(
               formatPermissions(
@@ -1174,7 +1175,6 @@ export function App({ options }: { options: TuiOptions }) {
     setHistoryIndex(-1)
     setBusy(true)
     spinnerTipRef.current = pickSpinnerTip()
-    interruptedRef.current = false
     activeRunIdRef.current = null
     lastActivityRef.current = Date.now()
 
@@ -1472,7 +1472,6 @@ export function App({ options }: { options: TuiOptions }) {
     if (key.escape && busy) {
       const client = clientRef.current
       const sessionId = sessionRef.current
-      interruptedRef.current = true
       if (client && sessionId) void client.abort(sessionId).catch(() => {})
       return
     }

@@ -19,7 +19,7 @@ export type EventDraft =
   | { type: "run.started"; runId: string }
   | { type: "message.assistant.delta"; runId: string; text: string }
   | { type: "run.completed"; runId: string }
-  | { type: "run.failed"; runId: string; error: string }
+  | { type: "run.failed"; runId: string; error: string; interrupted?: boolean }
   | {
       type: "usage"
       runId: string

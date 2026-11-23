@@ -122,6 +122,25 @@ describe("timeline", () => {
     })
   })
 
+  it("labels an interrupted run separately from a failure", () => {
+    const events: SessionEvent[] = [
+      { ...base, seq: 1, type: "run.started", runId: "r1" },
+      {
+        ...base,
+        seq: 2,
+        type: "run.failed",
+        runId: "r1",
+        error: "stopped by user",
+        interrupted: true,
+      },
+    ]
+
+    const item = timelineFromEvents(events).find(
+      (entry) => entry.kind === "assistant" && entry.text.startsWith("Run"),
+    )
+    expect(item).toMatchObject({ text: "Run interrupted: stopped by user" })
+  })
+
   it("labels common tools with their arguments", () => {
     const item: ToolTimelineItem = {
       kind: "tool",

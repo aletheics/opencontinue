@@ -436,10 +436,14 @@ describe("runAgent", () => {
       signal: controller.signal,
     })
 
-    const types = store.events(session.id).map((event) => event.type)
+    const events = store.events(session.id)
+    const types = events.map((event) => event.type)
     expect(types).toContain("permission.requested")
     expect(types).toContain("permission.resolved")
     expect(types).toContain("run.failed")
+    expect(events.find((event) => event.type === "run.failed")).toMatchObject({
+      interrupted: true,
+    })
     expect(types).not.toContain("tool.completed")
     await expect(readFile(path.join(workspace, "marker.txt"), "utf8")).rejects.toThrow()
   })

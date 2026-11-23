@@ -20,7 +20,15 @@ export function buildEvent(
     case "run.completed":
       return { ...base, type: draft.type, runId: draft.runId }
     case "run.failed":
-      return { ...base, type: draft.type, runId: draft.runId, error: draft.error }
+      return {
+        ...base,
+        type: draft.type,
+        runId: draft.runId,
+        error: draft.error,
+        ...(draft.interrupted === undefined
+          ? {}
+          : { interrupted: draft.interrupted }),
+      }
     case "usage":
       return {
         ...base,
@@ -97,7 +105,14 @@ export function draftOf(event: SessionEvent): EventDraft | null {
     case "run.completed":
       return { type: event.type, runId: event.runId }
     case "run.failed":
-      return { type: event.type, runId: event.runId, error: event.error }
+      return {
+        type: event.type,
+        runId: event.runId,
+        error: event.error,
+        ...(event.interrupted === undefined
+          ? {}
+          : { interrupted: event.interrupted }),
+      }
     case "usage":
       return {
         type: event.type,
