@@ -293,6 +293,46 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("searches input history with ctrl+r", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      for (const text of ["alpha", "beta"]) {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        stdin.write(text)
+        await vi.waitFor(() => expect(lastFrame()).toContain(`you> ${text}`))
+        stdin.write("\r")
+        await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), {
+          timeout: 5000,
+        })
+      }
+
+      stdin.write("\u0012")
+      await vi.waitFor(() => expect(lastFrame()).toContain("History"))
+      expect(lastFrame()).toContain("beta")
+
+      stdin.write("bet")
+      await vi.waitFor(() => expect(lastFrame()).toContain("History · /bet/"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).not.toContain("History · /bet/"))
+
+      stdin.write("!")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> beta!"))
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("runs the provider -> model -> chat loop", async () => {
     const { server, url } = await fakeProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })

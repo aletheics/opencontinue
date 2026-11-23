@@ -8,6 +8,7 @@ export type PromptProps = {
   height: number
   input: string
   cursor: number
+  prefix?: string
   menuOpen: boolean
   onInput: (value: string, cursor: number) => void
   onSubmit: (value: string) => void
@@ -21,6 +22,7 @@ export function Prompt({
   height,
   input,
   cursor,
+  prefix,
   menuOpen,
   onInput,
   onSubmit,
@@ -59,6 +61,7 @@ export function Prompt({
           width={Math.max(8, columns - 9)}
           rows={Math.max(1, height - 2)}
           placeholder="Type a message…"
+          prefix={prefix}
           menuOpen={menuOpen}
           onChange={onInput}
           onSubmit={onSubmit}

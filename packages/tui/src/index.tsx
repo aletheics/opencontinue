@@ -140,6 +140,10 @@ export function App({ options }: { options: TuiOptions }) {
   const [permission, setPermission] = useState<PermissionRequest | null>(null)
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
+  const [historySearch, setHistorySearch] = useState(false)
+  const [historyQuery, setHistoryQuery] = useState("")
+  const [historyCursor, setHistoryCursor] = useState(0)
+  const [historySearchIndex, setHistorySearchIndex] = useState(0)
   const [scrollOffset, setScrollOffset] = useState(0)
 
   const storeRef = useRef<SessionStore | null>(null)
@@ -192,6 +196,15 @@ export function App({ options }: { options: TuiOptions }) {
       `${item.title} ${item.id}`.toLowerCase().includes(query),
     )
   }, [sessions, sessionQuery])
+
+  const historyMatches = useMemo(() => {
+    if (!historySearch) return []
+    const query = historyQuery.trim().toLowerCase()
+    const matches = query
+      ? history.filter((item) => item.toLowerCase().includes(query))
+      : history
+    return [...matches].reverse().slice(0, 20)
+  }, [history, historyQuery, historySearch])
 
   useEffect(() => {
     return () => {
@@ -462,6 +475,29 @@ export function App({ options }: { options: TuiOptions }) {
     setCursor(Math.max(0, Math.min(at, value.length)))
   }
 
+  const startHistorySearch = () => {
+    if (history.length === 0 || rows < 18) return
+    setHistorySearch(true)
+    setHistoryQuery("")
+    setHistoryCursor(0)
+    setHistorySearchIndex(0)
+  }
+
+  const closeHistorySearch = () => {
+    setHistorySearch(false)
+    setHistoryQuery("")
+    setHistoryCursor(0)
+    setHistorySearchIndex(0)
+  }
+
+  const chooseHistory = () => {
+    const index = Math.min(historySearchIndex, Math.max(0, historyMatches.length - 1))
+    const chosen = historyMatches[index]
+    if (chosen === undefined) return
+    setDraft(chosen)
+    closeHistorySearch()
+  }
+
   const send = (value: string) => {
     const text = value.trim()
     if (!text) return
@@ -621,6 +657,26 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (key.ctrl && character === "r" && !busy) {
+      startHistorySearch()
+      return
+    }
+
+    if (historySearch) {
+      if (key.upArrow) {
+        setHistorySearchIndex((index) => Math.max(0, index - 1))
+      } else if (key.downArrow) {
+        setHistorySearchIndex((index) =>
+          Math.max(0, Math.min(historyMatches.length - 1, index + 1)),
+        )
+      } else if (key.tab && !key.shift) {
+        chooseHistory()
+      } else if (key.escape) {
+        closeHistorySearch()
+      }
+      return
+    }
+
     if (menuOpen) {
       if (key.upArrow) {
         setSlashIndex((index) => Math.max(0, index - 1))
@@ -719,22 +775,35 @@ export function App({ options }: { options: TuiOptions }) {
     slashMatches.length > 0 &&
     !busy &&
     !permission &&
+    !historySearch &&
     rows >= 18
   const activeSlashIndex = Math.min(slashIndex, Math.max(0, slashMatches.length - 1))
   const menuHeight = menuOpen ? slashMatches.length + 2 : 0
-  const footerText = menuOpen
-    ? "↑/↓ select · Tab complete · Enter run · Esc close"
-    : footer
+  const historyMenuHeight = historySearch && rows >= 18 ? 6 : 0
+  const activeHistoryIndex = Math.min(
+    historySearchIndex,
+    Math.max(0, historyMatches.length - 1),
+  )
+  const footerText = historySearch
+    ? "↑/↓ select · Enter use · Esc cancel"
+    : menuOpen
+      ? "↑/↓ select · Tab complete · Enter run · Esc close"
+      : footer
   const footerLine = footerText.slice(0, Math.max(10, columns - 2))
 
-  const maxInputHeight = Math.max(3, rows - 8 - menuHeight)
+  const maxInputHeight = Math.max(3, rows - 8 - menuHeight - historyMenuHeight)
   const inputLines = input.split("\n").length
-  const desiredInputHeight = permission
-    ? 5
-    : Math.min(6, Math.max(3, inputLines + 2))
+  const desiredInputHeight = historySearch
+    ? 3
+    : permission
+      ? 5
+      : Math.min(6, Math.max(3, inputLines + 2))
   const inputHeight =
     screen === "chat" ? Math.min(desiredInputHeight, maxInputHeight) : 0
-  const bodyHeight = Math.max(4, rows - 3 - inputHeight - menuHeight - 1)
+  const bodyHeight = Math.max(
+    4,
+    rows - 3 - inputHeight - menuHeight - historyMenuHeight - 1,
+  )
 
   const submitInput = (value: string) => {
     if (menuOpen) {
@@ -884,15 +953,46 @@ export function App({ options }: { options: TuiOptions }) {
       {menuOpen ? (
         <SlashMenu commands={slashMatches} selectedIndex={activeSlashIndex} />
       ) : null}
+      {historySearch ? (
+        <Box
+          flexShrink={0}
+          height={historyMenuHeight}
+          flexDirection="column"
+          borderStyle="round"
+          borderColor={theme.border}
+          paddingX={1}
+          overflow="hidden"
+        >
+          <Picker
+            header={`History${historyQuery ? ` · /${historyQuery}/` : ""} (${activeHistoryIndex + 1}/${historyMatches.length})`}
+            items={historyMatches.map((text, index) => ({
+              key: `${index}:${text}`,
+              label: text.replace(/\n/g, " ⏎ "),
+            }))}
+            selectedIndex={activeHistoryIndex}
+            windowSize={Math.max(1, historyMenuHeight - 3)}
+            emptyText="No matching history."
+          />
+        </Box>
+      ) : null}
       {screen === "chat" ? (
         <Prompt
           columns={columns}
           height={inputHeight}
-          input={input}
-          cursor={cursor}
+          input={historySearch ? historyQuery : input}
+          cursor={historySearch ? historyCursor : cursor}
+          prefix={historySearch ? "search> " : undefined}
           menuOpen={menuOpen}
-          onInput={setDraft}
-          onSubmit={submitInput}
+          onInput={
+            historySearch
+              ? (value, at) => {
+                  setHistoryQuery(value)
+                  setHistoryCursor(at)
+                  setHistorySearchIndex(0)
+                }
+              : setDraft
+          }
+          onSubmit={historySearch ? chooseHistory : submitInput}
           permission={permission}
           busy={busy}
           spinner={spinner}

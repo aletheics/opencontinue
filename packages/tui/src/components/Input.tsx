@@ -24,12 +24,11 @@ export type InputProps = {
   width: number
   rows: number
   placeholder: string
+  prefix?: string
   menuOpen: boolean
   onChange: (value: string, cursor: number) => void
   onSubmit: (value: string) => void
 }
-
-const PREFIX = "you> "
 
 export function Input({
   value,
@@ -37,6 +36,7 @@ export function Input({
   width,
   rows,
   placeholder,
+  prefix = "you> ",
   menuOpen,
   onChange,
   onSubmit,
@@ -129,9 +129,9 @@ export function Input({
   if (value.length === 0) {
     const text = placeholder.slice(0, Math.max(1, width))
     return (
-      <Box flexDirection="column" width={PREFIX.length + width} height={lineCount}>
+      <Box flexDirection="column" width={prefix.length + width} height={lineCount}>
         <Box flexDirection="row" height={1}>
-          <Text color={theme.user}>{PREFIX}</Text>
+          <Text color={theme.user}>{prefix}</Text>
           <Text dimColor>
             <Text inverse>{text[0] ?? " "}</Text>
             {text.slice(1)}
@@ -144,7 +144,7 @@ export function Input({
   return (
     <Box
       flexDirection="column"
-      width={PREFIX.length + width}
+      width={prefix.length + width}
       height={lineCount}
       overflow="hidden"
     >
@@ -165,7 +165,7 @@ export function Input({
         return (
           <Box key={globalLine} flexDirection="row" height={1} overflow="hidden">
             <Text color={theme.user}>
-              {globalLine === 0 ? PREFIX : " ".repeat(PREFIX.length)}
+              {globalLine === 0 ? prefix : " ".repeat(prefix.length)}
             </Text>
             <Text wrap="truncate">
               {before}

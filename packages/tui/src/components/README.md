@@ -5,7 +5,7 @@
 **Files:**
 
 - `Header.tsx` — fixed 3-row brand, provider/model, permission mode, and stats.
-- `Picker.tsx` — generic type-to-filter list used by provider, model, and session selection.
+- `Picker.tsx` — generic type-to-filter list used by provider, model, session, and history selection.
 - `Timeline.tsx` — clipped line viewport for the chat transcript.
 - `Prompt.tsx` — fixed input, permission dialog (tool detail plus y/a/n), or spinner.
 - `Input.tsx` — cursor-aware editor with horizontal/vertical scrolling and readline keys; pure editing math lives in `../input.ts`.
