@@ -13,13 +13,13 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 
 ## What OpenContinue adopts
 
-- **Inline Claude Code-style transcript**, not a full-screen dashboard. A startup banner shows an original block mark, version, model/provider, workspace, and a welcome line; a saved provider/model auto-starts chat, while a first run shows the picker.
+- **Inline Claude Code-style transcript**, not a full-screen dashboard. A startup banner matches Claude Code's condensed layout: a three-row coral block mark beside a bold name with a dim version, a dim `model · provider` line (split onto two lines on narrow terminals), and a dim workspace path. There is no extra welcome line. A saved provider/model auto-starts chat, while a first run shows the picker.
 - The mode line ends with `· ← 1 agent` while a session is attached. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
 - No header bar, no bordered transcript, no bordered input. The only box is the permission dialog.
 - Tool blocks: `● Tool(args)` with wrapped continuation aligned under the call, `⎿` output lines, colored diff lines, and `… +N lines (ctrl+o to expand)`.
 - User prompts: `❯ text` with two-space continuation. Assistant text: markdown-style headings, lists, quotes, and fenced code.
-- Live spinner: `✻ Scampering… (3s · ↓ 1.2k tokens)`, with a `Tip:` line below. The verb is chosen per turn; the color starts yellow and fades to red after 3s without model output. Active tools suppress the stall.
-- Completion line: `✻ Churned for 3.2s · done 16:01`.
+- Live spinner: `✻ Scampering…` followed by `(15m 57s · ↓ 45.5k tokens)` once the run passes 30 seconds, with a dim `  ⎿  Tip: …` line below. The glyph cycles through `· ✢ * ✶ ✻ ✽` forward and backward at 120ms. The verb is sampled per turn and shimmers in Claude coral (`#D77757`); after 3s without model output it fades to the error red (`rgb(171,43,63)`) over 2s. Active tools suppress the stall, and narrow terminals drop the token count before the timer.
+- Completion line: `✻ Churned for 3.2s · done 16:01`, using the eight past-tense completion verbs (`Baked`, `Brewed`, `Churned`, `Cogitated`, `Cooked`, `Crunched`, `Sautéed`, `Worked`) sampled independently of the spinner verb.
 - Bottom mode line: `⏵⏵ auto mode on (shift+tab to cycle)` in yellow, `⛔ readonly mode …` in red, or `? for shortcuts …` dim; busy adds `esc to interrupt`; workspace, branch, model, duration, and tokens sit dim on the right when width allows.
 - The live assistant is clipped to the viewport tail. Completed output is printed once from `Static`, which prevents long streaming responses from scrolling part of the live frame into scrollback and then reprinting it.
 - Slash, file, and history menus render below the prompt. File completion uses a `+ path` list; slash completion uses name/description columns.

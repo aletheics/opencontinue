@@ -40,6 +40,7 @@ import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
 import { SlashMenu } from "./components/SlashMenu.js"
+import { SpinnerLine } from "./components/SpinnerLine.js"
 import { Transcript, TranscriptItem } from "./components/Transcript.js"
 import {
   filterModels,
@@ -52,11 +53,11 @@ import { partitionTimeline } from "./session/transcript.js"
 import { workspaceInfo } from "./session/workspace.js"
 import { formatClock, formatDuration, formatTokens } from "./status/format.js"
 import {
+  pickCompletionVerb,
+  pickSpinnerTip,
   pickSpinnerVerb,
-  SPINNER_TIP,
-  spinnerColor,
+  spinnerFrames,
   stallIntensity,
-  type SpinnerVerb,
 } from "./status/spinner.js"
 import { theme } from "./theme.js"
 import { reduceTimeline, type TimelineItem } from "./timeline.js"
@@ -113,7 +114,7 @@ export function App({ options }: { options: TuiOptions }) {
   const queuedRef = useRef<string[]>([])
   const [slashIndex, setSlashIndex] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [tick, setTick] = useState(0)
+  const [, setTick] = useState(0)
   const [transcriptMode, setTranscriptMode] = useState(false)
   const [transcriptScroll, setTranscriptScroll] = useState(0)
   const [transcriptKey, setTranscriptKey] = useState(0)
@@ -138,7 +139,11 @@ export function App({ options }: { options: TuiOptions }) {
   const runStartedRef = useRef<number | null>(null)
   const lineCountRef = useRef(0)
   const autoStartedRef = useRef(false)
-  const spinnerVerbRef = useRef<SpinnerVerb>(pickSpinnerVerb())
+  const spinnerVerbRef = useRef<string>(pickSpinnerVerb())
+  const spinnerTipRef = useRef<string>(pickSpinnerTip())
+  const activeRunIdRef = useRef<string | null>(null)
+  const stallRef = useRef(0)
+  const spinnerFrameSet = useMemo(() => spinnerFrames(), [])
   const lastActivityRef = useRef(Date.now())
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   permissionModeRef.current = permissionMode
@@ -156,7 +161,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   useEffect(() => {
     if (!busy) return
-    const timer = setInterval(() => setTick((value) => value + 1), 100)
+    const timer = setInterval(() => setTick((value) => value + 1), 50)
     return () => clearInterval(timer)
   }, [busy])
 
@@ -383,6 +388,10 @@ export function App({ options }: { options: TuiOptions }) {
         handlePermissionRequest(event)
         return
       }
+      if (event.type === "run.started") {
+        activeRunIdRef.current = event.runId
+        return
+      }
       if (event.type === "permission.resolved") {
         handlePermissionResolved(event)
         return
@@ -391,11 +400,11 @@ export function App({ options }: { options: TuiOptions }) {
         const started = runStartedRef.current
         if (started !== null) {
           const elapsed = Date.now() - started
+          const verb = event.type === "run.completed" ? pickCompletionVerb() : "Failed"
           setLastDurationMs(elapsed)
-          appendMeta(
-            `✻ ${event.type === "run.completed" ? spinnerVerbRef.current.past : "Failed"} for ${formatDuration(elapsed)} · done ${formatClock()}`,
-          )
+          appendMeta(`✻ ${verb} for ${formatDuration(elapsed)} · done ${formatClock()}`)
         }
+        activeRunIdRef.current = null
         runStartedRef.current = null
         setRunStartedAt(null)
         setBusy(false)
@@ -740,6 +749,9 @@ export function App({ options }: { options: TuiOptions }) {
     setBusy(true)
     setLastDurationMs(null)
     spinnerVerbRef.current = pickSpinnerVerb()
+    spinnerTipRef.current = pickSpinnerTip()
+    activeRunIdRef.current = null
+    stallRef.current = 0
     lastActivityRef.current = Date.now()
 
     const started = Date.now()
@@ -1021,12 +1033,22 @@ export function App({ options }: { options: TuiOptions }) {
     0,
   )
   const elapsedMs = runStartedAt !== null ? Date.now() - runStartedAt : 0
-  const spinnerGlyph = ["✻", "✽", "✢", "·"][tick % 4] ?? "✻"
-  const stalled = busy
-    ? stallIntensity(Date.now() - lastActivityRef.current, Boolean(activeTool))
+  const idleMs = busy ? Date.now() - lastActivityRef.current : 0
+  const targetStall = busy ? stallIntensity(idleMs, Boolean(activeTool)) : 0
+  if (busy) stallRef.current += (targetStall - stallRef.current) * 0.1
+  else stallRef.current = 0
+  const stalled = stallRef.current
+  const activeRunId = activeRunIdRef.current
+  const runChars = activeRunId
+    ? timeline.reduce(
+        (sum, item) =>
+          item.kind === "assistant" && item.runId === activeRunId
+            ? sum + item.text.length
+            : sum,
+        0,
+      )
     : 0
-  const spinnerTint =
-    spinnerColor(stalled) === "red" ? theme.error : theme.tool
+  const runTokens = Math.round(runChars / 4)
 
   const modeText =
     permissionMode === "auto"
@@ -1258,27 +1280,15 @@ export function App({ options }: { options: TuiOptions }) {
           {screen === "chat" ? (
             <>
               {busy && !permission ? (
-                <>
-                  <Box marginTop={1} paddingX={2}>
-                    <Text color={spinnerTint}>{spinnerGlyph} </Text>
-                    <Text color={spinnerTint}>
-                      {spinnerVerbRef.current.present}…
-                    </Text>
-                    <Text dimColor>
-                      {" "}
-                      ({formatDuration(elapsedMs)}
-                      {totalTokens > 0
-                        ? ` · ↓ ${formatTokens(totalTokens)} tokens`
-                        : ""})
-                    </Text>
-                  </Box>
-                  <Box paddingX={4}>
-                    <Text dimColor wrap="truncate">
-                      {"  ⎿  "}
-                      {SPINNER_TIP}
-                    </Text>
-                  </Box>
-                </>
+                <SpinnerLine
+                  verb={spinnerVerbRef.current}
+                  tip={spinnerTipRef.current}
+                  elapsedMs={elapsedMs}
+                  tokens={runTokens}
+                  stalled={stalled}
+                  columns={columns}
+                  frames={spinnerFrameSet}
+                />
               ) : null}
 
               {queued.length > 0 ? (
