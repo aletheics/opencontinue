@@ -12,7 +12,7 @@ import { closeServer, startServer } from "@opencontinue/server"
 import { render } from "ink-testing-library"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { TranscriptItem } from "./components/Transcript.js"
+import { Transcript, TranscriptItem } from "./components/Transcript.js"
 import { App } from "./index.js"
 
 let home = ""
@@ -216,6 +216,26 @@ describe("TUI", () => {
     )
     expect(user.lastFrame() ?? "").toContain("❯ fix the bug")
     user.unmount()
+  })
+
+  it("clips a long live assistant response to the viewport", () => {
+    const text = Array.from({ length: 10 }, (_, index) => `line ${index}`).join(
+      "\n",
+    )
+    const view = render(
+      <Transcript
+        items={[{ kind: "assistant", id: "a1", runId: "r1", text }]}
+        columns={40}
+        expanded={false}
+        leading={false}
+        maxLines={4}
+      />,
+    )
+    const frame = view.lastFrame() ?? ""
+    expect(frame).toContain("earlier lines")
+    expect(frame).toContain("line 9")
+    expect(frame).not.toContain("line 1")
+    view.unmount()
   })
 
   it("shows providers before asking for a key", () => {
@@ -448,9 +468,9 @@ describe("TUI", () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/re")
       await vi.waitFor(() => {
-        expect(lastFrame()).toContain("/resume — resume a session")
+        expect(lastFrame()).toContain("/resume")
       })
-      expect(lastFrame()).not.toContain("/help — show commands")
+      expect(lastFrame()).not.toContain("show commands")
 
       stdin.write("\t")
       await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
@@ -499,16 +519,15 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("look @ap")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Files · /ap/"), {
+      await vi.waitFor(() => expect(lastFrame()).toContain("+ src/app.ts"), {
         timeout: 5000,
       })
-      expect(lastFrame()).toContain("src/app.ts")
 
       stdin.write("\t")
       await vi.waitFor(() =>
         expect(lastFrame()).toContain("❯ look @src/app.ts"),
       )
-      expect(lastFrame()).not.toContain("Files · /ap/")
+      expect(lastFrame()).not.toContain("+ src/app.ts")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -539,7 +558,7 @@ describe("TUI", () => {
       }
 
       await vi.waitFor(() => {
-        const count = output(frames).match(/✻ Worked/g)?.length ?? 0
+        const count = output(frames).match(/ · done /g)?.length ?? 0
         expect(count).toBeGreaterThanOrEqual(2)
       })
 

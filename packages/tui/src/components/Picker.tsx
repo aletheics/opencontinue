@@ -9,7 +9,8 @@ export type PickerItem = {
 }
 
 export type PickerProps = {
-  header: string
+  header?: string
+  marker?: string
   items: PickerItem[]
   selectedIndex: number
   windowSize: number
@@ -18,6 +19,7 @@ export type PickerProps = {
 
 export function Picker({
   header,
+  marker,
   items,
   selectedIndex,
   windowSize,
@@ -46,9 +48,11 @@ export function Picker({
 
   return (
     <>
-      <Text dimColor wrap="truncate">
-        {header}
-      </Text>
+      {header ? (
+        <Text dimColor wrap="truncate">
+          {header}
+        </Text>
+      ) : null}
       {visible.map((item, offset) => {
         const index = start + offset
         const active = index === selected
@@ -56,9 +60,10 @@ export function Picker({
           <Text
             key={item.key}
             color={active ? theme.brand : undefined}
+            dimColor={!active}
             wrap="truncate"
           >
-            {active ? "› " : "  "}
+            {marker ? `${marker} ` : active ? "› " : "  "}
             {item.label}
             {item.note ? ` — ${item.note}` : ""}
           </Text>

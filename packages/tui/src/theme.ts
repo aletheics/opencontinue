@@ -1,5 +1,6 @@
 export const theme = {
   brand: "cyan",
+  logo: "#E07A6A",
   user: "green",
   assistant: "white",
   tool: "yellow",

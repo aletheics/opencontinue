@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest"
 
-import { formatDuration, formatTokens } from "./format.js"
+import { formatClock, formatDuration, formatTokens } from "./format.js"
 
 describe("status format", () => {
   it("formats token counts", () => {
     expect(formatTokens(999)).toBe("999")
     expect(formatTokens(1500)).toBe("1.5k")
+  })
+
+  it("formats a local clock", () => {
+    expect(formatClock(new Date(2026, 0, 1, 16, 1))).toBe("16:01")
   })
 
   it("formats durations", () => {

@@ -46,11 +46,18 @@ import {
   filterProviders,
   initialProviderIndex,
 } from "./providers/selection.js"
-import { timelineLines, toolDisplayName } from "./transcript/format/index.js"
+import { timelineLines } from "./transcript/format/index.js"
 import { filterSessions, sessionLabel } from "./session/labels.js"
 import { partitionTimeline } from "./session/transcript.js"
 import { workspaceInfo } from "./session/workspace.js"
-import { formatDuration, formatTokens } from "./status/format.js"
+import { formatClock, formatDuration, formatTokens } from "./status/format.js"
+import {
+  pickSpinnerVerb,
+  SPINNER_TIP,
+  spinnerColor,
+  stallIntensity,
+  type SpinnerVerb,
+} from "./status/spinner.js"
 import { theme } from "./theme.js"
 import { reduceTimeline, type TimelineItem } from "./timeline.js"
 
@@ -131,6 +138,8 @@ export function App({ options }: { options: TuiOptions }) {
   const runStartedRef = useRef<number | null>(null)
   const lineCountRef = useRef(0)
   const autoStartedRef = useRef(false)
+  const spinnerVerbRef = useRef<SpinnerVerb>(pickSpinnerVerb())
+  const lastActivityRef = useRef(Date.now())
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   permissionModeRef.current = permissionMode
   const {
@@ -197,7 +206,7 @@ export function App({ options }: { options: TuiOptions }) {
     setFileIndex(0)
   }, [mentionQuery])
 
-  const slashMatches = screen === "chat" ? matchSlashCommands(input) : []
+  const slashMatches = screen === "chat" ? matchSlashCommands(input, 8) : []
   const fileMenuOpen =
     screen === "chat" &&
     mentionQuery !== null &&
@@ -367,6 +376,7 @@ export function App({ options }: { options: TuiOptions }) {
     setBusy(false)
 
     const subscription = client.subscribe(sessionId, -1, (event) => {
+      lastActivityRef.current = Date.now()
       setTimeline((items) => reduceTimeline(items, event))
 
       if (event.type === "permission.requested") {
@@ -383,7 +393,7 @@ export function App({ options }: { options: TuiOptions }) {
           const elapsed = Date.now() - started
           setLastDurationMs(elapsed)
           appendMeta(
-            `✻ ${event.type === "run.completed" ? "Worked" : "Failed"} for ${formatDuration(elapsed)}`,
+            `✻ ${event.type === "run.completed" ? spinnerVerbRef.current.past : "Failed"} for ${formatDuration(elapsed)} · done ${formatClock()}`,
           )
         }
         runStartedRef.current = null
@@ -729,6 +739,8 @@ export function App({ options }: { options: TuiOptions }) {
     setHistoryIndex(-1)
     setBusy(true)
     setLastDurationMs(null)
+    spinnerVerbRef.current = pickSpinnerVerb()
+    lastActivityRef.current = Date.now()
 
     const started = Date.now()
     setRunStartedAt(started)
@@ -1008,9 +1020,13 @@ export function App({ options }: { options: TuiOptions }) {
     (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
     0,
   )
-  const elapsedSeconds =
-    runStartedAt !== null ? Math.floor((Date.now() - runStartedAt) / 1000) : 0
+  const elapsedMs = runStartedAt !== null ? Date.now() - runStartedAt : 0
   const spinnerGlyph = ["✻", "✽", "✢", "·"][tick % 4] ?? "✻"
+  const stalled = busy
+    ? stallIntensity(Date.now() - lastActivityRef.current, Boolean(activeTool))
+    : 0
+  const spinnerTint =
+    spinnerColor(stalled) === "red" ? theme.error : theme.tool
 
   const modeText =
     permissionMode === "auto"
@@ -1028,13 +1044,22 @@ export function App({ options }: { options: TuiOptions }) {
         : null
 
   const agentHint = sessionRef.current ? " · ← 1 agent" : ""
+  const busyHint = busy ? " · esc to interrupt" : ""
+  const footerTint =
+    screen === "chat" && !transcriptMode && !menuHint && !permission
+      ? permissionMode === "auto"
+        ? theme.tool
+        : permissionMode === "readonly"
+          ? theme.error
+          : undefined
+      : undefined
   const footerLeft = transcriptMode
     ? "↑/↓ scroll · PgUp/PgDn page · ctrl+o close"
     : screen === "chat"
       ? (menuHint ??
         (permission
           ? "y allow · a allow for session · n deny"
-          : `${modeText}${agentHint}`))
+          : `${modeText}${agentHint}${busyHint}`))
       : screen === "provider" || screen === "models" || screen === "sessions"
         ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
         : screen === "key" || screen === "baseurl"
@@ -1226,21 +1251,34 @@ export function App({ options }: { options: TuiOptions }) {
               expanded={false}
               leading={committed.length > 0}
               permissionMode={permissionMode}
+              maxLines={Math.max(2, rows - 14)}
             />
           ) : null}
 
           {screen === "chat" ? (
             <>
               {busy && !permission ? (
-                <Box marginTop={1} paddingX={2}>
-                  <Text color={theme.brand}>{spinnerGlyph} </Text>
-                  <Text>
-                    {activeTool?.kind === "tool"
-                      ? `Running ${toolDisplayName(activeTool.name)}…`
-                      : "Thinking…"}
-                  </Text>
-                  <Text dimColor> ({formatDuration(elapsedSeconds * 1000)} · esc to interrupt)</Text>
-                </Box>
+                <>
+                  <Box marginTop={1} paddingX={2}>
+                    <Text color={spinnerTint}>{spinnerGlyph} </Text>
+                    <Text color={spinnerTint}>
+                      {spinnerVerbRef.current.present}…
+                    </Text>
+                    <Text dimColor>
+                      {" "}
+                      ({formatDuration(elapsedMs)}
+                      {totalTokens > 0
+                        ? ` · ↓ ${formatTokens(totalTokens)} tokens`
+                        : ""})
+                    </Text>
+                  </Box>
+                  <Box paddingX={4}>
+                    <Text dimColor wrap="truncate">
+                      {"  ⎿  "}
+                      {SPINNER_TIP}
+                    </Text>
+                  </Box>
+                </>
               ) : null}
 
               {queued.length > 0 ? (
@@ -1261,17 +1299,36 @@ export function App({ options }: { options: TuiOptions }) {
                     </Text>
                   </Box>
 
+                  <Prompt
+                    columns={columns}
+                    input={historySearch ? historyQuery : input}
+                    cursor={historySearch ? historyCursor : cursor}
+                    prefix={historySearch ? "search> " : undefined}
+                    menuOpen={menuOpen}
+                    onInput={
+                      historySearch
+                        ? (value, at) => {
+                            setHistoryQuery(value)
+                            setHistoryCursor(at)
+                            setHistorySearchIndex(0)
+                          }
+                        : setDraft
+                    }
+                    onSubmit={historySearch ? chooseHistory : submitInput}
+                  />
+
                   {menuOpen ? (
                     <SlashMenu
                       commands={slashMatches}
                       selectedIndex={activeSlashIndex}
+                      columns={columns}
                     />
                   ) : null}
 
                   {fileMenuOpen ? (
                     <Box flexDirection="column" paddingX={2}>
                       <Picker
-                        header={`Files${mentionQuery ? ` · /${mentionQuery}/` : ""} (${activeFileIndex + 1}/${fileMatches.length})`}
+                        marker="+"
                         items={fileMatches.map((file) => ({ key: file, label: file }))}
                         selectedIndex={activeFileIndex}
                         windowSize={Math.min(8, Math.max(1, rows - 8))}
@@ -1295,23 +1352,6 @@ export function App({ options }: { options: TuiOptions }) {
                     </Box>
                   ) : null}
 
-                  <Prompt
-                    columns={columns}
-                    input={historySearch ? historyQuery : input}
-                    cursor={historySearch ? historyCursor : cursor}
-                    prefix={historySearch ? "search> " : undefined}
-                    menuOpen={menuOpen}
-                    onInput={
-                      historySearch
-                        ? (value, at) => {
-                            setHistoryQuery(value)
-                            setHistoryCursor(at)
-                            setHistorySearchIndex(0)
-                          }
-                        : setDraft
-                    }
-                    onSubmit={historySearch ? chooseHistory : submitInput}
-                  />
 
                   <Box>
                     <Text dimColor wrap="truncate">
@@ -1328,7 +1368,7 @@ export function App({ options }: { options: TuiOptions }) {
           )}
 
           <Box paddingX={2} justifyContent="space-between" overflow="hidden">
-            <Text dimColor wrap="truncate">
+            <Text color={footerTint} dimColor={footerTint === undefined} wrap="truncate">
               {footerLeft}
             </Text>
             {columns >= 50 ? (

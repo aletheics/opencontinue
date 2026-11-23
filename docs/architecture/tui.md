@@ -18,8 +18,11 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - No header bar, no bordered transcript, no bordered input. The only box is the permission dialog.
 - Tool blocks: `● Tool(args)` with wrapped continuation aligned under the call, `⎿` output lines, colored diff lines, and `… +N lines (ctrl+o to expand)`.
 - User prompts: `❯ text` with two-space continuation. Assistant text: markdown-style headings, lists, quotes, and fenced code.
-- Completion line: `✻ Worked for 3.2s`; live spinner: `✻ Thinking… (3s · esc to interrupt)` or `Running Bash…`.
-- Bottom mode line: `⏵⏵ auto mode on (shift+tab to cycle)`, `⛔ readonly mode …`, or `? for shortcuts …`; workspace, branch, model, duration, and tokens sit dim on the right when width allows.
+- Live spinner: `✻ Scampering… (3s · ↓ 1.2k tokens)`, with a `Tip:` line below. The verb is chosen per turn; the color starts yellow and fades to red after 3s without model output. Active tools suppress the stall.
+- Completion line: `✻ Churned for 3.2s · done 16:01`.
+- Bottom mode line: `⏵⏵ auto mode on (shift+tab to cycle)` in yellow, `⛔ readonly mode …` in red, or `? for shortcuts …` dim; busy adds `esc to interrupt`; workspace, branch, model, duration, and tokens sit dim on the right when width allows.
+- The live assistant is clipped to the viewport tail. Completed output is printed once from `Static`, which prevents long streaming responses from scrolling part of the live frame into scrollback and then reprinting it.
+- Slash, file, and history menus render below the prompt. File completion uses a `+ path` list; slash completion uses name/description columns.
 - Prompt input submitted while a run is active is queued and sent when the run finishes.
 - Keybindings:
   - `Ctrl+C` exit

@@ -26,7 +26,7 @@ export function Welcome({
       <Box flexDirection="row">
         <Box flexDirection="column" marginRight={2} flexShrink={0}>
           {LOGO.map((line, index) => (
-            <Text key={index} color={theme.brand} wrap="truncate">
+            <Text key={index} color={theme.logo} wrap="truncate">
               {line}
             </Text>
           ))}

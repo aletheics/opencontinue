@@ -19,6 +19,7 @@ type TranscriptItemProps = {
   expanded: boolean
   leading: boolean
   permissionMode?: PermissionMode
+  maxLines?: number
 }
 
 function ToolBlock({
@@ -107,6 +108,7 @@ export function TranscriptItem({
   expanded,
   leading,
   permissionMode,
+  maxLines,
 }: TranscriptItemProps) {
   const width = Math.max(20, columns - 2)
 
@@ -139,9 +141,20 @@ export function TranscriptItem({
 
   if (item.kind === "assistant") {
     if (!item.text) return null
+    const all = formatAssistantLines(item.text, Math.max(10, width - 2))
+    const limit = maxLines ? Math.max(1, maxLines) : all.length
+    const hidden = all.length > limit ? all.length - (limit - 1) : 0
+    const visible = hidden > 0 ? all.slice(hidden) : all
+    const bulletIndex = visible.findIndex((line) => line.text.length > 0)
+
     return (
       <Box marginTop={leading ? 1 : 0} flexDirection="column">
-        {formatAssistantLines(item.text, width).map((line, index) => (
+        {hidden > 0 ? (
+          <Text dimColor wrap="truncate">
+            … +{hidden} earlier lines
+          </Text>
+        ) : null}
+        {visible.map((line, index) => (
           <Text
             key={index}
             color={line.color}
@@ -149,7 +162,14 @@ export function TranscriptItem({
             bold={line.bold}
             wrap="truncate"
           >
-            {line.text}
+            {index === bulletIndex ? (
+              <>
+                <Text color={theme.muted}>● </Text>
+                {line.text}
+              </>
+            ) : (
+              line.text
+            )}
           </Text>
         ))}
       </Box>
@@ -195,12 +215,14 @@ export function Transcript({
   expanded,
   leading,
   permissionMode,
+  maxLines,
 }: {
   items: TimelineItem[]
   columns: number
   expanded: boolean
   leading: boolean
   permissionMode?: PermissionMode
+  maxLines?: number
 }) {
   if (items.length === 0) return null
   return (
@@ -213,6 +235,7 @@ export function Transcript({
           expanded={expanded}
           leading={leading || index > 0}
           permissionMode={permissionMode}
+          maxLines={maxLines}
         />
       ))}
     </Box>
