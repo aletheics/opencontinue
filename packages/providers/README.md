@@ -2,11 +2,13 @@
 
 **Why:** model vendors differ; the agent loop should see one streaming/tool-call interface.
 
-**Owns:** provider catalog, OpenAI-compatible SSE transport, native Anthropic transport, model listing, reasoning-effort capabilities, echo fallback.
+**Owns:** provider catalog, OpenAI-compatible SSE transport, native Anthropic transport, model listing, reasoning-effort capabilities, echo fallback, provider request timeouts and bounded pre-stream retries.
 
 **Public API:** `createProvider`, `listModels`, `PROVIDER_PRESETS`, `reasoningEffortsFor`, `ChatProvider`, `ChatRequest`, `ChatStreamEvent`.
 
 **Reasoning:** `reasoningEffortsFor(provider, model)` advertises levels only where the provider documents the capability. OpenAI o-series / GPT-5 / GPT-6 use `reasoning_effort`; Claude 3.7/4/5 models use extended-thinking budgets via `anthropicThinking` (low 1k, medium 4k, high 8k tokens, with `max_tokens` raised above the budget). `auto` sends nothing; unadvertised levels are dropped. Thinking text is never surfaced as assistant output; signed thinking blocks are preserved across tool steps so multi-step Anthropic runs remain valid.
+
+**Resilience:** OpenAI-compatible requests time out after 10 minutes and retry 408/429/5xx before any stream is consumed, respecting `Retry-After` with capped exponential backoff. Anthropic uses the SDK's 10-minute timeout and two retries. A stream is never retried after text or tool-call deltas have been yielded.
 
 **Allowed imports:** external packages only.
 

@@ -311,6 +311,103 @@ describe("OpenAICompatibleProvider", () => {
     })
   })
 
+  it("retries retryable statuses before the stream starts", async () => {
+    let calls = 0
+    const fetchMock = vi.fn(async () => {
+      calls++
+      if (calls < 3) return new Response("busy", { status: 503 })
+      return new Response(
+        sseBody([
+          'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n',
+        ]),
+        { status: 200 },
+      )
+    })
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "https://example.test/v1",
+      model: "test-model",
+      fetch: fetchMock as unknown as typeof fetch,
+      maxRetries: 2,
+      retryDelayMs: 1,
+    })
+
+    const text: string[] = []
+    for await (const event of provider.streamChat({
+      model: "test-model",
+      messages: [{ role: "user", content: "hi" }],
+    })) {
+      if (event.type === "text") text.push(event.text)
+    }
+
+    expect(calls).toBe(3)
+    expect(text.join("")).toBe("ok")
+  })
+
+  it("does not retry an authentication failure", async () => {
+    let calls = 0
+    const fetchMock = vi.fn(async () => {
+      calls++
+      return new Response("unauthorized", { status: 401 })
+    })
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "https://example.test/v1",
+      model: "test-model",
+      fetch: fetchMock as unknown as typeof fetch,
+      maxRetries: 2,
+      retryDelayMs: 1,
+    })
+
+    await expect(async () => {
+      for await (const _event of provider.streamChat({
+        model: "test-model",
+        messages: [{ role: "user", content: "hi" }],
+      })) {
+        // Drain.
+      }
+    }).rejects.toThrow(/401/)
+
+    expect(calls).toBe(1)
+  })
+
+  it("aborts a stalled stream after the timeout", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const signal = init?.signal
+      if (!signal) throw new Error("missing signal")
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          signal.addEventListener(
+            "abort",
+            () =>
+              controller.error(
+                signal.reason instanceof Error
+                  ? signal.reason
+                  : new DOMException("Aborted", "AbortError"),
+              ),
+            { once: true },
+          )
+        },
+      })
+      return new Response(body, { status: 200 })
+    })
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: "https://example.test/v1",
+      model: "test-model",
+      fetch: fetchMock as unknown as typeof fetch,
+      timeoutMs: 20,
+      maxRetries: 0,
+      retryDelayMs: 1,
+    })
+
+    await expect(async () => {
+      for await (const _event of provider.streamChat({
+        model: "test-model",
+        messages: [{ role: "user", content: "hi" }],
+      })) {
+        // Drain.
+      }
+    }).rejects.toThrow()
+  })
+
   it("throws on non-2xx responses", async () => {
     const fetchMock = vi.fn(async () => new Response("unauthorized", { status: 401 }))
     const provider = new OpenAICompatibleProvider({

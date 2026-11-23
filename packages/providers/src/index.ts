@@ -167,6 +167,107 @@ export type OpenAICompatibleOptions = {
   headers?: Record<string, string>
   fetch?: typeof fetch
   reasoningEfforts?: readonly ReasoningEffort[]
+  timeoutMs?: number
+  maxRetries?: number
+  /** Base for exponential backoff; tests use a tiny value. */
+  retryDelayMs?: number
+}
+
+const DEFAULT_PROVIDER_TIMEOUT_MS = 10 * 60_000
+const DEFAULT_PROVIDER_RETRIES = 2
+const DEFAULT_RETRY_DELAY_MS = 500
+const MAX_RETRY_DELAY_MS = 30_000
+
+function abortError(signal: AbortSignal): Error {
+  return signal.reason instanceof Error
+    ? signal.reason
+    : new DOMException("Aborted", "AbortError")
+}
+
+function isAbort(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  )
+}
+
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(abortError(signal))
+      return
+    }
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer)
+        reject(abortError(signal))
+      },
+      { once: true },
+    )
+  })
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const value = response.headers.get("retry-after")
+  if (!value) return undefined
+
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000
+
+  const date = Date.parse(value)
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now())
+}
+
+function retryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
+}
+
+/**
+ * Retry only the request, before any stream is consumed. Retrying after text
+ * has been yielded would duplicate model output.
+ */
+async function requestWithRetry(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  options: {
+    signal: AbortSignal
+    maxRetries: number
+    retryDelayMs: number
+  },
+): Promise<Response> {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt <= options.maxRetries; attempt++) {
+    try {
+      const response = await fetchImpl(url, init)
+      if (!retryableStatus(response.status) || attempt === options.maxRetries) {
+        return response
+      }
+
+      const headerDelay = retryAfterMs(response)
+      await response.body?.cancel().catch(() => {})
+      await delay(
+        Math.min(
+          MAX_RETRY_DELAY_MS,
+          headerDelay ?? options.retryDelayMs * 2 ** attempt,
+        ),
+        options.signal,
+      )
+    } catch (error) {
+      if (isAbort(error) || options.signal.aborted) throw error
+      lastError = error
+      if (attempt === options.maxRetries) throw error
+      await delay(
+        Math.min(MAX_RETRY_DELAY_MS, options.retryDelayMs * 2 ** attempt),
+        options.signal,
+      )
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Provider request failed")
 }
 
 function toOpenAIMessage(message: ChatMessage): Record<string, unknown> {
@@ -207,6 +308,9 @@ export class OpenAICompatibleProvider implements ChatProvider {
   private readonly apiKey: string | undefined
   private readonly headers: Record<string, string>
   private readonly fetchImpl: typeof fetch
+  private readonly timeoutMs: number
+  private readonly maxRetries: number
+  private readonly retryDelayMs: number
 
   constructor(options: OpenAICompatibleOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "")
@@ -215,6 +319,9 @@ export class OpenAICompatibleProvider implements ChatProvider {
     this.headers = options.headers ?? {}
     this.fetchImpl = options.fetch ?? fetch
     this.reasoningEfforts = options.reasoningEfforts ?? []
+    this.timeoutMs = Math.max(1, options.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS)
+    this.maxRetries = Math.max(0, options.maxRetries ?? DEFAULT_PROVIDER_RETRIES)
+    this.retryDelayMs = Math.max(1, options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS)
   }
 
   async listModels(): Promise<string[]> {
@@ -263,16 +370,30 @@ export class OpenAICompatibleProvider implements ChatProvider {
       body.tool_choice = "auto"
     }
 
-    const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
-        ...this.headers,
+    const timeout = AbortSignal.timeout(this.timeoutMs)
+    const signal = request.signal
+      ? AbortSignal.any([request.signal, timeout])
+      : timeout
+
+    const response = await requestWithRetry(
+      this.fetchImpl,
+      `${this.baseUrl}/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
+          ...this.headers,
+        },
+        body: JSON.stringify(body),
+        signal,
       },
-      body: JSON.stringify(body),
-      signal: request.signal,
-    })
+      {
+        signal,
+        maxRetries: this.maxRetries,
+        retryDelayMs: this.retryDelayMs,
+      },
+    )
 
     if (!response.ok) {
       const text = await response.text()
