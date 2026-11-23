@@ -27,6 +27,9 @@ export type ToolTimelineItem = {
   output?: string
   error?: string
   diff?: string
+  /** Non-zero shell exit or timeout; the tool ran, so output stays available. */
+  exitCode?: number | null
+  timedOut?: boolean
 }
 
 export type UsageTimelineItem = {
@@ -119,7 +122,14 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
   if (event.type === "tool.completed") {
     return items.map((item) =>
       item.kind === "tool" && item.id === `tool:${event.callId}`
-        ? { ...item, status: "done", output: event.output, diff: event.diff }
+        ? {
+            ...item,
+            status: event.failed ? "failed" : "done",
+            output: event.output,
+            diff: event.diff,
+            exitCode: event.exitCode,
+            timedOut: event.timedOut,
+          }
         : item,
     )
   }

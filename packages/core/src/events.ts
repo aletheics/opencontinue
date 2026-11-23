@@ -47,6 +47,9 @@ export function buildEvent(
         callId: draft.callId,
         output: draft.output,
         ...(draft.diff === undefined ? {} : { diff: draft.diff }),
+        ...(draft.failed === undefined ? {} : { failed: draft.failed }),
+        ...(draft.exitCode === undefined ? {} : { exitCode: draft.exitCode }),
+        ...(draft.timedOut === undefined ? {} : { timedOut: draft.timedOut }),
       }
     case "tool.failed":
       return {
@@ -115,6 +118,9 @@ export function draftOf(event: SessionEvent): EventDraft | null {
         callId: event.callId,
         output: event.output,
         ...(event.diff === undefined ? {} : { diff: event.diff }),
+        ...(event.failed === undefined ? {} : { failed: event.failed }),
+        ...(event.exitCode === undefined ? {} : { exitCode: event.exitCode }),
+        ...(event.timedOut === undefined ? {} : { timedOut: event.timedOut }),
       }
     case "tool.failed":
       return {

@@ -286,6 +286,65 @@ async function fakeToolProvider(): Promise<{ server: http.Server; url: string }>
   return { server, url: `http://127.0.0.1:${address.port}/v1` }
 }
 
+async function fakeFailingBashProvider(): Promise<{
+  server: http.Server
+  url: string
+}> {
+  let chatCalls = 0
+  const server = http.createServer((request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      chatCalls++
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      if (chatCalls === 1) {
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      function: {
+                        name: "bash",
+                        arguments: JSON.stringify({
+                          command: 'node -e "process.exit(3)"',
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          })}\n\n`,
+        )
+      } else {
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [{ delta: { content: "command failed" } }],
+          })}\n\n`,
+        )
+      }
+      response.end("data: [DONE]\n\n")
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
 async function fakeWriteProvider(): Promise<{ server: http.Server; url: string }> {
   let chatCalls = 0
   const server = http.createServer((request, response) => {
@@ -657,6 +716,40 @@ describe("TUI", () => {
         expect(output(frames)).toContain("◆ Checkpoints · 1"),
       )
       expect(output(frames)).toContain("completed")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("shows a failed command inside a completed run", async () => {
+    const { server, url } = await fakeFailingBashProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("fail")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› fail"))
+      stdin.write("\r")
+
+      await vi.waitFor(() => expect(lastFrame()).toContain("? Permission required"), {
+        timeout: 5000,
+      })
+      stdin.write("y")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("command failed"), {
+        timeout: 5000,
+      })
+      await vi.waitFor(() => expect(output(frames)).toContain("Completed in"), {
+        timeout: 5000,
+      })
+      expect(output(frames)).toContain("Exit code 3")
+      expect(output(frames)).toContain("1 command (1 failed)")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

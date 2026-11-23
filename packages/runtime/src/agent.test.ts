@@ -228,6 +228,109 @@ describe("runAgent", () => {
     ])
   })
 
+  it("records a non-zero shell exit as a failed tool inside a completed run", async () => {
+    const workspace = await makeWorkspace()
+    const store = new MemorySessionStore()
+    const session = store.create()
+    store.append(session.id, { type: "message.user", text: "fail" })
+
+    const seen: ChatMessage[][] = []
+    let step = 0
+    const provider: ChatProvider = {
+      id: "fake",
+      model: "fake",
+      async *streamChat(request) {
+        seen.push(structuredClone(request.messages))
+        step++
+        if (step === 1) {
+          yield {
+            type: "tool_call",
+            call: {
+              id: "call_1",
+              name: "bash",
+              arguments: JSON.stringify({ command: 'node -e "process.exit(3)"' }),
+            },
+          }
+          return
+        }
+        yield { type: "text", text: "the command failed" }
+      },
+    }
+
+    await runAgent({
+      store,
+      sessionId: session.id,
+      provider,
+      tools: new ToolRegistry(),
+      permissions: allowAll,
+      workspace,
+    })
+
+    const events = store.events(session.id)
+    expect(events.find((event) => event.type === "tool.completed")).toMatchObject({
+      failed: true,
+      exitCode: 3,
+    })
+    expect(events.some((event) => event.type === "run.completed")).toBe(true)
+    expect(events.some((event) => event.type === "run.failed")).toBe(false)
+    expect(seen[1]?.find((message) => message.role === "tool")).toMatchObject({
+      content: expect.stringContaining("Exit code 3"),
+    })
+    expect(store.snapshot(session.id)?.messages.at(-1)).toEqual({
+      role: "assistant",
+      text: "the command failed",
+    })
+  })
+
+  it("still completes the run after a denied tool and tells the model why", async () => {
+    const workspace = await makeWorkspace()
+    const store = new MemorySessionStore()
+    const session = store.create()
+    store.append(session.id, { type: "message.user", text: "run it" })
+
+    const seen: ChatMessage[][] = []
+    let step = 0
+    const provider: ChatProvider = {
+      id: "fake",
+      model: "fake",
+      async *streamChat(request) {
+        seen.push(structuredClone(request.messages))
+        step++
+        if (step === 1) {
+          yield {
+            type: "tool_call",
+            call: {
+              id: "call_1",
+              name: "bash",
+              arguments: JSON.stringify({ command: "echo hi" }),
+            },
+          }
+          return
+        }
+        yield { type: "text", text: "not allowed" }
+      },
+    }
+
+    await runAgent({
+      store,
+      sessionId: session.id,
+      provider,
+      tools: new ToolRegistry(),
+      permissions: { async authorize() { return false } },
+      workspace,
+    })
+
+    const events = store.events(session.id)
+    expect(events.find((event) => event.type === "tool.failed")).toMatchObject({
+      error: "Permission denied",
+    })
+    expect(events.some((event) => event.type === "run.completed")).toBe(true)
+    expect(events.some((event) => event.type === "run.failed")).toBe(false)
+    expect(seen[1]?.find((message) => message.role === "tool")).toMatchObject({
+      content: "Error: Permission denied",
+    })
+  })
+
   it("records a failed run", async () => {
     const workspace = await makeWorkspace()
     const store = new MemorySessionStore()

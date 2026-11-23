@@ -97,16 +97,37 @@ describe("tools", () => {
     expect(await grepTool.execute({ pattern: "needle" }, context(workspace))).toContain("a.ts:1")
   })
 
-  it("returns bash output without a success exit-code prefix", async () => {
+  it("returns structured bash results for success and failure", async () => {
     const workspace = await makeWorkspace()
 
-    expect(await bashTool.execute({ command: "echo hi" }, context(workspace))).toBe("hi")
+    expect(await bashTool.execute({ command: "echo hi" }, context(workspace))).toMatchObject({
+      output: "hi",
+      failed: false,
+      exitCode: 0,
+      timedOut: false,
+    })
 
     const failed = await bashTool.execute(
       { command: 'node -e "process.exit(3)"' },
       context(workspace),
     )
-    expect(failed).toContain("Exit code 3")
+    expect(failed).toMatchObject({ failed: true, exitCode: 3, timedOut: false })
+    expect(typeof failed === "string" ? failed : failed.output).toContain("Exit code 3")
+  })
+
+  it("keeps bash failure metadata through the registry", async () => {
+    const workspace = await makeWorkspace()
+    const registry = new ToolRegistry()
+
+    const result = await registry.execute(
+      "bash",
+      JSON.stringify({ command: 'node -e "process.exit(3)"' }),
+      context(workspace),
+      { authorize: async () => true },
+    )
+
+    expect(result).toMatchObject({ ok: true, failed: true, exitCode: 3 })
+    expect(result.ok ? result.output : "").toContain("Exit code 3")
   })
 
   it("validates and summarizes a todo list", async () => {

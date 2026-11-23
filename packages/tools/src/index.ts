@@ -22,6 +22,10 @@ export type ToolOutput =
   | {
       output: string
       diff?: string
+      /** The tool ran but reported a domain failure, such as a non-zero shell exit. */
+      failed?: boolean
+      exitCode?: number | null
+      timedOut?: boolean
     }
 
 export type ToolPreview = {
@@ -39,7 +43,14 @@ export type Tool = {
 }
 
 export type ToolExecution =
-  | { ok: true; output: string; diff?: string }
+  | {
+      ok: true
+      output: string
+      diff?: string
+      failed?: boolean
+      exitCode?: number | null
+      timedOut?: boolean
+    }
   | { ok: false; error: string }
 
 export interface PermissionGate {
@@ -344,7 +355,7 @@ export const bashTool: Tool = {
     const { command, cwd = ".", timeoutMs = 120_000 } = bashInput.parse(raw)
     const workdir = resolveInside(context.workspace, cwd)
 
-    return await new Promise<string>((resolve, reject) => {
+    return await new Promise<ToolOutput>((resolve, reject) => {
       const child = spawn(command, {
         shell: true,
         cwd: workdir,
@@ -378,8 +389,8 @@ export const bashTool: Tool = {
         clearTimeout(timer)
         context.signal?.removeEventListener("abort", abort)
         const failed = code !== 0 || timedOut
-        resolve(
-          [
+        resolve({
+          output: [
             output.trimEnd(),
             failed
               ? `Exit code ${code ?? "null"}${timedOut ? " (timed out)" : ""}`
@@ -387,7 +398,10 @@ export const bashTool: Tool = {
           ]
             .filter(Boolean)
             .join("\n"),
-        )
+          failed,
+          exitCode: code,
+          timedOut,
+        })
       })
     })
   },
@@ -453,9 +467,15 @@ export class ToolRegistry {
 
     try {
       const result = await tool.execute(parsed.data, context)
-      return typeof result === "string"
-        ? { ok: true, output: result }
-        : { ok: true, output: result.output, diff: result.diff }
+      if (typeof result === "string") return { ok: true, output: result }
+      return {
+        ok: true,
+        output: result.output,
+        ...(result.diff === undefined ? {} : { diff: result.diff }),
+        ...(result.failed ? { failed: true } : {}),
+        ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
+        ...(result.timedOut ? { timedOut: true } : {}),
+      }
     } catch (error) {
       return { ok: false, error: messageOf(error) }
     }

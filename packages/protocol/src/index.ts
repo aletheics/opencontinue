@@ -84,6 +84,10 @@ export const SessionEvent = z.discriminatedUnion("type", [
     callId: z.string(),
     output: z.string(),
     diff: z.string().optional(),
+    /** The tool ran but reported a domain failure, such as a non-zero shell exit. */
+    failed: z.boolean().optional(),
+    exitCode: z.number().int().nullable().optional(),
+    timedOut: z.boolean().optional(),
   }),
   z.object({
     ...eventBase,

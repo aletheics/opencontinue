@@ -27,7 +27,16 @@ export type EventDraft =
       totalTokens?: number
     }
   | { type: "tool.started"; runId: string; callId: string; name: string; input: unknown }
-  | { type: "tool.completed"; runId: string; callId: string; output: string; diff?: string }
+  | {
+      type: "tool.completed"
+      runId: string
+      callId: string
+      output: string
+      diff?: string
+      failed?: boolean
+      exitCode?: number | null
+      timedOut?: boolean
+    }
   | { type: "tool.failed"; runId: string; callId: string; error: string }
   | {
       type: "permission.requested"

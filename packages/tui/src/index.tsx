@@ -621,7 +621,7 @@ export function App({ options }: { options: TuiOptions }) {
         runToolsRef.current.set(event.callId, {
           name: tool?.name ?? "tool",
           input: tool?.input,
-          status: "done",
+          status: event.failed ? "failed" : "done",
           diff: event.diff,
         })
         return

@@ -120,6 +120,9 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
             callId: call.id,
             output: result.output,
             ...(result.diff === undefined ? {} : { diff: result.diff }),
+            ...(result.failed ? { failed: true } : {}),
+            ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
+            ...(result.timedOut ? { timedOut: true } : {}),
           })
           history.push({ role: "tool", toolCallId: call.id, content: result.output })
         } else {

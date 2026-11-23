@@ -84,6 +84,42 @@ describe("timeline", () => {
     })
   })
 
+  it("marks a non-zero shell exit as a failed tool", () => {
+    const events: SessionEvent[] = [
+      { ...base, seq: 1, type: "run.started", runId: "r1" },
+      {
+        ...base,
+        seq: 2,
+        type: "tool.started",
+        runId: "r1",
+        callId: "c1",
+        name: "bash",
+        input: { command: "npm test" },
+      },
+      {
+        ...base,
+        seq: 3,
+        type: "tool.completed",
+        runId: "r1",
+        callId: "c1",
+        output: "1 failed\nExit code 1",
+        failed: true,
+        exitCode: 1,
+        timedOut: false,
+      },
+    ]
+
+    const item = timelineFromEvents(events).find(
+      (entry): entry is ToolTimelineItem => entry.kind === "tool",
+    )
+    expect(item).toMatchObject({
+      status: "failed",
+      output: "1 failed\nExit code 1",
+      exitCode: 1,
+      timedOut: false,
+    })
+  })
+
   it("labels common tools with their arguments", () => {
     const item: ToolTimelineItem = {
       kind: "tool",
