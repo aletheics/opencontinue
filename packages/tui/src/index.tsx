@@ -1316,6 +1316,11 @@ export function App({ options }: { options: TuiOptions }) {
                     }
                     onSubmit={historySearch ? chooseHistory : submitInput}
                   />
+                  <Box>
+                    <Text dimColor wrap="truncate">
+                      {rule}
+                    </Text>
+                  </Box>
 
                   {menuOpen ? (
                     <SlashMenu
@@ -1352,12 +1357,6 @@ export function App({ options }: { options: TuiOptions }) {
                     </Box>
                   ) : null}
 
-
-                  <Box>
-                    <Text dimColor wrap="truncate">
-                      {rule}
-                    </Text>
-                  </Box>
                 </>
               )}
             </>
