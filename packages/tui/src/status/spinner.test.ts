@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest"
 import {
   glimmerIndex,
   isShimmerChar,
-  pickCompletionVerb,
   pickSpinnerTip,
   pickSpinnerVerb,
   SPINNER_TIPS,
@@ -12,62 +11,28 @@ import {
   spinnerGlyph,
   stallIntensity,
   stallTint,
-  TURN_COMPLETION_VERBS,
   visibleStatusParts,
 } from "./spinner.js"
 
 describe("spinner", () => {
-  it("picks a verb, completion verb, and tip", () => {
+  it("picks an engineering verb and a tip", () => {
     expect(pickSpinnerVerb(0)).toBe(SPINNER_VERBS[0])
     expect(pickSpinnerVerb(0.999)).toBe(SPINNER_VERBS.at(-1))
-    expect(SPINNER_VERBS).toContain("Scampering")
-    expect(SPINNER_VERBS).toContain("Topsy-turvying")
-    expect(SPINNER_VERBS).toContain("Churning")
-
-    expect(pickCompletionVerb(0)).toBe("Baked")
-    expect(pickCompletionVerb(0.999)).toBe("Worked")
-    expect(TURN_COMPLETION_VERBS).toContain("Churned")
+    expect(SPINNER_VERBS).toContain("Analyzing")
+    expect(SPINNER_VERBS).toContain("Verifying")
+    expect(SPINNER_VERBS).toContain("Continuing")
 
     expect(pickSpinnerTip(0)).toBe(SPINNER_TIPS[0])
     expect(pickSpinnerTip(0.999)).toBe(SPINNER_TIPS.at(-1))
   })
 
-  it("uses platform-specific glyphs and a forward-then-back cycle", () => {
-    expect(spinnerFrames("darwin")).toEqual([
-      "·",
-      "✢",
-      "✳",
-      "✶",
-      "✻",
-      "✽",
-      "✽",
-      "✻",
-      "✶",
-      "✳",
-      "✢",
-      "·",
-    ])
-    expect(spinnerFrames("win32")).toEqual([
-      "·",
-      "✢",
-      "*",
-      "✶",
-      "✻",
-      "✽",
-      "✽",
-      "✻",
-      "✶",
-      "*",
-      "✢",
-      "·",
-    ])
-
-    const frames = spinnerFrames("win32")
-    expect(spinnerGlyph(0, frames)).toBe("·")
-    expect(spinnerGlyph(120, frames)).toBe("✢")
-    expect(spinnerGlyph(600, frames)).toBe("✽")
-    expect(spinnerGlyph(720, frames)).toBe("✽")
-    expect(spinnerGlyph(840, frames)).toBe("✻")
+  it("cycles the Braille spinner", () => {
+    const frames = spinnerFrames()
+    expect(frames).toEqual(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+    expect(spinnerGlyph(0, frames)).toBe("⠋")
+    expect(spinnerGlyph(120, frames)).toBe("⠙")
+    expect(spinnerGlyph(600, frames)).toBe("⠴")
+    expect(spinnerGlyph(1_200, frames)).toBe("⠋")
   })
 
   it("stalls only after three seconds without output", () => {
@@ -77,10 +42,10 @@ describe("spinner", () => {
     expect(stallIntensity(9_000, true)).toBe(0)
   })
 
-  it("fades the spinner from Claude orange to error red", () => {
-    expect(stallTint(0)).toBe("rgb(215,119,87)")
-    expect(stallTint(0.5)).toBe("rgb(193,81,75)")
-    expect(stallTint(1)).toBe("rgb(171,43,63)")
+  it("fades the spinner from working blue to danger red", () => {
+    expect(stallTint(0)).toBe("rgb(96,165,250)")
+    expect(stallTint(0.5)).toBe("rgb(168,117,159)")
+    expect(stallTint(1)).toBe("rgb(239,68,68)")
   })
 
   it("sweeps a shimmer highlight across the message", () => {

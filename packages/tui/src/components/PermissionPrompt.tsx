@@ -1,5 +1,6 @@
 import { Box, Text } from "ink"
 
+import { glyphs } from "../glyphs.js"
 import {
   formatDiffLines,
   toolDisplayName,
@@ -20,8 +21,8 @@ export function PermissionPrompt({ columns, permission }: PermissionPromptProps)
 
   return (
     <Box marginTop={1} paddingX={2} flexDirection="column">
-      <Text color={theme.tool} wrap="truncate">
-        ? Permission required
+      <Text color={theme.warning} wrap="truncate">
+        {glyphs.approval} Permission required
       </Text>
       <Text wrap="truncate">
         OpenContinue wants to {action}{" "}

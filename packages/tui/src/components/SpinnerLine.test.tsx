@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 import { spinnerFrames } from "../status/spinner.js"
 import { SpinnerLine } from "./SpinnerLine.js"
 
-const frames = spinnerFrames("win32")
+const frames = spinnerFrames()
 
 function plain(frame: string | undefined): string {
   return (frame ?? "").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")

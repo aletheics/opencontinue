@@ -1,3 +1,4 @@
+import { glyphs } from "../../glyphs.js"
 import { formatDuration } from "../../status/format.js"
 import type { ToolTimelineItem } from "../../timeline.js"
 import type { Line } from "./line.js"
@@ -34,9 +35,9 @@ export function toolHeaderLines(item: ToolTimelineItem, width: number): string[]
   const args = toolArgumentSummary(item)
   const safeWidth = Math.max(20, width)
 
-  if (!args) return [`● ${name}()`]
+  if (!args) return [`${glyphs.tool} ${name}()`]
 
-  const prefix = `● ${name}(`
+  const prefix = `${glyphs.tool} ${name}(`
   const contentWidth = Math.max(8, safeWidth - prefix.length - 2)
   const lines = wrapText(args, contentWidth).map((part, index) =>
     index === 0 ? `${prefix}${part}` : `  ${part}`,

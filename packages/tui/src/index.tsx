@@ -39,6 +39,7 @@ import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
 import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
 import type { PermissionMode } from "./permissions/types.js"
 import { useTerminalSize } from "./hooks/use-terminal-size.js"
+import { glyphs } from "./glyphs.js"
 import { LineText } from "./components/LineText.js"
 import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
@@ -57,7 +58,6 @@ import { partitionTimeline } from "./session/transcript.js"
 import { workspaceInfo } from "./session/workspace.js"
 import { formatClock, formatDuration, formatTokens } from "./status/format.js"
 import {
-  pickCompletionVerb,
   pickSpinnerTip,
   pickSpinnerVerb,
   spinnerFrames,
@@ -429,9 +429,14 @@ export function App({ options }: { options: TuiOptions }) {
         const started = runStartedRef.current
         if (started !== null) {
           const elapsed = Date.now() - started
-          const verb = event.type === "run.completed" ? pickCompletionVerb() : "Failed"
           setLastDurationMs(elapsed)
-          appendMeta(`✻ ${verb} for ${formatDuration(elapsed)} · done ${formatClock()}`)
+          const symbol =
+            event.type === "run.completed" ? glyphs.done : glyphs.failed
+          const outcome =
+            event.type === "run.completed" ? "Completed" : "Failed"
+          appendMeta(
+            `${symbol} ${outcome} in ${formatDuration(elapsed)} · ${formatClock()}`,
+          )
         }
         activeRunIdRef.current = null
         runStartedRef.current = null
@@ -1102,10 +1107,10 @@ export function App({ options }: { options: TuiOptions }) {
 
   const modeText =
     permissionMode === "auto"
-      ? "⟳ Auto · no per-action prompts · shift+tab to cycle"
+      ? `${glyphs.auto} Auto · no per-action prompts · shift+tab to cycle`
       : permissionMode === "plan"
-        ? "◎ Plan · read-only · shift+tab to cycle"
-        : "◈ Confirm · approve writes/bash · shift+tab to cycle"
+        ? `${glyphs.plan} Plan · read-only · shift+tab to cycle`
+        : `${glyphs.confirm} Confirm · approve writes/bash · shift+tab to cycle`
 
   const menuHint = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
@@ -1146,7 +1151,7 @@ export function App({ options }: { options: TuiOptions }) {
     `model: ${options.url ? "remote" : model}`,
     durationText,
     tokenText,
-    "? help",
+    `${glyphs.approval} help`,
   ]
     .filter(Boolean)
     .join(" · ")

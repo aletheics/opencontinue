@@ -594,16 +594,18 @@ Architecture rules:
     policy without breaking CLI compatibility. `--plan` is the canonical
     flag; `--readonly` remains an alias.
 -   [x] Make permission prompts show the exact operation and target.
--   [ ] Standardize status symbols and ASCII fallbacks.
+-   [x] Standardize status symbols and ASCII fallbacks. Implemented in
+    `packages/tui/src/glyphs.ts`; set `OPENCONTINUE_ASCII=1` to force the
+    ASCII set.
 -   [x] Make active mode always visible.
 
 ### P1 --- Improve daily usability
 
--   [ ] Refine startup/header hierarchy.
+-   [x] Refine startup/header hierarchy.
 -   [ ] Add concise task progress for multi-step work.
 -   [ ] Add evidence-based completion summaries.
 -   [ ] Make narrow-terminal behavior reliable.
--   [ ] Document existing shortcuts and commands in `?` help.
+-   [x] Document existing shortcuts and commands in `?` help.
 
 ### P2 --- Add provider-aware controls
 

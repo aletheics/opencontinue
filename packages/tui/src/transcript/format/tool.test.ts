@@ -20,11 +20,11 @@ function tool(overrides: Partial<ToolTimelineItem> = {}): ToolTimelineItem {
 }
 
 describe("tool formatting", () => {
-  it("renders a Claude-style header with args", () => {
-    expect(toolHeaderLines(tool(), 60)).toEqual(["● Read(src/app.ts)"])
+  it("renders a tool header with args", () => {
+    expect(toolHeaderLines(tool(), 60)).toEqual(["↳ Read(src/app.ts)"])
     expect(
       toolHeaderLines(tool({ name: "bash", input: { command: "echo hi" } }), 60),
-    ).toEqual(["● Bash(echo hi)"])
+    ).toEqual(["↳ Bash(echo hi)"])
   })
 
   it("collapses output until expanded", () => {

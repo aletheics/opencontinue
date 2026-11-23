@@ -16,7 +16,7 @@ export type SpinnerLineProps = {
   tokens: number
   stalled: number
   columns: number
-  frames: string[]
+  frames: readonly string[]
 }
 
 /**
@@ -34,7 +34,7 @@ export function SpinnerLine({
   frames,
 }: SpinnerLineProps) {
   const message = `${verb}…`
-  const tint = stalled > 0 ? stallTint(stalled) : theme.claude
+  const tint = stalled > 0 ? stallTint(stalled) : theme.working
   const glyph = spinnerGlyph(elapsedMs, frames)
   const shimmerAt = glimmerIndex(message.length, elapsedMs)
   const statusParts = visibleStatusParts(
@@ -56,8 +56,8 @@ export function SpinnerLine({
                 key={index}
                 color={
                   isShimmerChar(index, shimmerAt)
-                    ? theme.claudeShimmer
-                    : theme.claude
+                    ? theme.workingShimmer
+                    : theme.working
                 }
               >
                 {character}

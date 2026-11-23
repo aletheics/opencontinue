@@ -180,7 +180,7 @@ async function fakeWriteProvider(): Promise<{ server: http.Server; url: string }
 }
 
 describe("TUI", () => {
-  it("renders Claude-style inline transcript blocks", () => {
+  it("renders OpenContinue transcript blocks", () => {
     const tool = render(
       <TranscriptItem
         item={{
@@ -199,7 +199,7 @@ describe("TUI", () => {
       />,
     )
     const toolFrame = tool.lastFrame() ?? ""
-    expect(toolFrame).toContain("● Bash(echo hi)")
+    expect(toolFrame).toContain("↳ Bash(echo hi)")
     expect(toolFrame).toContain("⎿")
     expect(toolFrame).toContain("ctrl+o to expand")
     expect(toolFrame).toContain("Allowed by auto mode")
@@ -648,7 +648,7 @@ describe("TUI", () => {
       }
 
       await vi.waitFor(() => {
-        const count = output(frames).match(/ · done /g)?.length ?? 0
+        const count = output(frames).match(/Completed in/g)?.length ?? 0
         expect(count).toBeGreaterThanOrEqual(2)
       })
 
@@ -680,8 +680,12 @@ describe("TUI", () => {
 
     try {
       await ready(lastFrame)
-      expect(output(frames)).toContain("OpenContinue v0.0.1")
-      expect(output(frames)).toContain("gpt-6.2 · OpenAI (GPT)")
+      expect(output(frames)).toContain("◈ OpenContinue")
+      expect(output(frames)).toContain("v0.0.1")
+      expect(output(frames)).toContain("Model")
+      expect(output(frames)).toContain("gpt-6.2")
+      expect(output(frames)).toContain("Provider")
+      expect(output(frames)).toContain("OpenAI (GPT)")
       expect(output(frames)).toContain(home)
       expect(output(frames)).not.toContain("Welcome to OpenContinue")
       expect(lastFrame()).toContain("Plan")

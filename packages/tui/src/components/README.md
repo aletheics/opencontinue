@@ -4,10 +4,10 @@
 
 **Files:**
 
-- `Welcome.tsx` — condensed startup banner: a three-row coral block mark beside a bold name with dim version, dim model/provider, and dim workspace. No welcome line.
-- `Transcript.tsx` — Claude Code-style inline blocks: `›` prompts, white `●` assistant dots with a two-column indented markdown body, `● Tool(args)` with two-space header wraps, dim `⎿` gutters with normal output, colored diffs, collapsed output hints, `(No output)`, bash timeout/cwd notes, and dim meta lines.
+- `Welcome.tsx` — OpenContinue startup header: `◈ OpenContinue`, tagline, aligned model/provider/workspace rows with middle-shortened paths, and a ready line.
+- `Transcript.tsx` — OpenContinue inline blocks: `›` prompts, white `●` assistant dots with a two-column indented markdown body, `↳ Tool(args)` with two-space header wraps, dim `⎿` gutters with normal output, colored diffs, collapsed output hints, `(No output)`, bash timeout/cwd notes, and dim meta lines.
 - `Picker.tsx` — generic type-to-filter list used by provider, model, session, history, and file selection.
-- `SpinnerLine.tsx` — live turn status: a 120ms glyph cycle, a shimmering coral verb, the coral-to-error-red stall fade, the 30-second timer/token gate, and the `  ⎿  Tip:` line.
+- `SpinnerLine.tsx` — live turn status: a 120ms Braille spinner, a shimmering working-blue verb, the working-blue-to-danger-red stall fade, the 30-second timer/token gate, and the `  ⎿  Tip:` line.
 - `LineText.tsx` — renders a formatted line, including inline markdown spans (code, bold, italic, strikethrough, links).
 - `Prompt.tsx` — borderless prompt composed with `composer/editor/Input.tsx`.
 - `SlashMenu.tsx` — borderless command palette above the prompt.

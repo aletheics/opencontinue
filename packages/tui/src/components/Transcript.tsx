@@ -1,6 +1,7 @@
 import type { PermissionMode } from "@opencontinue/protocol"
 import { Box, Text } from "ink"
 
+import { glyphs } from "../glyphs.js"
 import {
   assistantBlock,
   formatDiffLines,
@@ -44,18 +45,19 @@ function ToolBlock({
   const header = toolHeaderLines(item, width)
   const dot =
     item.status === "failed"
-      ? theme.error
+      ? theme.danger
       : item.status === "running"
-        ? theme.tool
-        : theme.user
+        ? theme.working
+        : theme.success
 
   return (
     <Box marginTop={leading ? 1 : 0} flexDirection="column">
       {header.map((line, index) => {
-        if (index === 0 && line.startsWith("● ")) {
+        if (index === 0 && line.startsWith(`${glyphs.tool} `)) {
           return (
             <Text key={index} wrap="truncate">
-              <Text color={dot}>●</Text> <Text bold>{line.slice(2)}</Text>
+              <Text color={dot}>{glyphs.tool}</Text>{" "}
+              <Text bold>{line.slice(glyphs.tool.length + 1)}</Text>
             </Text>
           )
         }
@@ -94,7 +96,7 @@ function ToolBlock({
 
       {item.error
         ? formatToolOutputLines(item.error, width, expanded).map((line, index) => (
-            <Text key={`err-${index}`} color={theme.error} wrap="truncate">
+            <Text key={`err-${index}`} color={theme.danger} wrap="truncate">
               {line.text}
             </Text>
           ))

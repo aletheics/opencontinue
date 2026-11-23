@@ -1,20 +1,10 @@
 import { Box, Text } from "ink"
 
+import { PRODUCT_NAME, READY_LINE, TAGLINE } from "../brand.js"
+import { glyphs } from "../glyphs.js"
 import { theme } from "../theme.js"
 
-/**
- * Three-row coral block mark, 9 columns wide, matching Claude Code's
- * condensed startup footprint. It is an OpenContinue mark, not a copy.
- */
-export const BANNER_MARK = [
-  " ▄█████▄ ",
-  "██     ██",
-  " ▀█████▀ ",
-] as const
-
-const NAME = "OpenContinue"
-const VERSION_PREFIX = `${NAME} v`
-const SEPARATOR = " · "
+const LABEL_WIDTH = 12
 
 export type WelcomeProps = {
   version: string
@@ -24,72 +14,54 @@ export type WelcomeProps = {
   columns: number
 }
 
-/**
- * Claude Code subtracts the mark (9), the gap (2), and padding (2) from the
- * terminal width, with a 20-column floor.
- */
-export function bannerTextWidth(columns: number): number {
-  return Math.max(20, columns - 15)
-}
-
-export function truncateLine(text: string, width: number): string {
+/** Keep the root and the tail, inserting an ellipsis in the middle. */
+export function shortenPath(value: string, width: number): string {
   const limit = Math.max(0, width)
-  if (text.length <= limit) return text
-  if (limit === 0) return ""
-  if (limit === 1) return "…"
-  return `${text.slice(0, limit - 1)}…`
+  if (value.length <= limit) return value
+  if (limit <= 1) return "…"
+
+  const keep = limit - 1
+  const head = Math.ceil(keep / 2)
+  const tail = Math.floor(keep / 2)
+  return `${value.slice(0, head)}…${value.slice(value.length - tail)}`
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <Text wrap="truncate">
+      <Text dimColor>{label.padEnd(LABEL_WIDTH)}</Text>
+      {value}
+    </Text>
+  )
 }
 
 /**
- * `model · provider` on one line, or two dim lines when the terminal is
- * narrow. Mirrors the split Claude Code applies to model and billing.
+ * OpenContinue startup header: a stable brand mark, product name and
+ * version, tagline, aligned model/provider/workspace rows, and a ready line.
  */
-export function modelLines(
-  model: string,
-  provider: string,
-  width: number,
-): string[] {
-  const combined = `${model}${SEPARATOR}${provider}`
-  if (combined.length <= width) return [combined]
-  return [truncateLine(model, width), truncateLine(provider, width)]
-}
-
-export function Welcome({
-  version,
-  model,
-  provider,
-  workspace,
-  columns,
-}: WelcomeProps) {
-  const textWidth = bannerTextWidth(columns)
-  const versionText = truncateLine(
-    version,
-    Math.max(6, textWidth - VERSION_PREFIX.length),
-  )
-  const lines = modelLines(model, provider, textWidth)
-  const workspaceText = truncateLine(workspace, textWidth)
+export function Welcome({ version, model, provider, workspace, columns }: WelcomeProps) {
+  const valueWidth = Math.max(10, columns - LABEL_WIDTH)
 
   return (
-    <Box flexDirection="row" paddingLeft={2}>
-      <Box flexDirection="column" marginRight={2} flexShrink={0}>
-        {BANNER_MARK.map((line, index) => (
-          <Text key={index} color={theme.logo} wrap="truncate">
-            {line}
-          </Text>
-        ))}
+    <Box flexDirection="column">
+      <Text wrap="truncate">
+        <Text color={theme.brandMark}>{glyphs.brand}</Text>
+        <Text bold> {PRODUCT_NAME}</Text>
+        <Text dimColor>{"  "}v{version}</Text>
+      </Text>
+      <Text dimColor wrap="truncate">
+        {TAGLINE}
+      </Text>
+
+      <Box marginTop={1} flexDirection="column">
+        <Row label="Model" value={model} />
+        <Row label="Provider" value={provider} />
+        <Row label="Workspace" value={shortenPath(workspace, valueWidth)} />
       </Box>
-      <Box flexDirection="column" flexShrink={1} overflow="hidden">
-        <Text wrap="truncate">
-          <Text bold>{NAME}</Text>
-          <Text dimColor> v{versionText}</Text>
-        </Text>
-        {lines.map((line, index) => (
-          <Text key={`model-${index}`} dimColor wrap="truncate">
-            {line}
-          </Text>
-        ))}
+
+      <Box marginTop={1}>
         <Text dimColor wrap="truncate">
-          {workspaceText}
+          {glyphs.ready} {READY_LINE}
         </Text>
       </Box>
     </Box>

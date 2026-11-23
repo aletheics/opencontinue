@@ -1,140 +1,35 @@
+import { glyphs } from "../glyphs.js"
 import { formatDuration, formatNumber } from "./format.js"
 
 /**
- * Spinner verbs follow Claude Code's list. The verb is sampled once per turn
- * and shown with a trailing ellipsis.
+ * Engineering verbs in OpenContinue's own voice. The verb is sampled once per
+ * turn and shown with a trailing ellipsis.
  */
 export const SPINNER_VERBS = [
-  "Accomplishing",
-  "Actioning",
-  "Actualizing",
-  "Architecting",
-  "Baking",
-  "Beaming",
-  "Beboppin'",
-  "Befuddling",
-  "Billowing",
-  "Blanching",
-  "Bloviating",
-  "Boogieing",
-  "Boondoggling",
-  "Booping",
-  "Bootstrapping",
-  "Brewing",
-  "Bunning",
-  "Burrowing",
-  "Calculating",
-  "Canoodling",
-  "Caramelizing",
-  "Cascading",
-  "Catapulting",
-  "Cerebrating",
-  "Channelling",
-  "Choreographing",
-  "Churning",
-  "Coalescing",
-  "Cogitating",
-  "Combobulating",
-  "Composing",
-  "Computing",
-  "Concocting",
-  "Considering",
-  "Contemplating",
-  "Cooking",
-  "Crafting",
-  "Creating",
-  "Crunching",
-  "Crystallizing",
-  "Cultivating",
-  "Deciphering",
-  "Deliberating",
-  "Determining",
-  "Dilly-dallying",
-  "Discombobulating",
-  "Doing",
-  "Doodling",
-  "Drizzling",
-  "Elucidating",
-  "Embellishing",
-  "Enchanting",
-  "Envisioning",
-  "Fermenting",
-  "Fiddle-faddling",
-  "Finagling",
-  "Flambéing",
-  "Flowing",
-  "Flummoxing",
-  "Fluttering",
-  "Forging",
-  "Forming",
-  "Frolicking",
-  "Frosting",
-  "Gallivanting",
-  "Galloping",
-  "Garnishing",
-  "Generating",
-  "Gesticulating",
-  "Germinating",
-  "Gitifying",
-  "Grooving",
-  "Gusting",
-  "Harmonizing",
-  "Hashing",
-  "Hatching",
-  "Herding",
-  "Honking",
-  "Hullaballooing",
-  "Hyperspacing",
-  "Ideating",
-  "Imagining",
-  "Improvising",
-  "Incubating",
-  "Inferring",
-  "Infusing",
-  "Ionizing",
-  "Jitterbugging",
-  "Julienning",
-  "Kneading",
-  "Leavening",
-  "Levitating",
-  "Lollygagging",
-  "Manifesting",
-  "Marinating",
-  "Meandering",
-  "Metamorphosing",
-  "Misting",
-  "Moonwalking",
-  "Moseying",
-  "Mulling",
-  "Musing",
-  "Noodling",
-  "Percolating",
-  "Pondering",
-  "Puttering",
-  "Reticulating",
-  "Scampering",
-  "Scurrying",
-  "Simmering",
-  "Spelunking",
-  "Tinkering",
-  "Topsy-turvying",
-  "Transmuting",
-  "Unfurling",
-  "Whirring",
-  "Wrangling",
-  "Zesting",
-] as const
-
-/** Past-tense verbs for turn completion, e.g. "Churned for 1s". */
-export const TURN_COMPLETION_VERBS = [
-  "Baked",
-  "Brewed",
-  "Churned",
-  "Cogitated",
-  "Cooked",
-  "Crunched",
-  "Sautéed",
-  "Worked",
+  "Analyzing",
+  "Inspecting",
+  "Tracing",
+  "Planning",
+  "Building",
+  "Editing",
+  "Refactoring",
+  "Testing",
+  "Verifying",
+  "Checking",
+  "Searching",
+  "Reading",
+  "Wiring",
+  "Measuring",
+  "Documenting",
+  "Reviewing",
+  "Exploring",
+  "Mapping",
+  "Shaping",
+  "Validating",
+  "Hardening",
+  "Polishing",
+  "Connecting",
+  "Continuing",
 ] as const
 
 export const SPINNER_TIPS = [
@@ -151,8 +46,8 @@ export const SPINNER_TIPS = [
 ] as const
 
 const COLORS = {
-  claude: { r: 215, g: 119, b: 87 },
-  error: { r: 171, g: 43, b: 63 },
+  working: { r: 96, g: 165, b: 250 },
+  danger: { r: 239, g: 68, b: 68 },
 } as const
 
 const STATUS_AFTER_MS = 30_000
@@ -166,33 +61,26 @@ export function pickSpinnerVerb(random: number = Math.random()): string {
   return SPINNER_VERBS[index] ?? SPINNER_VERBS[0]
 }
 
-export function pickCompletionVerb(random: number = Math.random()): string {
-  const index = Math.floor(Math.abs(random) * TURN_COMPLETION_VERBS.length)
-  return TURN_COMPLETION_VERBS[index] ?? "Worked"
-}
-
 export function pickSpinnerTip(random: number = Math.random()): string {
   const index = Math.floor(Math.abs(random) * SPINNER_TIPS.length)
   return SPINNER_TIPS[index] ?? SPINNER_TIPS[0]!
 }
 
 /**
- * Six glyphs run forward then backward, 120ms per frame. Windows uses `*`
- * where macOS uses `✽`, matching Claude Code's terminal quirk workaround.
+ * OpenContinue uses the Braille spinner by default. OPENCONTINUE_ASCII=1
+ * switches to the four-character ASCII cycle.
  */
-export function spinnerFrames(platform: string = process.platform): string[] {
-  const glyphs =
-    platform === "darwin" ? ["·", "✢", "✳", "✶", "✻", "✽"] : ["·", "✢", "*", "✶", "✻", "✽"]
-  return [...glyphs, ...[...glyphs].reverse()]
+export function spinnerFrames(): readonly string[] {
+  return glyphs.spinnerFrames
 }
 
-export function spinnerGlyph(elapsedMs: number, frames: string[]): string {
+export function spinnerGlyph(elapsedMs: number, frames: readonly string[]): string {
   const frame = Math.floor(Math.max(0, elapsedMs) / FRAME_MS)
-  return frames[frame % frames.length] ?? frames[0] ?? "✻"
+  return frames[frame % frames.length] ?? frames[0] ?? glyphs.ready
 }
 
 /**
- * Claude Code holds the base color for 3s, then fades to red over 2s.
+ * Hold the working color for 3s, then fade to danger red over 2s.
  * Active tools suppress the stall.
  */
 export function stallIntensity(idleMs: number, activeTool: boolean): number {
@@ -213,9 +101,9 @@ export function rgbColor(color: Rgb): string {
   return `rgb(${color.r},${color.g},${color.b})`
 }
 
-/** Interpolates the spinner tint from Claude orange to the error red. */
+/** Interpolates the spinner tint from working blue to danger red. */
 export function stallTint(intensity: number): string {
-  return rgbColor(interpolateRgb(COLORS.claude, COLORS.error, intensity))
+  return rgbColor(interpolateRgb(COLORS.working, COLORS.danger, intensity))
 }
 
 /**

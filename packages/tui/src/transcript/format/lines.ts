@@ -1,3 +1,5 @@
+import { PRODUCT_NAME, READY_LINE, TAGLINE } from "../../brand.js"
+import { glyphs } from "../../glyphs.js"
 import { theme } from "../../theme.js"
 import type { TimelineItem } from "../../timeline.js"
 import { assistantBlock } from "./assistant.js"
@@ -22,13 +24,21 @@ export function timelineLines(
     if (item.kind === "usage") continue
 
     if (item.kind === "banner") {
+      const title = `${glyphs.brand} ${PRODUCT_NAME}  v${item.version}`
       lines.push({
-        text: `OpenContinue v${item.version}`,
-        color: theme.brand,
-        bold: true,
+        text: title,
+        color: theme.assistant,
+        spans: [
+          { text: glyphs.brand, color: theme.brandMark },
+          { text: ` ${PRODUCT_NAME}`, bold: true },
+          { text: `  v${item.version}`, dim: true },
+        ],
       })
-      lines.push({ text: `${item.model} · ${item.provider}`, dim: true })
-      lines.push({ text: item.workspace, dim: true })
+      lines.push({ text: TAGLINE, dim: true })
+      lines.push({ text: `Model       ${item.model}`, dim: true })
+      lines.push({ text: `Provider    ${item.provider}`, dim: true })
+      lines.push({ text: `Workspace   ${item.workspace}`, dim: true })
+      lines.push({ text: `${glyphs.ready} ${READY_LINE}`, dim: true })
       lines.push({ text: "", dim: true })
       continue
     }
@@ -66,9 +76,9 @@ export function timelineLines(
         text,
         color:
           item.status === "failed"
-            ? theme.error
+            ? theme.danger
             : item.status === "running"
-              ? theme.tool
+              ? theme.working
               : index === 0
                 ? theme.assistant
                 : undefined,
