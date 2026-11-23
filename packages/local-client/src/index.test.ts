@@ -77,6 +77,7 @@ describe("LocalSessionClient", () => {
 
     await expect(client.listSessions()).resolves.toHaveLength(1)
     await expect(client.getSession(session.id)).resolves.toMatchObject({ id: session.id })
+    await expect(client.workspaceFiles()).resolves.toContain("package.json")
     client.close()
   })
 

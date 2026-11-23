@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import type { Server as HttpServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import os from "node:os"
@@ -112,6 +112,7 @@ describe("server security", () => {
 describe("client/server e2e", () => {
   it("creates a session, streams one echo run, and lists it", async () => {
     const directory = await workspace()
+    await writeFile(path.join(directory, "remote-note.txt"), "hello\n")
     const store = createSessionStore({ workspace: directory })
     const running = startServer({
       store,
@@ -159,6 +160,9 @@ describe("client/server e2e", () => {
 
       expect(output).toContain("Echo: hello")
       await expect(client.listSessions()).resolves.toHaveLength(1)
+      await expect(
+        client.workspaceFiles({ includeDirectories: true }),
+      ).resolves.toContain("remote-note.txt")
       const snapshot = await client.getSession(session.id)
       expect(snapshot).toMatchObject({
         id: session.id,

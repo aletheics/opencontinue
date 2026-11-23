@@ -1571,6 +1571,47 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("loads @file completion from the remote workspace", async () => {
+    const remote = await mkdtemp(path.join(os.tmpdir(), "opencontinue-remote-"))
+    await writeFile(path.join(remote, "remote-note.ts"), "export {}\n")
+
+    const store = createSessionStore({ workspace: remote })
+    const running = startServer({
+      store,
+      provider: new EchoProvider(),
+      port: 0,
+      workspace: remote,
+      permissionMode: "plan",
+    })
+    const server = running.server as unknown as http.Server
+    if (!server.listening) await once(server, "listening")
+    const address = server.address() as AddressInfo
+
+    const { stdin, lastFrame, unmount } = render(
+      <App
+        options={{
+          url: `http://127.0.0.1:${address.port}`,
+          token: running.token,
+        }}
+      />,
+    )
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("look @remote")
+      await vi.waitFor(
+        () => expect(lastFrame()).toContain("+ remote-note.ts"),
+        { timeout: 5000 },
+      )
+    } finally {
+      unmount()
+      await closeServer(running.server)
+      store.close()
+      await rm(remote, { recursive: true, force: true })
+    }
+  }, 20000)
+
   it("does not garble repeated help output", async () => {
     const { server, url } = await fakeProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })

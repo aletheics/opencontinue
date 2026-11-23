@@ -19,7 +19,7 @@ import {
   type PermissionMode,
   type PermissionPolicy,
 } from "@opencontinue/runtime"
-import { ToolRegistry } from "@opencontinue/tools"
+import { listWorkspaceFiles, ToolRegistry } from "@opencontinue/tools"
 
 export type LocalClientOptions = {
   store: SessionStore
@@ -115,6 +115,13 @@ export class LocalSessionClient implements OpenContinueClient {
 
   async getSession(sessionId: string): Promise<SessionSnapshot> {
     return this.snapshot(sessionId)
+  }
+
+  async workspaceFiles(options: {
+    includeDirectories?: boolean
+    limit?: number
+  } = {}): Promise<string[]> {
+    return listWorkspaceFiles(this.workspace, options)
   }
 
   async forkSession(

@@ -6,6 +6,7 @@ import {
   type SessionEvent,
   type SessionSnapshot,
   type SessionSummary,
+  type WorkspaceFilesResponse,
 } from "@opencontinue/protocol"
 
 export type FetchLike = typeof fetch
@@ -38,6 +39,11 @@ export interface OpenContinueClient {
   listSessions(): Promise<SessionSummary[]>
   createSession(title?: string): Promise<SessionSnapshot>
   getSession(sessionId: string): Promise<SessionSnapshot>
+  /** List paths in the server's workspace for @file completion. */
+  workspaceFiles?(options?: {
+    includeDirectories?: boolean
+    limit?: number
+  }): Promise<string[]>
   sendMessage(sessionId: string, text: string): Promise<void>
   abort(sessionId: string): Promise<void>
   resolvePermission(
@@ -186,6 +192,20 @@ export class HttpSessionClient implements OpenContinueClient {
 
   async getSession(sessionId: string): Promise<SessionSnapshot> {
     return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}`)
+  }
+
+  async workspaceFiles(options: {
+    includeDirectories?: boolean
+    limit?: number
+  } = {}): Promise<string[]> {
+    const query = new URLSearchParams()
+    if (options.includeDirectories) query.set("directories", "1")
+    if (options.limit !== undefined) query.set("limit", String(options.limit))
+    const suffix = query.size > 0 ? `?${query.toString()}` : ""
+    const response = await this.request<WorkspaceFilesResponse>(
+      `/v1/workspace/files${suffix}`,
+    )
+    return response.files
   }
 
   async sendMessage(sessionId: string, text: string): Promise<void> {

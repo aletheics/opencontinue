@@ -94,6 +94,9 @@ async function fixture(): Promise<Fixture> {
       return json(snapshot, 201)
     }
     if (url.pathname === `/v1/sessions/${sessionId}`) return json(snapshot)
+    if (url.pathname === "/v1/workspace/files") {
+      return json({ files: ["src/app.ts", "src/"] })
+    }
     if (url.pathname === `/v1/sessions/${sessionId}/messages`) {
       return json({ accepted: true }, 202)
     }
@@ -140,6 +143,9 @@ describe("HttpSessionClient", () => {
     await expect(client.listSessions()).resolves.toEqual([summary])
     await expect(client.createSession("Test session")).resolves.toEqual(snapshot)
     await expect(client.getSession(sessionId)).resolves.toEqual(snapshot)
+    await expect(
+      client.workspaceFiles({ includeDirectories: true, limit: 10 }),
+    ).resolves.toEqual(["src/app.ts", "src/"])
     await expect(client.sendMessage(sessionId, "hello")).resolves.toBeUndefined()
     await expect(client.abort(sessionId)).resolves.toBeUndefined()
     await expect(client.resolvePermission(sessionId, "request-1", true)).resolves.toBeUndefined()
@@ -157,6 +163,12 @@ describe("HttpSessionClient", () => {
     expect(requests.some((request) => request.path === "/health?sessionId=session-1")).toBe(
       true,
     )
+    expect(
+      requests.some(
+        (request) =>
+          request.path === "/v1/workspace/files?directories=1&limit=10",
+      ),
+    ).toBe(true)
     expect(requests).toContainEqual({
       method: "POST",
       path: `/v1/sessions/${sessionId}/abort`,

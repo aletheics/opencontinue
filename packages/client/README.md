@@ -2,7 +2,7 @@
 
 **Why:** every client needs one session contract and one SSE implementation, not a copy per app.
 
-**Owns:** the typed session client interface, HTTP request helpers, run abort, SSE replay/reconnect, and subscriber lifecycle. It knows the protocol, not the runtime, tools, provider, or database.
+**Owns:** the typed session client interface, HTTP request helpers, run abort, SSE replay/reconnect, subscriber lifecycle, and server-workspace file listing for remote prompt completion. It knows the protocol, not the runtime, tools, provider, or database.
 
 **Public API:** `OpenContinueClient`, `HttpSessionClient`, `SessionSubscription`, `ClientHttpError`.
 
@@ -10,6 +10,6 @@
 
 **Must not:** import `core`, `runtime`, `providers`, `tools`, `server`, `tui`, or `cli`.
 
-**Tests:** `src/index.test.ts` uses a local HTTP server to cover requests, SSE replay, reconnect, and close.
+**Tests:** `src/index.test.ts` uses a local HTTP server to cover requests, SSE replay, reconnect, workspace files, and close.
 
-**Next transport:** an in-process adapter for clients that do not want a daemon. It belongs behind the same `OpenContinueClient` interface.
+The in-process adapter lives in `packages/local-client` behind the same interface.

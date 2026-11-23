@@ -56,10 +56,11 @@ Apps can compose packages. Packages never import apps. The boundary test enforce
 
 These are deliberate next steps, not accidents:
 
-1. **Remote TUI still uses local workspace services.** `--url` shares sessions and runs through `HttpSessionClient`, but `@file` completion still scans the local workspace; a workspace/files endpoint is the next boundary.
-2. **Checks live in `apps/cli`.** When checks need a web or CI UI, extract `packages/checks` with the worktree/patch domain.
-3. **No web or desktop app yet.** When added, they are `apps/web` and `apps/desktop`, composed from `packages/client` and shared UI packages.
-4. **No generated SDK yet.** `packages/protocol` is the source; generated bindings come after the hand-written client contract stabilizes.
+1. **Checks live in `apps/cli`.** When checks need a web or CI UI, extract `packages/checks` with the worktree/patch domain.
+2. **No web or desktop app yet.** When added, they are `apps/web` and `apps/desktop`, composed from `packages/client` and shared UI packages.
+3. **No generated SDK yet.** `packages/protocol` is the source; generated bindings come after the hand-written client contract stabilizes.
+
+Remote clients use `GET /v1/workspace/files` for `@file` completion against the server workspace; local clients scan in-process.
 
 ## Adding a folder
 

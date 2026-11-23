@@ -25,7 +25,7 @@ import {
   runAgent,
   type PermissionMode,
 } from "@opencontinue/runtime"
-import { ToolRegistry } from "@opencontinue/tools"
+import { listWorkspaceFiles, ToolRegistry } from "@opencontinue/tools"
 
 import { followSession } from "./event-stream.js"
 import {
@@ -155,6 +155,18 @@ export function createApp(
 
     permissions.allowForSession(sessionId, tool)
     return c.json({ ok: true })
+  })
+
+  app.get("/v1/workspace/files", async (c) => {
+    const rawLimit = Number(c.req.query("limit") ?? "2000")
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(5_000, Math.max(1, Math.trunc(rawLimit)))
+      : 2_000
+    const files = await listWorkspaceFiles(workspace, {
+      limit,
+      includeDirectories: c.req.query("directories") === "1",
+    })
+    return c.json({ files })
   })
 
   app.post("/v1/sessions", async (c) => {

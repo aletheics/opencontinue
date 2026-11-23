@@ -298,7 +298,14 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen !== "chat" || filesLoadedRef.current) return
     filesLoadedRef.current = true
     setFilesLoading(true)
-    void listWorkspaceFiles(workspace, { includeDirectories: true })
+
+    const client = clientRef.current
+    const loader =
+      options.url && client?.workspaceFiles
+        ? client.workspaceFiles({ includeDirectories: true })
+        : listWorkspaceFiles(workspace, { includeDirectories: true })
+
+    void loader
       .then(setWorkspaceFiles)
       .catch(() => setWorkspaceFiles([]))
       .finally(() => setFilesLoading(false))

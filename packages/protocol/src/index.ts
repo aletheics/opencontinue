@@ -133,6 +133,11 @@ export const SendMessageRequest = z.object({
 })
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>
 
+export const WorkspaceFilesResponse = z.object({
+  files: z.array(z.string()),
+})
+export type WorkspaceFilesResponse = z.infer<typeof WorkspaceFilesResponse>
+
 export const ForkSessionRequest = z.object({
   atSeq: z.number().int().nonnegative().optional(),
   title: z.string().optional(),
