@@ -4,30 +4,63 @@
  */
 export const STREAM_TAIL_LINES = 1
 
-function fenceBalanced(lines: string[]): boolean {
-  const fences = lines.filter((line) => line.trimStart().startsWith("```")).length
-  return fences % 2 === 0
+function isFenceLine(line: string): boolean {
+  return /^\s*```/.test(line)
 }
 
-function inlineBalanced(text: string): boolean {
+function fenceBalanced(lines: string[]): boolean {
+  return lines.filter(isFenceLine).length % 2 === 0
+}
+
+function inlineBalanced(lines: string[]): boolean {
   let ticks = 0
-  for (const char of text) {
-    if (char === "`") ticks++
+  let inFence = false
+
+  for (const line of lines) {
+    if (isFenceLine(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    for (const char of line) {
+      if (char === "`") ticks++
+    }
   }
+
   return ticks % 2 === 0
 }
 
+function linksBalanced(lines: string[]): boolean {
+  let open = 0
+  let inFence = false
+
+  for (const line of lines) {
+    if (isFenceLine(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    for (let index = 0; index < line.length; index++) {
+      if (line.startsWith("](", index)) {
+        open++
+        index++
+      } else if (line[index] === ")" && open > 0) {
+        open--
+      }
+    }
+  }
+
+  return open === 0
+}
+
 /**
- * Find the largest safe character offset of the streamed assistant text that
- * can be committed to scrollback. A boundary is safe when it ends a line,
- * does not cut a fenced code block, and does not split inline code. Prefer a
- * blank line so paragraph spacing survives the split; otherwise any balanced
- * line boundary works.
+ * Find the largest offset of the streamed assistant text that ends a complete
+ * top-level block. Only a blank line or a closing fence is a commit point, so
+ * a chunk never starts in the middle of a paragraph, list, table, quote, or
+ * code block. Open inline code or links keep the text live. Returning zero
+ * means "keep it all live"; the formatter then sees the whole message.
  */
-export function stableStreamBoundary(
-  text: string,
-  tailLines: number = STREAM_TAIL_LINES,
-): number {
+export function stableStreamBoundary(text: string, tailLines: number = STREAM_TAIL_LINES): number {
   const lines = text.split("\n")
   const complete = lines.length - 1
   if (complete <= tailLines + 1) return 0
@@ -45,16 +78,16 @@ export function stableStreamBoundary(
 
   const safe = (cut: number): boolean => {
     const prefix = lines.slice(0, cut)
-    return fenceBalanced(prefix) && inlineBalanced(prefix.join("\n"))
+    return fenceBalanced(prefix) && inlineBalanced(prefix) && linksBalanced(prefix)
   }
 
-  let fallback = 0
   for (let cut = maxCut; cut > 0; cut--) {
     if (!safe(cut)) continue
-    const offset = offsetAt(cut)
-    if (!fallback) fallback = offset
-    if ((lines[cut - 1] ?? "").trim() === "") return offset
+    const previous = lines[cut - 1] ?? ""
+    if (previous.trim() === "" || isFenceLine(previous)) {
+      return offsetAt(cut)
+    }
   }
 
-  return fallback
+  return 0
 }

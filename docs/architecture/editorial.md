@@ -65,7 +65,8 @@ screen re-projects the durable timeline. Both must use the same formatter.
 ## Streaming
 
 - Do not commit inside an open code fence, inline code, table, list, or link.
-- Commit only whole blocks at stable boundaries.
+- Commit only whole blocks at a blank line or a closed fence; otherwise keep the
+  message live.
 - Inline scrollback must not print the same history twice.
 - The final inline layout must match a one-shot render of the completed text.
 - Alternate-screen rendering always reflows from the full durable timeline.
@@ -87,6 +88,6 @@ screen re-projects the durable timeline. Both must use the same formatter.
 | 2 | Table readable minimums and vertical narrow layout | done |
 | 3 | Code labels/rules, PowerShell/YAML/Markdown/Diff highlighting | done |
 | 4 | Link destinations, grapheme-aware emoji width | done |
-| 5 | Streaming stability for tables/lists/links, inline/fullscreen parity | planned |
+| 5 | Streaming stability for tables/lists/links, inline/fullscreen parity | done |
 | 6 | Light/dark theme tokens | planned |
 | 7 | Answer-structure guidance and final visual verification | planned |

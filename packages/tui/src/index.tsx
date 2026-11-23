@@ -275,8 +275,10 @@ export function App({ options }: { options: TuiOptions }) {
     if (boundary <= state.committed) return
 
     const raw = active.text.slice(state.committed, boundary)
-    const text = raw.endsWith("\n") ? raw.slice(0, -1) : raw
+    const text = raw.replace(/\n+$/, "")
     state.committed = boundary
+    if (!text.trim()) return
+
     const chunk: AssistantTimelineItem = {
       kind: "assistant",
       id: `stream:${active.id}:${state.chunk}`,

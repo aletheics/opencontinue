@@ -346,12 +346,6 @@ export function formatAssistantLines(text: string, width: number): Line[] {
     result.push(...lines)
   }
 
-  // Streaming commits chunks at paragraph boundaries; keep one trailing blank
-  // line so the next chunk stays separated without reprinting extra blanks.
-  const endsWithBlank = normalized.split("\n").at(-1)?.trim() === ""
-  if (endsWithBlank && result.length > 0) {
-    result.push({ text: "", color: theme.assistant })
-  }
   return result
 }
 

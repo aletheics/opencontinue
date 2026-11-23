@@ -61,18 +61,16 @@ describe("assistant markdown", () => {
     ])
   })
 
-  it("keeps one trailing blank line for streamed chunks", () => {
+  it("drops trailing blank lines", () => {
     expect(formatAssistantLines("first\n\nsecond\n", 40).map((line) => line.text)).toEqual([
       "first",
       "",
       "second",
-      "",
     ])
     expect(formatAssistantLines("first\n\n\n\nsecond\n\n\n", 40).map((line) => line.text)).toEqual([
       "first",
       "",
       "second",
-      "",
     ])
   })
 
