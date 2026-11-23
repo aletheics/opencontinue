@@ -14,8 +14,8 @@
 
 **Keys:** type to filter providers or models; `esc` clears the filter or returns to chat; `ctrl+o` expands or collapses tool output and diffs; `shift+tab` cycles permission mode; `esc` aborts a run; `up`/`down` recall input history; `pgup`/`pgdn` scroll; `ctrl+d` exits when the input is empty.
 
-**Slash commands:** `/help`, `/clear`, `/model`, `/provider`, `/mode`, `/status`, `/exit`.
+**Slash commands:** `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/status`, `/exit`.
 
-**Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, key entry, the full provider → model → chat loop, and a fixed frame after repeated help output; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, diff colorization, output collapsing, and line clipping. The frame is fixed: one header, one body, one input box, one footer.
+**Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, key entry, session resume, the full provider → model → chat loop, and a fixed frame after repeated help output; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, diff colorization, output collapsing, and line clipping. The frame is fixed: one header, one body, one input box, one footer.
 
 **Known gap:** it currently runs the runtime in-process. The target is `packages/client` over the server.

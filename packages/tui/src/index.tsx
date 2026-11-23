@@ -16,6 +16,7 @@ import {
   type ChatProvider,
   type ProviderPreset,
 } from "@opencontinue/providers"
+import type { SessionSummary } from "@opencontinue/protocol"
 import { runAgent } from "@opencontinue/runtime"
 import { ToolRegistry, type PermissionGate, type Tool } from "@opencontinue/tools"
 
@@ -33,7 +34,15 @@ export type TuiOptions = {
   resume?: string
 }
 
-type Screen = "provider" | "key" | "baseurl" | "loading" | "models" | "chat" | "error"
+type Screen =
+  | "provider"
+  | "key"
+  | "baseurl"
+  | "loading"
+  | "models"
+  | "sessions"
+  | "chat"
+  | "error"
 type PermissionMode = "ask" | "auto" | "readonly"
 
 type PermissionRequest = {
@@ -47,6 +56,7 @@ const SLASH_COMMANDS = [
   { name: "/clear", description: "new session" },
   { name: "/model", description: "change model" },
   { name: "/provider", description: "change provider" },
+  { name: "/resume", description: "resume a session" },
   { name: "/mode", description: "cycle permissions" },
   { name: "/status", description: "session status" },
   { name: "/exit", description: "quit" },
@@ -153,6 +163,9 @@ export function App({ options }: { options: TuiOptions }) {
   const [models, setModels] = useState<string[]>([])
   const [modelIndex, setModelIndex] = useState(0)
   const [modelQuery, setModelQuery] = useState("")
+  const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [sessionIndex, setSessionIndex] = useState(0)
+  const [sessionQuery, setSessionQuery] = useState("")
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
@@ -205,6 +218,14 @@ export function App({ options }: { options: TuiOptions }) {
     if (!query) return models
     return models.filter((item) => item.toLowerCase().includes(query))
   }, [models, modelQuery])
+
+  const filteredSessions = useMemo(() => {
+    const query = sessionQuery.trim().toLowerCase()
+    if (!query) return sessions
+    return sessions.filter((item) =>
+      `${item.title} ${item.id}`.toLowerCase().includes(query),
+    )
+  }, [sessions, sessionQuery])
 
   useEffect(() => {
     return () => {
@@ -344,6 +365,32 @@ export function App({ options }: { options: TuiOptions }) {
     appendSystem("Started a new session.")
   }
 
+  const openSessions = () => {
+    const store = storeRef.current
+    if (!store) return
+    abortRef.current?.abort()
+    abortRef.current = null
+    if (gate.pending) gate.answer(false)
+    setPermission(null)
+    setBusy(false)
+    setLastDurationMs(null)
+    setRunStartedAt(null)
+    runStartedRef.current = null
+    setSessions([...store.list()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)))
+    setSessionQuery("")
+    setSessionIndex(0)
+    setScreen("sessions")
+  }
+
+  const chooseSession = () => {
+    const store = storeRef.current
+    const chosen = filteredSessions[sessionIndex]
+    if (!store || !chosen) return
+    attachSession(store, chosen.id)
+    setSessionQuery("")
+    setScreen("chat")
+  }
+
   const handleCommand = (text: string): boolean => {
     const name = text.split(/\s+/)[0]
     switch (name) {
@@ -368,6 +415,10 @@ export function App({ options }: { options: TuiOptions }) {
         setProviderQuery("")
         setProviderIndex(initialProviderIndex(preset?.id ?? initial.provider))
         setScreen("provider")
+        return true
+      case "/resume":
+      case "/sessions":
+        openSessions()
         return true
       case "/mode":
         cycleMode()
@@ -556,6 +607,32 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (screen === "sessions") {
+      if (key.escape) {
+        if (sessionQuery) {
+          setSessionQuery("")
+          setSessionIndex(0)
+        } else {
+          setScreen("chat")
+        }
+      } else if (key.backspace || key.delete) {
+        setSessionQuery((query) => query.slice(0, -1))
+        setSessionIndex(0)
+      } else if (key.upArrow) {
+        setSessionIndex((index) => Math.max(0, index - 1))
+      } else if (key.downArrow) {
+        setSessionIndex((index) =>
+          Math.max(0, Math.min(filteredSessions.length - 1, index + 1)),
+        )
+      } else if (key.return) {
+        chooseSession()
+      } else if (isPrintableInput(character, key)) {
+        setSessionQuery((query) => query + character)
+        setSessionIndex(0)
+      }
+      return
+    }
+
     if (screen !== "chat") return
 
     if (permission) {
@@ -622,7 +699,7 @@ export function App({ options }: { options: TuiOptions }) {
   const headerModel =
     screen === "chat" ? model : screen === "models" ? "select model" : "—"
   const footer =
-    screen === "provider" || screen === "models"
+    screen === "provider" || screen === "models" || screen === "sessions"
       ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
       : screen === "key" || screen === "baseurl"
         ? "Enter submit · Ctrl+C exit"
@@ -730,6 +807,22 @@ export function App({ options }: { options: TuiOptions }) {
           selectedIndex={modelIndex}
           windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
           emptyText={`No models match “${modelQuery}”`}
+        />
+      )
+    }
+
+    if (screen === "sessions") {
+      return (
+        <Picker
+          header={`Resume a session${sessionQuery ? ` · /${sessionQuery}/` : ""} (${sessionIndex + 1}/${filteredSessions.length})`}
+          items={filteredSessions.map((item) => ({
+            key: item.id,
+            label: item.title,
+            note: `${item.id === sessionRef.current ? "current · " : ""}${item.id.slice(0, 8)} · ${item.lastSeq} events`,
+          }))}
+          selectedIndex={sessionIndex}
+          windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
+          emptyText={sessionQuery ? `No sessions match “${sessionQuery}”` : "No sessions yet."}
         />
       )
     }

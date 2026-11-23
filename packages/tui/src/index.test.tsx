@@ -6,6 +6,7 @@ import os from "node:os"
 import path from "node:path"
 
 import { saveAuthConfig, saveProviderConfig } from "@opencontinue/config"
+import { createSessionStore } from "@opencontinue/core"
 import { render } from "ink-testing-library"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -136,6 +137,43 @@ describe("TUI", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   })
+
+  it("resumes a previous session from the slash command", async () => {
+    const seed = createSessionStore({ workspace: home })
+    const previous = seed.create("Previous work")
+    seed.append(previous.id, { type: "message.user", text: "remember this" })
+    seed.close()
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/resume")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> /resume"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Resume a session"))
+      expect(lastFrame()).toContain("Previous work")
+
+      stdin.write("previous")
+      await vi.waitFor(() => expect(lastFrame()).toContain("/previous/"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> remember this"), {
+        timeout: 5000,
+      })
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
 
   it("runs the provider -> model -> chat loop", async () => {
     const { server, url } = await fakeProvider()
