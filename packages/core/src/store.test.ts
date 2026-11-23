@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { MemorySessionStore } from "./index.js"
+import type { SessionExport } from "./types.js"
 
 describe("MemorySessionStore", () => {
   it("projects user and assistant messages", () => {
@@ -46,6 +47,32 @@ describe("MemorySessionStore", () => {
     ])
     expect(store.get(session.id)?.events).toHaveLength(5)
     expect(store.fork("missing", 1)).toBeUndefined()
+  })
+
+  it("rejects a malformed import", () => {
+    const store = new MemorySessionStore()
+    const session = store.create("exported")
+    store.append(session.id, { type: "message.user", text: "hi" })
+    const exported = store.exportSession(session.id)!
+
+    const broken = {
+      ...exported,
+      events: [
+        ...exported.events,
+        {
+          type: "message.user",
+          sessionId: session.id,
+          seq: 5,
+          at: new Date().toISOString(),
+          text: "gap",
+        },
+      ],
+    }
+
+    expect(() => store.importSession(broken as SessionExport)).toThrow(
+      /sequence must start at 0/,
+    )
+    expect(store.list()).toHaveLength(1)
   })
 
   it("notifies subscribers until they unsubscribe", () => {

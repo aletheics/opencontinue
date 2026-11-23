@@ -1,10 +1,13 @@
+import { randomUUID } from "node:crypto"
 import { mkdtemp, rm } from "node:fs/promises"
+import { DatabaseSync } from "node:sqlite"
 import os from "node:os"
 import path from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
 import { SqliteSessionStore } from "./sqlite.js"
+import type { SessionExport } from "./types.js"
 
 const temporary: string[] = []
 
@@ -110,6 +113,57 @@ describe("SqliteSessionStore", () => {
     store.close()
   })
 
+  it("rejects a malformed import before writing rows", async () => {
+    const file = await makeDbPath()
+    const store = new SqliteSessionStore(file)
+    const session = store.create("exported")
+    store.append(session.id, { type: "message.user", text: "hi" })
+    const exported = store.exportSession(session.id)!
+
+    const broken = {
+      ...exported,
+      events: [
+        ...exported.events,
+        {
+          type: "message.user",
+          sessionId: session.id,
+          seq: 99,
+          at: new Date().toISOString(),
+          text: "gap",
+        },
+      ],
+    }
+
+    expect(() => store.importSession(broken as SessionExport)).toThrow(
+      /sequence must start at 0/,
+    )
+    expect(store.list()).toHaveLength(1)
+    store.close()
+  })
+
+  it("rejects a corrupt stored event on open", async () => {
+    const file = await makeDbPath()
+    const store = new SqliteSessionStore(file)
+    const session = store.create("corrupt")
+    store.close()
+
+    const raw = new DatabaseSync(file)
+    raw
+      .prepare(
+        "INSERT INTO events (session_id, seq, type, at, payload) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(
+        session.id,
+        99,
+        "message.user",
+        new Date().toISOString(),
+        JSON.stringify({ type: "message.user", seq: 99 }),
+      )
+    raw.close()
+
+    expect(() => new SqliteSessionStore(file)).toThrow(/Invalid session event/)
+  })
+
   it("exports and imports sessions", async () => {
     const file = await makeDbPath()
     const store = new SqliteSessionStore(file)
@@ -121,7 +175,11 @@ describe("SqliteSessionStore", () => {
 
     const imported = store.importSession({
       ...exported!,
-      session: { ...exported!.session, id: "imported-session", title: "imported" },
+      session: {
+        ...exported!.session,
+        id: randomUUID(),
+        title: "imported",
+      },
     })
 
     expect(imported.title).toBe("imported")

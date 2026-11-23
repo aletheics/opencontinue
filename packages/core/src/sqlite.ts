@@ -7,6 +7,7 @@ import type { SessionEvent, SessionId, SessionSnapshot, SessionSummary } from "@
 
 import { buildEvent, draftOf } from "./events.js"
 import { snapshotOf, summarize } from "./projection.js"
+import { parseSessionEvent, parseSessionExport } from "./validate.js"
 import type {
   EventDraft,
   SessionExport,
@@ -24,6 +25,7 @@ type SessionRow = {
 }
 
 type EventRow = {
+  seq: number
   payload: string
 }
 
@@ -54,10 +56,19 @@ export class SqliteSessionStore implements SessionStore {
   constructor(private readonly path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true })
     this.db = new DatabaseSync(path)
-    this.db.exec("PRAGMA journal_mode = WAL")
-    this.db.exec("PRAGMA foreign_keys = ON")
-    this.migrate()
-    this.recover()
+    try {
+      this.db.exec("PRAGMA journal_mode = WAL")
+      this.db.exec("PRAGMA foreign_keys = ON")
+      this.migrate()
+      this.recover()
+    } catch (error) {
+      try {
+        this.db.close()
+      } catch {
+        // Preserve the original open/recovery error.
+      }
+      throw error
+    }
   }
 
   create(title = "Untitled session"): SessionRecord {
@@ -123,10 +134,30 @@ export class SqliteSessionStore implements SessionStore {
   events(id: SessionId, after = -1): SessionEvent[] {
     const rows = asRows<EventRow>(
       this.db
-        .prepare("SELECT payload FROM events WHERE session_id = ? AND seq > ? ORDER BY seq ASC")
+        .prepare(
+          "SELECT seq, payload FROM events WHERE session_id = ? AND seq > ? ORDER BY seq ASC",
+        )
         .all(id, after),
     )
-    return rows.map((row) => JSON.parse(row.payload) as SessionEvent)
+    return rows.map((row) => {
+      let value: unknown
+      try {
+        value = JSON.parse(row.payload)
+      } catch {
+        throw new Error(
+          `Invalid session event payload at seq ${row.seq}: not JSON`,
+        )
+      }
+      try {
+        return parseSessionEvent(value)
+      } catch (error) {
+        throw new Error(
+          `Invalid session event at seq ${row.seq}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        )
+      }
+    })
   }
 
   append(id: SessionId, draft: EventDraft): SessionEvent {
@@ -183,24 +214,27 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   importSession(data: SessionExport): SessionRecord {
-    if (this.get(data.session.id)) throw new Error(`Session already exists: ${data.session.id}`)
+    const validated = parseSessionExport(data)
+    if (this.get(validated.session.id)) {
+      throw new Error(`Session already exists: ${validated.session.id}`)
+    }
 
     this.transaction(() => {
       this.db
         .prepare("INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)")
         .run(
-          data.session.id,
-          data.session.title,
-          data.session.createdAt,
-          data.session.updatedAt,
+          validated.session.id,
+          validated.session.title,
+          validated.session.createdAt,
+          validated.session.updatedAt,
         )
-      for (const event of data.events) {
-        this.insertEvent({ ...event, sessionId: data.session.id })
+      for (const event of validated.events) {
+        this.insertEvent({ ...event, sessionId: validated.session.id })
       }
     })
 
-    const imported = this.get(data.session.id)
-    if (!imported) throw new Error(`Failed to import session: ${data.session.id}`)
+    const imported = this.get(validated.session.id)
+    if (!imported) throw new Error(`Failed to import session: ${validated.session.id}`)
     return imported
   }
 

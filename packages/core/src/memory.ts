@@ -4,6 +4,7 @@ import type { SessionEvent, SessionId, SessionSnapshot, SessionSummary } from "@
 
 import { buildEvent, draftOf } from "./events.js"
 import { snapshotOf, summarize } from "./projection.js"
+import { parseSessionExport } from "./validate.js"
 import type {
   EventDraft,
   SessionExport,
@@ -102,12 +103,16 @@ export class MemorySessionStore implements SessionStore {
   }
 
   importSession(data: SessionExport): SessionRecord {
-    if (this.sessions.has(data.session.id)) {
-      throw new Error(`Session already exists: ${data.session.id}`)
+    const validated = parseSessionExport(data)
+    if (this.sessions.has(validated.session.id)) {
+      throw new Error(`Session already exists: ${validated.session.id}`)
     }
-    const events = data.events.map((event) => ({ ...event, sessionId: data.session.id }))
+    const events = validated.events.map((event) => ({
+      ...event,
+      sessionId: validated.session.id,
+    }))
     const record: SessionRecord = {
-      ...data.session,
+      ...validated.session,
       events,
     }
     this.sessions.set(record.id, record)
