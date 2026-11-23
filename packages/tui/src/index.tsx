@@ -23,6 +23,7 @@ import { ToolRegistry } from "@opencontinue/tools"
 import { Header } from "./components/Header.js"
 import { Picker } from "./components/Picker.js"
 import { Prompt } from "./components/Prompt.js"
+import { SlashMenu } from "./components/SlashMenu.js"
 import { Timeline } from "./components/Timeline.js"
 import {
   TuiPermissionGate,
@@ -129,6 +130,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [input, setInput] = useState("")
+  const [slashIndex, setSlashIndex] = useState(0)
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(0)
   const [expandAll, setExpandAll] = useState(false)
@@ -161,6 +163,10 @@ export function App({ options }: { options: TuiOptions }) {
     const timer = setInterval(() => setTick((value) => value + 1), 100)
     return () => clearInterval(timer)
   }, [busy])
+
+  useEffect(() => {
+    setSlashIndex(0)
+  }, [input])
 
   const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10] ?? "⠋"
 
@@ -609,6 +615,27 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (menuOpen) {
+      if (key.upArrow) {
+        setSlashIndex((index) => Math.max(0, index - 1))
+        return
+      }
+      if (key.downArrow) {
+        setSlashIndex((index) =>
+          Math.max(0, Math.min(slashMatches.length - 1, index + 1)),
+        )
+        return
+      }
+      if (key.tab && !key.shift) {
+        setInput(slashMatches[activeSlashIndex]?.name ?? input)
+        return
+      }
+      if (key.escape) {
+        setInput("")
+        return
+      }
+    }
+
     if (key.escape && busy) {
       abortRef.current?.abort()
       return
@@ -672,22 +699,41 @@ export function App({ options }: { options: TuiOptions }) {
             ? "Loading models…"
             : "Ctrl+C exit"
 
-  const slashMatches =
-    screen === "chat" && input.startsWith("/")
-      ? SLASH_COMMANDS.filter((command) =>
-          command.name.startsWith(input.split(/\s+/)[0] ?? "/"),
-        ).slice(0, 3)
-      : []
-  const footerText =
-    slashMatches.length > 0
-      ? slashMatches.map((command) => command.name).join("  ")
-      : footer
+  const slashQuery =
+    screen === "chat" && input.startsWith("/") && !input.includes(" ")
+      ? (input.split(/\s+/)[0] ?? "/")
+      : ""
+  const slashMatches = slashQuery
+    ? SLASH_COMMANDS.filter((command) => command.name.startsWith(slashQuery)).slice(0, 5)
+    : []
+  const menuOpen =
+    screen === "chat" &&
+    slashMatches.length > 0 &&
+    !busy &&
+    !permission &&
+    rows >= 18
+  const activeSlashIndex = Math.min(slashIndex, Math.max(0, slashMatches.length - 1))
+  const menuHeight = menuOpen ? slashMatches.length + 2 : 0
+  const footerText = menuOpen
+    ? "↑/↓ select · Tab complete · Enter run · Esc close"
+    : footer
   const footerLine = footerText.slice(0, Math.max(10, columns - 2))
 
-  const maxInputHeight = Math.max(3, rows - 8)
+  const maxInputHeight = Math.max(3, rows - 8 - menuHeight)
   const inputHeight =
     screen === "chat" ? Math.min(permission ? 5 : 3, maxInputHeight) : 0
-  const bodyHeight = Math.max(4, rows - 3 - inputHeight - 1)
+  const bodyHeight = Math.max(4, rows - 3 - inputHeight - menuHeight - 1)
+
+  const submitInput = (value: string) => {
+    if (menuOpen) {
+      const chosen = slashMatches[activeSlashIndex]
+      if (chosen) {
+        send(chosen.name)
+        return
+      }
+    }
+    send(value)
+  }
 
   const body = (() => {
     if (screen === "provider") {
@@ -823,13 +869,16 @@ export function App({ options }: { options: TuiOptions }) {
       >
         {body}
       </Box>
+      {menuOpen ? (
+        <SlashMenu commands={slashMatches} selectedIndex={activeSlashIndex} />
+      ) : null}
       {screen === "chat" ? (
         <Prompt
           columns={columns}
           height={inputHeight}
           input={input}
           onInput={setInput}
-          onSubmit={send}
+          onSubmit={submitInput}
           permission={permission}
           busy={busy}
           spinner={spinner}

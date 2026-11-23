@@ -8,6 +8,7 @@
 - `Picker.tsx` — generic type-to-filter list used by provider, model, and session selection.
 - `Timeline.tsx` — clipped line viewport for the chat transcript.
 - `Prompt.tsx` — fixed input, permission dialog (tool detail plus y/a/n), or spinner.
+- `SlashMenu.tsx` — command palette above the input while a slash command is being typed.
 
 **Rule:** components are presentational. Sessions, providers, permissions, commands, and keybindings stay in `index.tsx`. A component receives already-computed data and callbacks.
 
