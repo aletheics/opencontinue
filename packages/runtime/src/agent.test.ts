@@ -331,6 +331,47 @@ describe("runAgent", () => {
     })
   })
 
+  it("records the broker authorization reason on completion", async () => {
+    const workspace = await makeWorkspace()
+    const store = new MemorySessionStore()
+    const session = store.create()
+    store.append(session.id, { type: "message.user", text: "write a.txt" })
+
+    let step = 0
+    const provider: ChatProvider = {
+      id: "fake",
+      model: "fake",
+      async *streamChat() {
+        step++
+        if (step === 1) {
+          yield {
+            type: "tool_call",
+            call: {
+              id: "call_1",
+              name: "write",
+              arguments: JSON.stringify({ path: "a.txt", content: "hello" }),
+            },
+          }
+          return
+        }
+        yield { type: "text", text: "done" }
+      },
+    }
+
+    await runAgent({
+      store,
+      sessionId: session.id,
+      provider,
+      tools: new ToolRegistry(),
+      permissions: { async authorize() { return { approved: true, reason: "auto" } } },
+      workspace,
+    })
+
+    expect(
+      store.events(session.id).find((event) => event.type === "tool.completed"),
+    ).toMatchObject({ authorization: "auto" })
+  })
+
   it("records a failed run", async () => {
     const workspace = await makeWorkspace()
     const store = new MemorySessionStore()

@@ -5,7 +5,12 @@ import type {
   PermissionMode,
   PermissionPolicy,
 } from "@opencontinue/protocol"
-import type { PermissionGate, Tool, ToolContext } from "@opencontinue/tools"
+import type {
+  PermissionDecision,
+  PermissionGate,
+  Tool,
+  ToolContext,
+} from "@opencontinue/tools"
 
 export type { PermissionMode, PermissionPolicy }
 
@@ -91,20 +96,33 @@ export class PermissionBroker implements PermissionGate {
     this.policy = { ...this.policy, allow: [...this.policy.allow, tool] }
   }
 
-  async authorize(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {
-    if (this.policy.deny.includes(tool.name)) return false
+  async authorize(
+    tool: Tool,
+    input: unknown,
+    context: ToolContext,
+  ): Promise<PermissionDecision> {
+    if (this.policy.deny.includes(tool.name)) return { approved: false }
 
     if (this.mode === "plan") {
-      return tool.capability === "read" && !this.policy.ask.includes(tool.name)
+      const approved =
+        tool.capability === "read" && !this.policy.ask.includes(tool.name)
+      return approved ? { approved, reason: "read" } : { approved: false }
     }
 
-    if (this.policy.allow.includes(tool.name)) return true
+    if (this.policy.allow.includes(tool.name)) {
+      return { approved: true, reason: "allow" }
+    }
 
     const explicitAsk = this.policy.ask.includes(tool.name)
-    if (!explicitAsk && tool.capability === "read") return true
-    if (this.mode === "auto" && !explicitAsk) return true
+    if (!explicitAsk && tool.capability === "read") {
+      return { approved: true, reason: "read" }
+    }
+    if (this.mode === "auto" && !explicitAsk) {
+      return { approved: true, reason: "auto" }
+    }
 
-    return this.request(tool, input, context)
+    const approved = await this.request(tool, input, context)
+    return approved ? { approved: true, reason: "user" } : { approved: false }
   }
 
   private async request(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {

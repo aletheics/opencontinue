@@ -1,4 +1,5 @@
 import type {
+  AuthorizationReason,
   SessionEvent,
   SessionId,
   SessionSnapshot,
@@ -36,6 +37,7 @@ export type EventDraft =
       failed?: boolean
       exitCode?: number | null
       timedOut?: boolean
+      authorization?: AuthorizationReason
     }
   | { type: "tool.failed"; runId: string; callId: string; error: string }
   | {

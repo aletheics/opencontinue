@@ -57,12 +57,17 @@ function setup(mode: "plan" | "confirm" | "auto", policy?: PermissionPolicy) {
 describe("PermissionBroker", () => {
   it("allows read tools without asking", async () => {
     const { broker, context } = setup("confirm")
-    await expect(broker.authorize(readTool, {}, context)).resolves.toBe(true)
+    await expect(broker.authorize(readTool, {}, context)).resolves.toMatchObject({
+      approved: true,
+      reason: "read",
+    })
   })
 
   it("denies write tools in plan mode without prompting", async () => {
     const { store, session, broker, context } = setup("plan")
-    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(false)
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toMatchObject({
+      approved: false,
+    })
     expect(
       store.events(session.id).some((event) => event.type === "permission.requested"),
     ).toBe(false)
@@ -78,10 +83,15 @@ describe("PermissionBroker", () => {
   it("changes policy when the mode changes", async () => {
     const { store, session, broker, context } = setup("confirm")
     broker.setMode("auto")
-    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(true)
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toMatchObject({
+      approved: true,
+      reason: "auto",
+    })
 
     broker.setMode("plan")
-    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(false)
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toMatchObject({
+      approved: false,
+    })
     expect(
       store.events(session.id).some((event) => event.type === "permission.requested"),
     ).toBe(false)
@@ -106,15 +116,22 @@ describe("PermissionBroker", () => {
   it("remembers a tool for the session", async () => {
     const { broker, context } = setup("confirm")
     broker.allowForSession("write")
-    await expect(broker.authorize(writeTool, {}, context)).resolves.toBe(true)
+    await expect(broker.authorize(writeTool, {}, context)).resolves.toMatchObject({
+      approved: true,
+      reason: "allow",
+    })
   })
 
   it("honors project allow and deny lists", async () => {
     const allowed = setup("confirm", { allow: ["write"], ask: [], deny: [] })
-    await expect(allowed.broker.authorize(writeTool, {}, allowed.context)).resolves.toBe(true)
+    await expect(
+      allowed.broker.authorize(writeTool, {}, allowed.context),
+    ).resolves.toMatchObject({ approved: true, reason: "allow" })
 
     const denied = setup("auto", { allow: [], ask: [], deny: ["read"] })
-    await expect(denied.broker.authorize(readTool, {}, denied.context)).resolves.toBe(false)
+    await expect(denied.broker.authorize(readTool, {}, denied.context)).resolves.toMatchObject({
+      approved: false,
+    })
   })
 
   it("allows an explicit ask list to override auto mode", async () => {
@@ -130,7 +147,7 @@ describe("PermissionBroker", () => {
     if (request?.type !== "permission.requested") throw new Error("request missing")
 
     expect(broker.resolve(request.requestId, true)).toBe(true)
-    await expect(pending).resolves.toBe(true)
+    await expect(pending).resolves.toMatchObject({ approved: true, reason: "user" })
   })
 
   it("describes and previews a permission request", async () => {
@@ -157,7 +174,7 @@ describe("PermissionBroker", () => {
       .find((event) => event.type === "permission.requested")
     if (request?.type !== "permission.requested") throw new Error("request missing")
     expect(broker.resolve(request.requestId, true)).toBe(true)
-    await expect(pending).resolves.toBe(true)
+    await expect(pending).resolves.toMatchObject({ approved: true, reason: "user" })
   })
 
   it("asks and resolves a write request", async () => {
@@ -171,7 +188,7 @@ describe("PermissionBroker", () => {
     if (request?.type !== "permission.requested") throw new Error("request missing")
 
     expect(broker.resolve(request.requestId, true)).toBe(true)
-    await expect(pending).resolves.toBe(true)
+    await expect(pending).resolves.toMatchObject({ approved: true, reason: "user" })
     expect(store.events(session.id).some((event) => event.type === "permission.resolved")).toBe(true)
   })
 })

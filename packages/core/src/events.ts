@@ -50,6 +50,9 @@ export function buildEvent(
         ...(draft.failed === undefined ? {} : { failed: draft.failed }),
         ...(draft.exitCode === undefined ? {} : { exitCode: draft.exitCode }),
         ...(draft.timedOut === undefined ? {} : { timedOut: draft.timedOut }),
+        ...(draft.authorization === undefined
+          ? {}
+          : { authorization: draft.authorization }),
       }
     case "tool.failed":
       return {
@@ -121,6 +124,9 @@ export function draftOf(event: SessionEvent): EventDraft | null {
         ...(event.failed === undefined ? {} : { failed: event.failed }),
         ...(event.exitCode === undefined ? {} : { exitCode: event.exitCode }),
         ...(event.timedOut === undefined ? {} : { timedOut: event.timedOut }),
+        ...(event.authorization === undefined
+          ? {}
+          : { authorization: event.authorization }),
       }
     case "tool.failed":
       return {

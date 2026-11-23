@@ -123,6 +123,9 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
             ...(result.failed ? { failed: true } : {}),
             ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
             ...(result.timedOut ? { timedOut: true } : {}),
+            ...(result.authorization === undefined
+              ? {}
+              : { authorization: result.authorization }),
           })
           history.push({ role: "tool", toolCallId: call.id, content: result.output })
         } else {

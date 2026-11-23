@@ -106,6 +106,7 @@ describe("timeline", () => {
         failed: true,
         exitCode: 1,
         timedOut: false,
+        authorization: "auto",
       },
     ]
 
@@ -117,6 +118,7 @@ describe("timeline", () => {
       output: "1 failed\nExit code 1",
       exitCode: 1,
       timedOut: false,
+      authorization: "auto",
     })
   })
 

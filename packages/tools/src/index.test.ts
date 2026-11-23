@@ -153,6 +153,20 @@ describe("tools", () => {
     ).rejects.toThrow(/one todo/i)
   })
 
+  it("records the permission reason on an allowed tool", async () => {
+    const workspace = await makeWorkspace()
+    const registry = new ToolRegistry()
+
+    const result = await registry.execute(
+      "write",
+      JSON.stringify({ path: "a.txt", content: "x" }),
+      context(workspace),
+      { authorize: async () => ({ approved: true, reason: "auto" }) },
+    )
+
+    expect(result).toMatchObject({ ok: true, authorization: "auto" })
+  })
+
   it("enforces the permission gate", async () => {
     const workspace = await makeWorkspace()
     const registry = new ToolRegistry()

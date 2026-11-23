@@ -42,6 +42,14 @@ export type Tool = {
   preview?(raw: unknown, context: ToolContext): Promise<ToolPreview>
 }
 
+/** Why a tool was allowed to run. `auto` is the only mode label the TUI shows. */
+export type AuthorizationReason = "auto" | "allow" | "read" | "user"
+
+export type PermissionDecision = {
+  approved: boolean
+  reason?: AuthorizationReason
+}
+
 export type ToolExecution =
   | {
       ok: true
@@ -50,11 +58,16 @@ export type ToolExecution =
       failed?: boolean
       exitCode?: number | null
       timedOut?: boolean
+      authorization?: AuthorizationReason
     }
   | { ok: false; error: string }
 
 export interface PermissionGate {
-  authorize(tool: Tool, input: unknown, context: ToolContext): Promise<boolean>
+  authorize(
+    tool: Tool,
+    input: unknown,
+    context: ToolContext,
+  ): Promise<boolean | PermissionDecision>
 }
 
 const MAX_READ_LINES = 2000
@@ -461,13 +474,25 @@ export class ToolRegistry {
       return { ok: false, error: `Invalid arguments: ${parsed.error.message}` }
     }
 
-    if (gate && !(await gate.authorize(tool, parsed.data, context))) {
-      return { ok: false, error: "Permission denied" }
+    let authorization: AuthorizationReason | undefined
+    if (gate) {
+      const decision = await gate.authorize(tool, parsed.data, context)
+      const approved =
+        typeof decision === "boolean" ? decision : decision.approved
+      if (!approved) return { ok: false, error: "Permission denied" }
+      authorization =
+        typeof decision === "boolean" ? undefined : decision.reason
     }
 
     try {
       const result = await tool.execute(parsed.data, context)
-      if (typeof result === "string") return { ok: true, output: result }
+      if (typeof result === "string") {
+        return {
+          ok: true,
+          output: result,
+          ...(authorization === undefined ? {} : { authorization }),
+        }
+      }
       return {
         ok: true,
         output: result.output,
@@ -475,6 +500,7 @@ export class ToolRegistry {
         ...(result.failed ? { failed: true } : {}),
         ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
         ...(result.timedOut ? { timedOut: true } : {}),
+        ...(authorization === undefined ? {} : { authorization }),
       }
     } catch (error) {
       return { ok: false, error: messageOf(error) }

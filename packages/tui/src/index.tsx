@@ -1853,7 +1853,6 @@ export function App({ options }: { options: TuiOptions }) {
               columns={columns}
               expanded={false}
               leading={index > 0}
-              permissionMode={permissionMode}
               workspace={workspace}
             />
           )}
@@ -1890,7 +1889,6 @@ export function App({ options }: { options: TuiOptions }) {
               columns={columns}
               expanded={false}
               leading={committed.length > 0}
-              permissionMode={permissionMode}
               maxLines={Math.max(2, rows - 14)}
               workspace={workspace}
             />

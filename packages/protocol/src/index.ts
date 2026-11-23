@@ -22,6 +22,10 @@ export const PermissionPolicy = z.object({
 })
 export type PermissionPolicy = z.infer<typeof PermissionPolicy>
 
+/** Why a tool was allowed to run. `auto` is the only mode label the TUI shows. */
+export const AuthorizationReason = z.enum(["auto", "allow", "read", "user"])
+export type AuthorizationReason = z.infer<typeof AuthorizationReason>
+
 const eventBase = {
   sessionId: SessionId,
   seq: EventSeq,
@@ -88,6 +92,8 @@ export const SessionEvent = z.discriminatedUnion("type", [
     failed: z.boolean().optional(),
     exitCode: z.number().int().nullable().optional(),
     timedOut: z.boolean().optional(),
+    /** Recorded by the broker when a tool ran without prompting. */
+    authorization: AuthorizationReason.optional(),
   }),
   z.object({
     ...eventBase,

@@ -1,4 +1,3 @@
-import type { PermissionMode } from "@opencontinue/protocol"
 import { Box, Text } from "ink"
 
 import { glyphs } from "../glyphs.js"
@@ -21,7 +20,6 @@ type TranscriptItemProps = {
   columns: number
   expanded: boolean
   leading: boolean
-  permissionMode?: PermissionMode
   maxLines?: number
   workspace?: string
 }
@@ -31,14 +29,12 @@ function ToolBlock({
   columns,
   expanded,
   leading,
-  permissionMode,
   workspace,
 }: {
   item: ToolTimelineItem
   columns: number
   expanded: boolean
   leading: boolean
-  permissionMode?: PermissionMode
   workspace?: string
 }) {
   const hasOutput = Boolean(item.output?.trim())
@@ -64,7 +60,7 @@ function ToolBlock({
           )
         }
         return (
-          <Text key={index} wrap="truncate">
+          <Text key={index} bold wrap="truncate">
             {line}
           </Text>
         )
@@ -118,9 +114,7 @@ function ToolBlock({
         </Text>
       ))}
 
-      {permissionMode === "auto" &&
-      item.status === "done" &&
-      !["read", "grep", "glob"].includes(item.name) ? (
+      {item.authorization === "auto" ? (
         <Text dimColor wrap="truncate">
           {"  ⎿  Allowed by auto mode"}
         </Text>
@@ -134,7 +128,6 @@ export function TranscriptItem({
   columns,
   expanded,
   leading,
-  permissionMode,
   maxLines,
   workspace,
 }: TranscriptItemProps) {
@@ -206,7 +199,6 @@ export function TranscriptItem({
         columns={columns}
         expanded={expanded}
         leading={leading}
-        permissionMode={permissionMode}
         workspace={workspace}
       />
     )
@@ -240,7 +232,6 @@ export function Transcript({
   columns,
   expanded,
   leading,
-  permissionMode,
   maxLines,
   workspace,
 }: {
@@ -248,7 +239,6 @@ export function Transcript({
   columns: number
   expanded: boolean
   leading: boolean
-  permissionMode?: PermissionMode
   maxLines?: number
   workspace?: string
 }) {
@@ -262,7 +252,6 @@ export function Transcript({
           columns={columns}
           expanded={expanded}
           leading={leading || index > 0}
-          permissionMode={permissionMode}
           maxLines={maxLines}
           workspace={workspace}
         />

@@ -20,9 +20,17 @@ export function timelineLines(
 ): Line[] {
   const width = Math.max(20, columns)
   const lines: Line[] = []
+  const visible = items.filter(
+    (item): item is Exclude<TimelineItem, { kind: "usage" }> =>
+      item.kind !== "usage" &&
+      !(item.kind === "tool" && item.name === "todo") &&
+      !(item.kind === "assistant" && item.text === ""),
+  )
 
-  for (const item of items) {
-    if (item.kind === "usage") continue
+  for (const item of visible) {
+    if (lines.length > 0 && (lines.at(-1)?.text ?? "") !== "") {
+      lines.push({ text: "", dim: true })
+    }
 
     if (item.kind === "banner") {
       const title = `${glyphs.brand} ${PRODUCT_NAME}  v${item.version}`
@@ -70,10 +78,8 @@ export function timelineLines(
       continue
     }
 
-    if (item.name === "todo") continue
-
     const header = toolHeaderLines(item, width)
-    header.forEach((text, index) => {
+    header.forEach((text) => {
       lines.push({
         text,
         color:
@@ -81,10 +87,8 @@ export function timelineLines(
             ? theme.danger
             : item.status === "running"
               ? theme.working
-              : index === 0
-                ? theme.assistant
-                : undefined,
-        bold: index === 0,
+              : theme.assistant,
+        bold: true,
       })
     })
 
@@ -115,6 +119,9 @@ export function timelineLines(
       for (const note of toolNotes(item, workspace)) {
         lines.push({ text: `  ⎿  ${note}`, dim: true })
       }
+    }
+    if (item.authorization === "auto") {
+      lines.push({ text: "  ⎿  Allowed by auto mode", dim: true })
     }
   }
 

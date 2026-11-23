@@ -11,8 +11,31 @@ describe("timeline lines", () => {
       { kind: "assistant", id: "a1", runId: "r1", text: "hi there" },
     ]
     const lines = timelineLines(items, 40, false)
-    expect(lines.map((line) => line.text)).toEqual(["› hello", "● hi there"])
+    expect(lines.map((line) => line.text)).toEqual(["› hello", "", "● hi there"])
     expect(lines[0]?.color).toBe(theme.assistant)
+  })
+
+  it("keeps one blank line between tool blocks", () => {
+    const tool: TimelineItem = {
+      kind: "tool",
+      id: "t1",
+      runId: "r1",
+      name: "bash",
+      input: { command: "echo one" },
+      status: "done",
+      output: "one",
+    }
+    const lines = timelineLines(
+      [tool, { ...tool, id: "t2", input: { command: "echo two" }, output: "two" }],
+      60,
+      false,
+    )
+    const plain = lines.map((line) => line.text)
+
+    expect(plain[0]).toContain("Bash(echo one)")
+    expect(plain).toContain("")
+    expect(plain.some((line) => line.includes("Bash(echo two)"))).toBe(true)
+    expect(plain.filter((line) => line === "")).toHaveLength(1)
   })
 
   it("indents assistant continuation lines", () => {

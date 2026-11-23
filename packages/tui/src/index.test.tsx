@@ -409,11 +409,11 @@ describe("TUI", () => {
           input: { command: "echo hi" },
           status: "done",
           output: Array.from({ length: 8 }, (_, index) => `line ${index}`).join("\n"),
+          authorization: "auto",
         }}
         columns={80}
         expanded={false}
         leading={false}
-        permissionMode="auto"
       />,
     )
     const toolFrame = tool.lastFrame() ?? ""
@@ -461,7 +461,6 @@ describe("TUI", () => {
         columns={80}
         expanded={false}
         leading={false}
-        permissionMode="auto"
         workspace={"D:\\work"}
       />,
     )
@@ -469,6 +468,40 @@ describe("TUI", () => {
     expect(emptyFrame).toContain("(No output)")
     expect(emptyFrame).toContain("(timeout 2m)")
     empty.unmount()
+  })
+
+  it("only labels the auto-mode reason recorded by the broker", () => {
+    const base = {
+      kind: "tool" as const,
+      id: "tool:auto",
+      runId: "run:1",
+      name: "bash",
+      input: { command: "echo hi" },
+      status: "done" as const,
+      output: "hi",
+    }
+
+    const auto = render(
+      <TranscriptItem
+        item={{ ...base, authorization: "auto" }}
+        columns={80}
+        expanded={false}
+        leading={false}
+      />,
+    )
+    expect(auto.lastFrame() ?? "").toContain("Allowed by auto mode")
+    auto.unmount()
+
+    const user = render(
+      <TranscriptItem
+        item={{ ...base, authorization: "user" }}
+        columns={80}
+        expanded={false}
+        leading={false}
+      />,
+    )
+    expect(user.lastFrame() ?? "").not.toContain("Allowed by auto mode")
+    user.unmount()
   })
 
   it("renders the update summary and line-numbered diff", () => {
@@ -791,6 +824,43 @@ describe("TUI", () => {
       })
       expect(output(frames)).toContain("Exit code 3")
       expect(output(frames)).toContain("1 command (1 failed)")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("shows the auto-mode reason recorded by the broker", async () => {
+    const { server, url } = await fakeToolProvider()
+    saveProviderConfig({
+      provider: "openai",
+      baseUrl: url,
+      model: "gpt-6.2",
+      permissionMode: "auto",
+    })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      expect(lastFrame()).toContain("⟳ Auto")
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("run it")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› run it"))
+      stdin.write("\r")
+
+      await vi.waitFor(
+        () => expect(output(frames)).toContain("Allowed by auto mode"),
+        { timeout: 5000 },
+      )
+      await vi.waitFor(
+        () => expect(output(frames)).toContain("Completed in"),
+        { timeout: 5000 },
+      )
+      expect(output(frames)).toContain("Bash(echo hi)")
+      expect(output(frames)).not.toContain("Permission required")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

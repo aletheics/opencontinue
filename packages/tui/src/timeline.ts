@@ -1,4 +1,7 @@
-import type { SessionEvent } from "@opencontinue/protocol"
+import type {
+  AuthorizationReason,
+  SessionEvent,
+} from "@opencontinue/protocol"
 
 export type UserTimelineItem = {
   kind: "user"
@@ -30,6 +33,8 @@ export type ToolTimelineItem = {
   /** Non-zero shell exit or timeout; the tool ran, so output stays available. */
   exitCode?: number | null
   timedOut?: boolean
+  /** Why the broker allowed the tool without prompting. */
+  authorization?: AuthorizationReason
 }
 
 export type UsageTimelineItem = {
@@ -129,6 +134,7 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
             diff: event.diff,
             exitCode: event.exitCode,
             timedOut: event.timedOut,
+            authorization: event.authorization,
           }
         : item,
     )
