@@ -18,6 +18,7 @@ import {
   runChecks,
   summarizeResults,
 } from "./checks.js"
+import { doctorExitCode, formatDoctor, runDoctor } from "./doctor.js"
 import { importCommand } from "./import.js"
 import { configCommand, setupCommand } from "./setup.js"
 
@@ -415,6 +416,24 @@ program
       format: String(program.opts().format ?? options.format ?? "text"),
     }),
   )
+
+program
+  .command("doctor")
+  .description("Check Node, workspace, provider, auth, sessions, and server")
+  .option("--json", "Print machine-readable checks")
+  .option("--network", "Check the provider model list over the network")
+  .option("--url <url>", "Also check a running server")
+  .action(async (options: { json?: boolean; network?: boolean; url?: string }) => {
+    const checks = await runDoctor({
+      workspace: process.env.INIT_CWD ?? process.cwd(),
+      url: options.url ? String(program.opts().url ?? options.url) : undefined,
+      network: options.network,
+    })
+    console.log(
+      options.json ? JSON.stringify({ checks }, null, 2) : formatDoctor(checks),
+    )
+    process.exitCode = doctorExitCode(checks)
+  })
 
 program
   .command("sessions")

@@ -42,6 +42,7 @@ Optional commands:
 ```bash
 opencontinue setup              # interactive provider setup
 opencontinue config             # show current config
+opencontinue doctor             # check Node, workspace, provider, auth, sessions
 opencontinue import continue    # import ~/.continue/config.yaml
 opencontinue import opencode    # import opencode.json(c)
 ```
