@@ -117,8 +117,14 @@ export function saveAuthConfig(auth: AuthConfig): void {
 export function resolveProviderSettings(env: NodeJS.ProcessEnv = process.env): ProviderSettings {
   const config = loadProviderConfig()
   const auth = loadAuthConfig()
-  const provider = env.OPENCONTINUE_PROVIDER ?? env.OPENAI_PROVIDER ?? config.provider
+  const provider = env.OPENCONTINUE_PROVIDER ?? config.provider
   const providerKey = provider ? auth.keys?.[provider] : undefined
+
+  // OPENAI_* variables only apply to the default OpenAI provider. A Claude or
+  // DeepSeek request must never receive an OpenAI key or endpoint.
+  const openai = provider === undefined || provider === "openai"
+  const openaiEnv = (key: string): string | undefined =>
+    openai ? env[key] : undefined
 
   const permissionMode =
     normalizePermissionModeSetting(env.OPENCONTINUE_PERMISSION_MODE) ??
@@ -129,9 +135,17 @@ export function resolveProviderSettings(env: NodeJS.ProcessEnv = process.env): P
 
   return {
     provider,
-    baseUrl: env.OPENCONTINUE_BASE_URL ?? env.OPENAI_BASE_URL ?? config.baseUrl,
-    apiKey: env.OPENCONTINUE_API_KEY ?? env.OPENAI_API_KEY ?? providerKey ?? auth.apiKey,
-    model: env.OPENCONTINUE_MODEL ?? env.OPENAI_MODEL ?? config.model,
+    baseUrl:
+      env.OPENCONTINUE_BASE_URL ??
+      openaiEnv("OPENAI_BASE_URL") ??
+      config.baseUrl,
+    apiKey:
+      env.OPENCONTINUE_API_KEY ??
+      openaiEnv("OPENAI_API_KEY") ??
+      providerKey ??
+      auth.apiKey,
+    model:
+      env.OPENCONTINUE_MODEL ?? openaiEnv("OPENAI_MODEL") ?? config.model,
     permissionMode,
     reasoningEffort,
   }

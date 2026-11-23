@@ -72,6 +72,33 @@ describe("config", () => {
     })
   })
 
+  it("does not leak OPENAI_* env into another provider", () => {
+    saveProviderConfig({ provider: "claude" })
+    saveAuthConfig({ keys: { claude: "claude-key" } })
+
+    const claude = resolveProviderSettings({
+      OPENCONTINUE_PROVIDER: "claude",
+      OPENAI_API_KEY: "openai-key",
+      OPENAI_BASE_URL: "https://api.openai.com/v1",
+      OPENAI_MODEL: "gpt-6.2",
+    })
+    expect(claude.apiKey).toBe("claude-key")
+    expect(claude.baseUrl).toBeUndefined()
+    expect(claude.model).toBeUndefined()
+
+    const openai = resolveProviderSettings({
+      OPENCONTINUE_PROVIDER: "openai",
+      OPENAI_API_KEY: "openai-key",
+      OPENAI_BASE_URL: "https://api.openai.com/v1",
+      OPENAI_MODEL: "gpt-6.2",
+    })
+    expect(openai).toMatchObject({
+      apiKey: "openai-key",
+      baseUrl: "https://api.openai.com/v1",
+      model: "gpt-6.2",
+    })
+  })
+
   it("persists and resolves the permission mode", () => {
     saveProviderConfig({ permissionMode: "auto" })
     expect(resolveProviderSettings({}).permissionMode).toBe("auto")
