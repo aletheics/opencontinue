@@ -569,6 +569,33 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("shows directories in @file completion", async () => {
+    await mkdir(path.join(home, "src"), { recursive: true })
+    await writeFile(path.join(home, "src", "app.ts"), "export const app = 1\n")
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      await ready(lastFrame)
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("@")
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain(`+ src${path.sep}`),
+      )
+
+      stdin.write("\t")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› @src/"))
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("searches input history with ctrl+r", async () => {
     const { server, url } = await fakeProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })

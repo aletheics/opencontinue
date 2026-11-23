@@ -14,12 +14,23 @@ export function mentionQueryAt(input: string, cursor: number): string | null {
 }
 
 function score(file: string, query: string): number {
-  const lower = file.toLowerCase()
+  const lower = (file.endsWith("/") ? file.slice(0, -1) : file).toLowerCase()
   const base = lower.split("/").at(-1) ?? ""
   if (base.startsWith(query)) return 0
   if (lower.startsWith(query)) return 1
   if (base.includes(query)) return 2
   return 3
+}
+
+/**
+ * Directory entries arrive with a forward slash. Show the platform separator
+ * in the menu while keeping the value itself portable.
+ */
+export function displayMention(
+  file: string,
+  separator: string = "/",
+): string {
+  return file.endsWith("/") ? `${file.slice(0, -1)}${separator}` : file
 }
 
 export function filterWorkspaceFiles(
@@ -52,8 +63,9 @@ export function completeMention(
   if (!match) return null
 
   const start = before.length - (match[0]?.length ?? 0) + (match[1]?.length ?? 0)
+  const suffix = file.endsWith("/") ? "" : " "
   return {
-    value: `${input.slice(0, start)}@${file} ${input.slice(cursor)}`,
-    cursor: start + file.length + 2,
+    value: `${input.slice(0, start)}@${file}${suffix}${input.slice(cursor)}`,
+    cursor: start + file.length + 1 + suffix.length,
   }
 }

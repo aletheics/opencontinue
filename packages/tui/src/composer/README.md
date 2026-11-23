@@ -6,7 +6,7 @@
 
 - `commands.ts` — slash command catalog, help text, and bare-prefix matching.
 - `history.ts` — newest-first history search and cursor movement.
-- `mentions.ts` — `@file` token detection, ranked filtering, and token replacement.
+- `mentions.ts` — `@file` token detection, ranked filtering over files and directories, platform-separator display, and token replacement.
 - `keys.ts` — printable-input predicate shared by pickers.
 - `editor/` — cursor-aware input actions, viewport math, and the Ink component.
 

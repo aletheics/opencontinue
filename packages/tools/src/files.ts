@@ -15,6 +15,8 @@ const IGNORED_DIRECTORIES = new Set([
 
 export type ListFilesOptions = {
   limit?: number
+  /** Include directory entries (with a trailing slash) in the result. */
+  includeDirectories?: boolean
 }
 
 /**
@@ -46,6 +48,7 @@ export async function listWorkspaceFiles(
 
       const nextRelative = relative ? `${relative}/${entry.name}` : entry.name
       if (entry.isDirectory()) {
+        if (options.includeDirectories) files.push(`${nextRelative}/`)
         if (IGNORED_DIRECTORIES.has(entry.name)) continue
         await walk(path.join(directory, entry.name), nextRelative)
       } else if (entry.isFile()) {

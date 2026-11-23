@@ -1,3 +1,5 @@
+import { sep } from "node:path"
+
 import { Box, Static, Text, render, useApp, useInput } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -27,6 +29,7 @@ import { listWorkspaceFiles } from "@opencontinue/tools"
 
 import {
   completeMention as applyMention,
+  displayMention,
   filterWorkspaceFiles,
   mentionQueryAt,
 } from "./composer/mentions.js"
@@ -174,7 +177,7 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen !== "chat" || filesLoadedRef.current) return
     filesLoadedRef.current = true
     setFilesLoading(true)
-    void listWorkspaceFiles(workspace)
+    void listWorkspaceFiles(workspace, { includeDirectories: true })
       .then(setWorkspaceFiles)
       .catch(() => setWorkspaceFiles([]))
       .finally(() => setFilesLoading(false))
@@ -1339,7 +1342,10 @@ export function App({ options }: { options: TuiOptions }) {
                     <Box flexDirection="column" paddingX={2}>
                       <Picker
                         marker="+"
-                        items={fileMatches.map((file) => ({ key: file, label: file }))}
+                        items={fileMatches.map((file) => ({
+                          key: file,
+                          label: displayMention(file, sep),
+                        }))}
                         selectedIndex={activeFileIndex}
                         windowSize={Math.min(8, Math.max(1, rows - 8))}
                         emptyText={filesLoading ? "Loading files…" : "No files match."}

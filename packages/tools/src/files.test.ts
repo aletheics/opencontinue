@@ -29,6 +29,12 @@ describe("listWorkspaceFiles", () => {
     ])
   })
 
+  it("includes directories with a trailing slash when asked", async () => {
+    await expect(
+      listWorkspaceFiles(workspace, { includeDirectories: true }),
+    ).resolves.toEqual(["node_modules/", "README.md", "src/", "src/app.ts"])
+  })
+
   it("honors the limit", async () => {
     const files = await listWorkspaceFiles(workspace, { limit: 1 })
     expect(files).toEqual(["README.md"])

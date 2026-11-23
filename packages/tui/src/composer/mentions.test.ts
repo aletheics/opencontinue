@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   completeMention,
+  displayMention,
   filterWorkspaceFiles,
   mentionQueryAt,
 } from "./mentions.js"
@@ -29,5 +30,17 @@ describe("@file mentions", () => {
       cursor: 17,
     })
     expect(completeMention("mail a@b", 9, "src/app.ts")).toBeNull()
+  })
+
+  it("ranks and completes directory entries", () => {
+    expect(
+      filterWorkspaceFiles(["src/", "src/app.ts", "docs/"], "sr"),
+    ).toEqual(["src/", "src/app.ts"])
+    expect(completeMention("look @sr", 8, "src/")).toEqual({
+      value: "look @src/",
+      cursor: 10,
+    })
+    expect(displayMention("src/", "\\")).toBe("src\\")
+    expect(displayMention("src/app.ts", "\\")).toBe("src/app.ts")
   })
 })

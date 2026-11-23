@@ -22,7 +22,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Completion line: `✻ Churned for 3.2s · done 16:01`, using the eight past-tense completion verbs (`Baked`, `Brewed`, `Churned`, `Cogitated`, `Cooked`, `Crunched`, `Sautéed`, `Worked`) sampled independently of the spinner verb.
 - Bottom mode line: `⏵⏵ auto mode on (shift+tab to cycle)` in yellow, `⛔ readonly mode …` in red, or `? for shortcuts …` dim; busy adds `esc to interrupt`; workspace, branch, model, duration, and tokens sit dim on the right when width allows.
 - The live assistant is clipped to the viewport tail. Completed output is printed once from `Static`, which prevents long streaming responses from scrolling part of the live frame into scrollback and then reprinting it.
-- Slash, file, and history menus render below the prompt. File completion uses a `+ path` list; slash completion uses name/description columns.
+- Slash, file, and history menus render below the prompt. File completion uses a `+ path` list and includes directories with the platform separator (`.github\` on Windows); completing a directory keeps the menu open at the trailing slash. Slash completion uses name/description columns.
 - Prompt input submitted while a run is active is queued and sent when the run finishes.
 - Keybindings:
   - `Ctrl+C` exit
