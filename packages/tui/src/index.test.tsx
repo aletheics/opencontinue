@@ -10,6 +10,7 @@ import { createSessionStore } from "@opencontinue/core"
 import { render } from "ink-testing-library"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { TranscriptItem } from "./components/Transcript.js"
 import { App } from "./index.js"
 
 let home = ""
@@ -31,6 +32,10 @@ afterEach(async () => {
   else process.env.INIT_CWD = previousInitCwd
   await rm(home, { recursive: true, force: true })
 })
+
+function output(frames: string[]): string {
+  return frames.join("\n").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+}
 
 async function fakeProvider(
   models: string[] = ["gpt-6.2"],
@@ -166,6 +171,42 @@ async function fakeWriteProvider(): Promise<{ server: http.Server; url: string }
 }
 
 describe("TUI", () => {
+  it("renders Claude-style inline transcript blocks", () => {
+    const tool = render(
+      <TranscriptItem
+        item={{
+          kind: "tool",
+          id: "tool:1",
+          runId: "run:1",
+          name: "bash",
+          input: { command: "echo hi" },
+          status: "done",
+          output: Array.from({ length: 8 }, (_, index) => `line ${index}`).join("\n"),
+        }}
+        columns={80}
+        expanded={false}
+        leading={false}
+      />,
+    )
+    const toolFrame = tool.lastFrame() ?? ""
+    expect(toolFrame).toContain("● Bash(echo hi)")
+    expect(toolFrame).toContain("⎿")
+    expect(toolFrame).toContain("ctrl+o to expand")
+    expect(toolFrame).not.toContain("╭")
+    tool.unmount()
+
+    const user = render(
+      <TranscriptItem
+        item={{ kind: "user", id: "user:1", text: "fix the bug" }}
+        columns={80}
+        expanded={false}
+        leading={false}
+      />,
+    )
+    expect(user.lastFrame() ?? "").toContain("❯ fix the bug")
+    user.unmount()
+  })
+
   it("shows providers before asking for a key", () => {
     const { lastFrame, unmount } = render(<App options={{ readonly: true }} />)
     const frame = lastFrame() ?? ""
@@ -235,7 +276,7 @@ describe("TUI", () => {
         expect(lastFrame()).toContain("Select a model · OpenAI (GPT) · /deep/ (1/1)")
       })
       expect(lastFrame()).toContain("deepseek-chat")
-      expect(lastFrame()).not.toContain("gpt-6.2")
+      expect(lastFrame()).not.toContain("› gpt-6.2")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -252,7 +293,9 @@ describe("TUI", () => {
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
 
     try {
       stdin.write("\r")
@@ -262,7 +305,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/resume")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> /resume"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Resume a session"))
       expect(lastFrame()).toContain("Previous work")
@@ -270,7 +313,7 @@ describe("TUI", () => {
       stdin.write("previous")
       await vi.waitFor(() => expect(lastFrame()).toContain("/previous/"))
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> remember this"), {
+      await vi.waitFor(() => expect(output(frames)).toContain("❯ remember this"), {
         timeout: 5000,
       })
     } finally {
@@ -289,7 +332,9 @@ describe("TUI", () => {
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
 
     try {
       stdin.write("\r")
@@ -299,7 +344,7 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/resume")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> /resume"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("Resume a session"))
       expect(lastFrame()).toContain("fix the parser")
@@ -307,7 +352,7 @@ describe("TUI", () => {
       stdin.write("parser")
       await vi.waitFor(() => expect(lastFrame()).toContain("/parser/"))
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> fix the parser"), {
+      await vi.waitFor(() => expect(output(frames)).toContain("❯ fix the parser"), {
         timeout: 5000,
       })
     } finally {
@@ -323,7 +368,7 @@ describe("TUI", () => {
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{}} />)
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
 
     try {
       stdin.write("\r")
@@ -333,10 +378,10 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("change it")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> change it"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ change it"))
       stdin.write("\r")
 
-      await vi.waitFor(() => expect(lastFrame()).toContain("Permission needed: write"), {
+      await vi.waitFor(() => expect(lastFrame()).toContain("Permission required · write"), {
         timeout: 5000,
       })
       expect(lastFrame()).toContain("note.txt")
@@ -344,7 +389,7 @@ describe("TUI", () => {
       expect(lastFrame()).toContain("+hello")
 
       stdin.write("n")
-      await vi.waitFor(() => expect(lastFrame()).toContain("done"), { timeout: 5000 })
+      await vi.waitFor(() => expect(output(frames)).toContain("done"), { timeout: 5000 })
       await expect(readFile(path.join(home, "note.txt"), "utf8")).resolves.toBe("old\n")
     } finally {
       unmount()
@@ -357,7 +402,7 @@ describe("TUI", () => {
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{}} />)
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
 
     try {
       stdin.write("\r")
@@ -367,19 +412,19 @@ describe("TUI", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("run it")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> run it"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ run it"))
 
       stdin.write("\r")
-      await vi.waitFor(() => expect(lastFrame()).toContain("Permission needed: bash"), {
+      await vi.waitFor(() => expect(lastFrame()).toContain("Permission required · bash"), {
         timeout: 5000,
       })
       expect(lastFrame()).toContain("echo hi")
-      expect(lastFrame()).toContain("allow bash for session")
+      expect(lastFrame()).toContain("allow for session")
 
       stdin.write("a")
-      await vi.waitFor(() => expect(lastFrame()).toContain("done"), { timeout: 5000 })
-      expect(lastFrame()).toContain("Bash echo hi")
-      expect(lastFrame()).toContain("hi")
+      await vi.waitFor(() => expect(output(frames)).toContain("done"), { timeout: 5000 })
+      expect(output(frames)).toContain("Bash(echo hi)")
+      expect(output(frames)).toContain("hi")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -407,7 +452,7 @@ describe("TUI", () => {
       expect(lastFrame()).not.toContain("/help — show commands")
 
       stdin.write("\t")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> /resume"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ /resume"))
 
       stdin.write("\u001b")
       await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"))
@@ -466,7 +511,7 @@ describe("TUI", () => {
 
       stdin.write("\t")
       await vi.waitFor(() =>
-        expect(lastFrame()).toContain("you> look @src/app.ts"),
+        expect(lastFrame()).toContain("❯ look @src/app.ts"),
       )
       expect(lastFrame()).not.toContain("Files · /ap/")
     } finally {
@@ -480,7 +525,9 @@ describe("TUI", () => {
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
 
     try {
       stdin.write("\r")
@@ -488,15 +535,21 @@ describe("TUI", () => {
       stdin.write("\r")
       await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
 
-      for (const text of ["alpha", "beta"]) {
+      for (const [index, text] of ["alpha", "beta"].entries()) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         stdin.write(text)
-        await vi.waitFor(() => expect(lastFrame()).toContain(`you> ${text}`))
+        await vi.waitFor(() => expect(lastFrame()).toContain(`❯ ${text}`))
         stdin.write("\r")
-        await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"), {
-          timeout: 5000,
-        })
+        await vi.waitFor(() => {
+          const count = output(frames).match(/hello from tui/g)?.length ?? 0
+          expect(count).toBeGreaterThanOrEqual(index + 1)
+        }, { timeout: 5000 })
       }
+
+      await vi.waitFor(() => {
+        const count = output(frames).match(/✻ Worked/g)?.length ?? 0
+        expect(count).toBeGreaterThanOrEqual(2)
+      })
 
       stdin.write("\u0012")
       await vi.waitFor(() => expect(lastFrame()).toContain("History"))
@@ -508,7 +561,7 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).not.toContain("History · /bet/"))
 
       stdin.write("!")
-      await vi.waitFor(() => expect(lastFrame()).toContain("you> beta!"))
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ beta!"))
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -520,7 +573,9 @@ describe("TUI", () => {
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
 
     try {
       stdin.write("\r")
@@ -541,31 +596,30 @@ describe("TUI", () => {
 
       stdin.write("hi")
       await vi.waitFor(() => {
-        expect(lastFrame()).toContain("you> hi")
+        expect(lastFrame()).toContain("❯ hi")
       })
 
       stdin.write("\r")
       await vi.waitFor(
         () => {
-          expect(lastFrame()).toContain("hello from tui")
+          expect(output(frames)).toContain("hello from tui")
         },
         { timeout: 5000 },
       )
 
       const frame = lastFrame() ?? ""
-      expect(frame.match(/OpenContinue/g)?.length ?? 0).toBe(1)
       expect(frame).toContain("Type a message…")
-      expect(frame).toContain("/exit ·")
+      expect(frame).toContain("readonly mode")
       expect(frame.split("\n").length).toBeLessThanOrEqual(24)
 
       await new Promise((resolve) => setTimeout(resolve, 0))
       stdin.write("/help")
       await vi.waitFor(() => {
-        expect(lastFrame()).toContain("you> /help")
+        expect(lastFrame()).toContain("❯ /help")
       })
       stdin.write("\r")
       await vi.waitFor(() => {
-        expect(lastFrame()).toContain("show commands")
+        expect(output(frames)).toContain("show commands")
       })
     } finally {
       unmount()
@@ -573,12 +627,14 @@ describe("TUI", () => {
     }
   }, 20000)
 
-  it("keeps a fixed frame after repeated help output", async () => {
+  it("does not garble repeated help output", async () => {
     const { server, url } = await fakeProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
 
-    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
 
     try {
       stdin.write("\r")
@@ -589,23 +645,18 @@ describe("TUI", () => {
       for (let index = 0; index < 5; index++) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         stdin.write("/help")
-        await vi.waitFor(() => expect(lastFrame()).toContain("you> /help"))
+        await vi.waitFor(() => expect(lastFrame()).toContain("❯ /help"))
         stdin.write("\r")
-        await vi.waitFor(() => expect(lastFrame()).toContain("show commands"))
+        await vi.waitFor(() => {
+          const count = output(frames).match(/show commands/g)?.length ?? 0
+          expect(count).toBeGreaterThanOrEqual(index + 1)
+        })
       }
 
       const frame = lastFrame() ?? ""
-      const plain = frame.replace(/\x1b\[[0-9;]*m/g, "")
-      expect(plain.split("\n").length).toBeLessThanOrEqual(24)
-      expect(plain.match(/OpenContinue/g)?.length ?? 0).toBe(1)
-      expect(plain).toContain("Type a message…")
-      expect(plain).toContain("/exit ·")
-      expect(plain).toContain("older lines · PgUp")
-
-      const width = plain.split("\n")[0]?.length ?? 0
-      for (const line of plain.split("\n")) {
-        expect(line.length).toBeLessThanOrEqual(width)
-      }
+      expect(frame).toContain("Type a message…")
+      expect(output(frames)).not.toContain("/help/help")
+      expect(output(frames)).not.toContain("❯ /help/help")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

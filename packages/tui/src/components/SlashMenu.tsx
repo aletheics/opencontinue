@@ -18,19 +18,12 @@ export function SlashMenu({ commands, selectedIndex }: SlashMenuProps) {
   const selected = Math.min(selectedIndex, commands.length - 1)
 
   return (
-    <Box
-      flexShrink={0}
-      height={commands.length + 2}
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.border}
-      paddingX={1}
-      overflow="hidden"
-    >
+    <Box flexDirection="column" paddingX={2}>
       {commands.map((command, index) => (
         <Text
           key={command.name}
           color={index === selected ? theme.brand : undefined}
+          dimColor={index !== selected}
           wrap="truncate"
         >
           {index === selected ? "› " : "  "}

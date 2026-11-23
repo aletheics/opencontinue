@@ -13,43 +13,41 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 
 ## What OpenContinue adopts
 
-- Full-screen alternate buffer with one persistent frame.
-- Fixed regions: header, scrollable timeline, input box, footer.
-- Timeline blocks: user, assistant, tool, system; tool blocks show `●`/`✗`, `+N -M`, colored diffs, collapsed output.
-- Token usage and elapsed time in the header.
+- **Inline Claude Code-style transcript**, not a full-screen dashboard. Completed items are written once to terminal scrollback through Ink `<Static>`; only the live tail, spinner, and prompt repaint.
+- No header bar, no bordered transcript, no bordered input. The only box is the permission dialog.
+- Tool blocks: `● Tool(args)` with wrapped continuation aligned under the call, `⎿` output lines, colored diff lines, and `… +N lines (ctrl+o to expand)`.
+- User prompts: `❯ text` with two-space continuation. Assistant text: markdown-style headings, lists, quotes, and fenced code.
+- Completion line: `✻ Worked for 3.2s`; live spinner: `✻ Thinking… (3s · esc to interrupt)` or `Running Bash…`.
+- Bottom mode line: `⏵⏵ auto mode on (shift+tab to cycle)`, `⛔ readonly mode …`, or `? for shortcuts …`; workspace, branch, model, duration, and tokens sit dim on the right when width allows.
+- Prompt input submitted while a run is active is queued and sent when the run finishes.
 - Keybindings:
   - `Ctrl+C` exit
-  - `Ctrl+O` expand/collapse tool output and diffs
+  - `Ctrl+O` open/close the expanded transcript view
   - `Shift+Tab` cycle permission mode (`ask` → `auto` → `readonly`)
   - `Esc` abort the active run
   - `Up`/`Down` input history
-  - `PgUp`/`PgDn` scroll the timeline
   - `Ctrl+D` exit when input is empty
+  - Terminal scrollback handles normal scrolling; the transcript view adds `↑/↓` and `PgUp`/`PgDn`.
 - Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/status`, `/exit`.
-- Slash menu above the input: filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
+- Slash menu above the prompt: borderless, filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
 - Session picker via `/resume`: sorted by recency, type-to-filter by title or id, `Esc` returns to chat. Sessions with the generic default title are labeled by their first user message.
-- Permission dialog: shows the tool name and a readable detail (command, path, or pattern); write/edit tools also show a dry-run diff before approval. `y` allows once, `a` remembers the tool for the session, `n` denies. The gate lives in `packages/tui/src/permission-gate.ts`; previews come from the tool's optional `preview` method.
-- Provider/model pickers with type-to-filter search, `Esc` to clear or return, and per-provider API keys inside the same frame.
+- Permission dialog: bordered, shows the tool name and a readable detail (command, path, or pattern); write/edit tools also show a dry-run diff before approval. `y` allows once, `a` remembers the tool for the session, `n` denies. The gate lives in `packages/tui/src/permission-gate.ts`; previews come from the tool's optional `preview` method.
+- Provider/model pickers with type-to-filter search, `Esc` to clear or return, and per-provider API keys.
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
-- A line-buffer renderer in `packages/tui/src/render.ts`: timeline items become styled lines, long text wraps to the content width, and the viewport slices by line so scrolling and clipping are exact.
-- Presentational components in `packages/tui/src/components/` (Header, Picker, Timeline, Prompt); `index.tsx` stays the state machine and event wiring.
-- Markdown-style assistant output: headings, lists, task boxes, blockquotes, rules, and fenced code with a gutter. Styling is line-level because the renderer is a line buffer.
+- Formatting in `packages/tui/src/render.ts`: tool headers, `⎿` output, diff coloring, markdown, and the expanded transcript line buffer.
+- Presentational components in `packages/tui/src/components/` (Transcript, Picker, Prompt, Input, SlashMenu, PermissionPrompt); `index.tsx` stays the state machine and event wiring.
 - A cursor-aware input (`components/Input.tsx` plus pure `input.ts`): horizontal and vertical scrolling, readline keys, forward delete, and multi-line entry when the terminal reports modifiers.
-- `Ctrl+R` history search: filters submitted prompts, previews them above the input, and restores the chosen entry as a draft.
-- `@file` completion: a bounded workspace scan from `@opencontinue/tools` feeds a ranked picker; `Tab`/`Enter` inserts the path with a trailing space.
-- Status line: the footer's right side shows the workspace folder and the git branch (read directly from `.git/HEAD`, with a short hash when detached).
-- Ink's `alternateScreen` and `kittyKeyboard` auto mode instead of manual escape writes.
+- `Ctrl+R` history search, `@file` completion, workspace/git status, and Ink `kittyKeyboard` auto mode.
 
 ## Rendering contract
 
-The frame must occupy exactly the terminal height. Every text line is one terminal row:
+The TUI is an inline Ink app:
 
-- header: fixed 3 rows, truncated
-- body: fixed height, one `<Text wrap="truncate">` per buffered line
-- input: fixed 3 rows, width-constrained
-- footer: fixed 1 row, truncated
-
-This avoids Ink diff desync caused by terminal auto-wrap and variable-height nested boxes. Scrolling is measured in lines, not timeline items.
+- `<Static>` owns committed transcript items and prints each once; never mutate a committed item.
+- The live area below it renders the streaming assistant item, running tools, queued notices, spinner, menus, permission dialog, and prompt.
+- Every rendered line must be truncated or pre-wrapped so the terminal cannot auto-wrap. Terminal scrollback is the scrollback; do not replace it with a fixed-height viewport.
+- The expanded `Ctrl+O` transcript is the only scrolling viewport and is rendered on demand.
+- Permission dialogs, pickers, and the provider setup screens may use borders, but the main transcript and prompt do not.
 
 ## What OpenContinue does not copy yet
 

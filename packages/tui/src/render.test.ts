@@ -14,8 +14,8 @@ const assistant: TimelineItem = {
 describe("timelineLines", () => {
   it("renders user and assistant text as color-coded lines", () => {
     const lines = timelineLines([user, assistant], 40, false)
-    expect(lines.map((line) => line.text)).toEqual(["you> hello", "hi there"])
-    expect(lines[0]?.color).toBe("green")
+    expect(lines.map((line) => line.text)).toEqual(["❯ hello", "hi there"])
+    expect(lines[0]?.color).toBe("white")
   })
 
   it("wraps long lines to the viewport width", () => {
@@ -90,10 +90,13 @@ describe("timelineLines", () => {
       diff: ["--- a/src/app.ts", "+++ b/src/app.ts", "@@ -1 +1 @@", "-old", "+new"].join("\n"),
     }
     const lines = timelineLines([tool], 60, false)
-    expect(lines[0]?.text).toContain("Edit src/app.ts")
-    expect(lines[0]?.text).toContain("+1 -1")
-    expect(lines.some((line) => line.text === "+new" && line.color === "green")).toBe(true)
-    expect(lines.some((line) => line.text === "-old" && line.color === "red")).toBe(true)
+    expect(lines[0]?.text).toContain("Edit(src/app.ts)")
+    expect(
+      lines.some((line) => line.text.endsWith("+new") && line.color === "green"),
+    ).toBe(true)
+    expect(
+      lines.some((line) => line.text.endsWith("-old") && line.color === "red"),
+    ).toBe(true)
   })
 
   it("collapses tool output until expanded", () => {
@@ -110,7 +113,7 @@ describe("timelineLines", () => {
     const collapsed = timelineLines([tool], 60, false)
     const expanded = timelineLines([tool], 60, true)
     expect(collapsed.length).toBeLessThan(expanded.length)
-    expect(collapsed.some((line) => line.text.includes("more lines"))).toBe(true)
+    expect(collapsed.some((line) => line.text.includes("ctrl+o to expand"))).toBe(true)
   })
 
   it("skips usage items", () => {

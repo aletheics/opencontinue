@@ -39,12 +39,19 @@ export type SystemTimelineItem = {
   text: string
 }
 
+export type MetaTimelineItem = {
+  kind: "meta"
+  id: string
+  text: string
+}
+
 export type TimelineItem =
   | UserTimelineItem
   | AssistantTimelineItem
   | ToolTimelineItem
   | UsageTimelineItem
   | SystemTimelineItem
+  | MetaTimelineItem
 
 export function reduceTimeline(items: TimelineItem[], event: SessionEvent): TimelineItem[] {
   if (event.type === "message.user") {

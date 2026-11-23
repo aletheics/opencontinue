@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 
-import { Box, Text, render, useApp, useInput, useStdout } from "ink"
+import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -23,17 +23,17 @@ import type { SessionSummary } from "@opencontinue/protocol"
 import { runAgent } from "@opencontinue/runtime"
 import { listWorkspaceFiles, ToolRegistry } from "@opencontinue/tools"
 
-import { Header } from "./components/Header.js"
 import { Picker } from "./components/Picker.js"
+import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
 import { SlashMenu } from "./components/SlashMenu.js"
-import { Timeline } from "./components/Timeline.js"
+import { Transcript, TranscriptItem } from "./components/Transcript.js"
 import {
   TuiPermissionGate,
   type PermissionMode,
   type PermissionRequest,
 } from "./permission-gate.js"
-import { timelineLines } from "./render.js"
+import { timelineLines, toolDisplayName } from "./render.js"
 import { theme } from "./theme.js"
 import { reduceTimeline, timelineFromEvents, type TimelineItem } from "./timeline.js"
 
@@ -131,6 +131,22 @@ function workspaceInfo(workspace: string): { name: string; branch: string | null
   return { name: path.basename(root), branch }
 }
 
+function isCommittedItem(
+  item: TimelineItem,
+  index: number,
+  items: TimelineItem[],
+  busy: boolean,
+): boolean {
+  if (item.kind === "usage") return false
+  if (item.kind === "user" || item.kind === "system" || item.kind === "meta") return true
+  if (item.kind === "tool") return item.status !== "running"
+  if (item.kind === "assistant") {
+    if (!busy) return true
+    return items.slice(index + 1).some((later) => later.kind !== "usage")
+  }
+  return false
+}
+
 function sessionLabel(store: SessionStore, item: SessionSummary): string {
   const generic =
     !item.title || item.title === "OpenContinue TUI" || item.title === "Untitled session"
@@ -175,10 +191,14 @@ export function App({ options }: { options: TuiOptions }) {
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [input, setInput] = useState("")
   const [cursor, setCursor] = useState(0)
+  const [queued, setQueued] = useState<string[]>([])
+  const queuedRef = useRef<string[]>([])
   const [slashIndex, setSlashIndex] = useState(0)
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(0)
-  const [expandAll, setExpandAll] = useState(false)
+  const [transcriptMode, setTranscriptMode] = useState(false)
+  const [transcriptScroll, setTranscriptScroll] = useState(0)
+  const [transcriptKey, setTranscriptKey] = useState(0)
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [lastDurationMs, setLastDurationMs] = useState<number | null>(null)
   const [permission, setPermission] = useState<PermissionRequest | null>(null)
@@ -193,7 +213,6 @@ export function App({ options }: { options: TuiOptions }) {
   const [fileIndex, setFileIndex] = useState(0)
   const [dismissedMention, setDismissedMention] = useState<string | null>(null)
   const filesLoadedRef = useRef(false)
-  const [scrollOffset, setScrollOffset] = useState(0)
 
   const storeRef = useRef<SessionStore | null>(null)
   const sessionRef = useRef<string | null>(null)
@@ -231,8 +250,6 @@ export function App({ options }: { options: TuiOptions }) {
       .catch(() => setWorkspaceFiles([]))
       .finally(() => setFilesLoading(false))
   }, [screen])
-
-  const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10] ?? "⠋"
 
   const filteredProviders = useMemo(() => {
     const query = providerQuery.trim().toLowerCase()
@@ -295,6 +312,34 @@ export function App({ options }: { options: TuiOptions }) {
   useEffect(() => {
     setFileIndex(0)
   }, [mentionQuery])
+
+  const slashQuery =
+    screen === "chat" && input.startsWith("/") && !/\s/.test(input)
+      ? (input.split(/\s+/)[0] ?? "/")
+      : ""
+  const slashMatches = slashQuery
+    ? SLASH_COMMANDS.filter((command) => command.name.startsWith(slashQuery)).slice(0, 5)
+    : []
+  const fileMenuOpen =
+    screen === "chat" &&
+    mentionQuery !== null &&
+    dismissedMention !== mentionQuery &&
+    !busy &&
+    !permission &&
+    !historySearch
+  const activeFileIndex = Math.min(fileIndex, Math.max(0, fileMatches.length - 1))
+  const menuOpen =
+    screen === "chat" &&
+    slashMatches.length > 0 &&
+    !busy &&
+    !permission &&
+    !historySearch &&
+    !fileMenuOpen
+  const activeSlashIndex = Math.min(slashIndex, Math.max(0, slashMatches.length - 1))
+  const activeHistoryIndex = Math.min(
+    historySearchIndex,
+    Math.max(0, historyMatches.length - 1),
+  )
 
   useEffect(() => {
     return () => {
@@ -402,17 +447,36 @@ export function App({ options }: { options: TuiOptions }) {
     ])
   }
 
+  const appendMeta = (text: string) => {
+    setTimeline((items) => [
+      ...items,
+      {
+        kind: "meta",
+        id: `meta:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        text,
+      },
+    ])
+  }
+
   const attachSession = (store: SessionStore, sessionId: string) => {
     storeRef.current = store
     sessionRef.current = sessionId
     setTimeline(timelineFromEvents(store.events(sessionId)))
-    setScrollOffset(0)
+    setTranscriptKey((key) => key + 1)
+    setTranscriptScroll(0)
+    setTranscriptMode(false)
     unsubscribeRef.current?.()
     unsubscribeRef.current = store.subscribe(sessionId, (event) => {
       setTimeline((items) => reduceTimeline(items, event))
       if (event.type === "run.completed" || event.type === "run.failed") {
         const started = runStartedRef.current
-        if (started !== null) setLastDurationMs(Date.now() - started)
+        if (started !== null) {
+          const elapsed = Date.now() - started
+          setLastDurationMs(elapsed)
+          appendMeta(
+            `✻ ${event.type === "run.completed" ? "Worked" : "Failed"} for ${(elapsed / 1000).toFixed(1)}s`,
+          )
+        }
         runStartedRef.current = null
         setRunStartedAt(null)
         abortRef.current = null
@@ -618,12 +682,20 @@ export function App({ options }: { options: TuiOptions }) {
     const store = storeRef.current
     const sessionId = sessionRef.current
     const provider = providerRef.current
-    if (!store || !sessionId || !provider || busy) return
+    if (!store || !sessionId || !provider) return
+
+    if (busy) {
+      queuedRef.current.push(text)
+      setQueued((items) => [...items, text])
+      setDraft("")
+      setHistory((items) => [...items, text])
+      setHistoryIndex(-1)
+      return
+    }
 
     setDraft("")
     setHistory((items) => [...items, text])
     setHistoryIndex(-1)
-    setScrollOffset(0)
     setBusy(true)
     setLastDurationMs(null)
 
@@ -652,6 +724,33 @@ export function App({ options }: { options: TuiOptions }) {
     })
   }
 
+  useEffect(() => {
+    if (busy || permission || queuedRef.current.length === 0) return
+    const next = queuedRef.current.shift()
+    if (next === undefined) return
+    setQueued((items) => items.slice(1))
+    send(next)
+  }, [busy, permission])
+
+  const submitInput = (value: string) => {
+    if (fileMenuOpen) {
+      const chosen = fileMatches[activeFileIndex]
+      if (chosen) {
+        completeMention(chosen)
+        return
+      }
+      if (filesLoading) return
+    }
+    if (menuOpen) {
+      const chosen = slashMatches[activeSlashIndex]
+      if (chosen) {
+        send(chosen.name)
+        return
+      }
+    }
+    send(value)
+  }
+
   useInput((character, key) => {
     if (key.ctrl && character === "c") {
       exit()
@@ -664,7 +763,28 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (key.ctrl && character === "o") {
-      setExpandAll((value) => !value)
+      setTranscriptMode((value) => !value)
+      setTranscriptScroll(0)
+      return
+    }
+
+    if (transcriptMode) {
+      const page = Math.max(1, rows - 6)
+      if (key.escape) {
+        setTranscriptMode(false)
+      } else if (key.upArrow) {
+        setTranscriptScroll((value) =>
+          Math.min(Math.max(0, lineCountRef.current - page), value + 1),
+        )
+      } else if (key.downArrow) {
+        setTranscriptScroll((value) => Math.max(0, value - 1))
+      } else if (key.pageUp) {
+        setTranscriptScroll((value) =>
+          Math.min(Math.max(0, lineCountRef.current - page), value + page),
+        )
+      } else if (key.pageDown) {
+        setTranscriptScroll((value) => Math.max(0, value - page))
+      }
       return
     }
 
@@ -763,7 +883,7 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
-    if (key.ctrl && character === "r" && !busy) {
+    if (key.ctrl && character === "r") {
       startHistorySearch()
       return
     }
@@ -853,128 +973,75 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
-    const page = Math.max(1, Math.floor((rows - 9) / 2))
-
-    if (key.pageUp) {
-      setScrollOffset((value) =>
-        Math.min(Math.max(0, lineCountRef.current - page), value + page),
-      )
-      return
-    }
-
-    if (key.pageDown) {
-      setScrollOffset((value) => Math.max(0, value - page))
-      return
-    }
   })
 
-  const headerProvider =
-    screen === "provider"
-      ? "select provider"
-      : preset?.label ?? initial.provider ?? "OpenContinue"
-  const headerModel =
-    screen === "chat" ? model : screen === "models" ? "select model" : "—"
-  const footer =
-    screen === "provider" || screen === "models" || screen === "sessions"
-      ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
-      : screen === "key" || screen === "baseurl"
-        ? "Enter submit · Ctrl+C exit"
-        : screen === "chat"
-          ? "/exit · ctrl+o expand · shift+tab mode · PgUp/PgDn"
-          : screen === "loading"
-            ? "Loading models…"
-            : "Ctrl+C exit"
+  const committed: TimelineItem[] = []
+  const live: TimelineItem[] = []
+  timeline.forEach((item, index) => {
+    if (item.kind === "usage") return
+    if (isCommittedItem(item, index, timeline, busy)) committed.push(item)
+    else live.push(item)
+  })
 
-  const slashQuery =
-    screen === "chat" && input.startsWith("/") && !/\s/.test(input)
-      ? (input.split(/\s+/)[0] ?? "/")
-      : ""
-  const slashMatches = slashQuery
-    ? SLASH_COMMANDS.filter((command) => command.name.startsWith(slashQuery)).slice(0, 5)
-    : []
-  const fileMenuOpen =
-    screen === "chat" &&
-    mentionQuery !== null &&
-    dismissedMention !== mentionQuery &&
-    !busy &&
-    !permission &&
-    !historySearch &&
-    rows >= 18
-  const activeFileIndex = Math.min(fileIndex, Math.max(0, fileMatches.length - 1))
-  const fileMenuHeight = fileMenuOpen ? 6 : 0
-  const menuOpen =
-    screen === "chat" &&
-    slashMatches.length > 0 &&
-    !busy &&
-    !permission &&
-    !historySearch &&
-    !fileMenuOpen &&
-    rows >= 18
-  const activeSlashIndex = Math.min(slashIndex, Math.max(0, slashMatches.length - 1))
-  const menuHeight = menuOpen ? slashMatches.length + 2 : 0
-  const historyMenuHeight = historySearch && rows >= 18 ? 6 : 0
-  const activeHistoryIndex = Math.min(
-    historySearchIndex,
-    Math.max(0, historyMatches.length - 1),
+  const activeTool = [...timeline]
+    .reverse()
+    .find((item) => item.kind === "tool" && item.status === "running")
+  const totalTokens = timeline.reduce(
+    (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
+    0,
   )
-  const footerText = historySearch
+  const elapsedSeconds =
+    runStartedAt !== null ? Math.floor((Date.now() - runStartedAt) / 1000) : 0
+  const spinnerGlyph = ["✻", "✽", "✢", "·"][tick % 4] ?? "✻"
+
+  const modeText =
+    permissionMode === "auto"
+      ? "⏵⏵ auto mode on (shift+tab to cycle)"
+      : permissionMode === "readonly"
+        ? "⛔ readonly mode (shift+tab to cycle)"
+        : "? for shortcuts · shift+tab to cycle modes"
+
+  const menuHint = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
     : fileMenuOpen
       ? "↑/↓ select · Tab/Enter insert · Esc close"
       : menuOpen
         ? "↑/↓ select · Tab complete · Enter run · Esc close"
-        : footer
-  const statusText =
-    screen === "chat"
-      ? `${workspaceStatus.name}${workspaceStatus.branch ? ` · ${workspaceStatus.branch}` : ""}`.slice(
-          0,
-          Math.max(0, Math.floor(columns / 3)),
-        )
-      : ""
-  const footerLine = footerText.slice(
-    0,
-    Math.max(10, columns - 2 - (statusText ? statusText.length + 3 : 0)),
-  )
+        : null
 
-  const maxInputHeight = Math.max(
-    3,
-    rows - 8 - menuHeight - historyMenuHeight - fileMenuHeight,
-  )
-  const inputLines = input.split("\n").length
-  const desiredInputHeight = historySearch
-    ? 3
-    : permission
-      ? permission.diff
-        ? 8
-        : 5
-      : Math.min(6, Math.max(3, inputLines + 2))
-  const inputHeight =
-    screen === "chat" ? Math.min(desiredInputHeight, maxInputHeight) : 0
-  const bodyHeight = Math.max(
-    4,
-    rows - 3 - inputHeight - menuHeight - historyMenuHeight - fileMenuHeight - 1,
-  )
+  const footerLeft = transcriptMode
+    ? "↑/↓ scroll · PgUp/PgDn page · ctrl+o close"
+    : screen === "chat"
+      ? (menuHint ??
+        (permission
+          ? "y allow · a allow for session · n deny"
+          : modeText))
+      : screen === "provider" || screen === "models" || screen === "sessions"
+        ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
+        : screen === "key" || screen === "baseurl"
+          ? "Enter submit · Ctrl+C exit"
+          : screen === "loading"
+            ? "Loading…"
+            : "Ctrl+C exit"
 
-  const submitInput = (value: string) => {
-    if (fileMenuOpen) {
-      const chosen = fileMatches[activeFileIndex]
-      if (chosen) {
-        completeMention(chosen)
-        return
-      }
-      if (filesLoading) return
-    }
-    if (menuOpen) {
-      const chosen = slashMatches[activeSlashIndex]
-      if (chosen) {
-        send(chosen.name)
-        return
-      }
-    }
-    send(value)
-  }
+  const durationText =
+    lastDurationMs !== null ? `${(lastDurationMs / 1000).toFixed(1)}s` : undefined
+  const tokenText = totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : undefined
+  const rightStatus = [
+    workspaceStatus.name,
+    workspaceStatus.branch,
+    `model: ${model}`,
+    durationText,
+    tokenText,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, Math.max(0, Math.floor(columns / 2)))
 
-  const body = (() => {
+  const pickerWindow = Math.max(4, Math.min(12, rows - 6))
+  const rule = "─".repeat(Math.max(1, columns))
+
+  const screenBody = (() => {
     if (screen === "provider") {
       return (
         <Picker
@@ -985,8 +1052,36 @@ export function App({ options }: { options: TuiOptions }) {
             note: item.note,
           }))}
           selectedIndex={providerIndex}
-          windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
+          windowSize={pickerWindow}
           emptyText={`No providers match “${providerQuery}”`}
+        />
+      )
+    }
+
+    if (screen === "models") {
+      return (
+        <Picker
+          header={`Select a model · ${preset?.label ?? "provider"}${modelQuery ? ` · /${modelQuery}/` : ""} (${modelIndex + 1}/${filteredModels.length})`}
+          items={filteredModels.map((item) => ({ key: item, label: item }))}
+          selectedIndex={modelIndex}
+          windowSize={pickerWindow}
+          emptyText={`No models match “${modelQuery}”`}
+        />
+      )
+    }
+
+    if (screen === "sessions") {
+      return (
+        <Picker
+          header={`Resume a session${sessionQuery ? ` · /${sessionQuery}/` : ""} (${sessionIndex + 1}/${filteredSessions.length})`}
+          items={filteredSessions.map((item) => ({
+            key: item.id,
+            label: sessionLabels[item.id] ?? item.title,
+            note: `${item.id === sessionRef.current ? "current · " : ""}${item.id.slice(0, 8)} · ${item.lastSeq} events`,
+          }))}
+          selectedIndex={sessionIndex}
+          windowSize={pickerWindow}
+          emptyText={sessionQuery ? `No sessions match “${sessionQuery}”` : "No sessions yet."}
         />
       )
     }
@@ -997,7 +1092,8 @@ export function App({ options }: { options: TuiOptions }) {
           <Text bold wrap="truncate">
             {preset?.label} API key
           </Text>
-          <Box marginTop={1} width={Math.max(10, columns - 8)} overflow="hidden">
+          <Box marginTop={1} width={Math.max(10, columns - 4)}>
+            <Text color={theme.assistant}>❯ </Text>
             <TextInput value={keyInput} onChange={setKeyInput} mask="*" onSubmit={submitKey} />
           </Box>
           <Text dimColor wrap="truncate">
@@ -1013,7 +1109,8 @@ export function App({ options }: { options: TuiOptions }) {
           <Text bold wrap="truncate">
             {preset?.label} base URL
           </Text>
-          <Box marginTop={1} width={Math.max(10, columns - 8)} overflow="hidden">
+          <Box marginTop={1} width={Math.max(10, columns - 4)}>
+            <Text color={theme.assistant}>❯ </Text>
             <TextInput
               value={baseInput}
               onChange={setBaseInput}
@@ -1049,155 +1146,182 @@ export function App({ options }: { options: TuiOptions }) {
       )
     }
 
-    if (screen === "models") {
-      return (
-        <Picker
-          header={`Select a model · ${preset?.label ?? "provider"}${modelQuery ? ` · /${modelQuery}/` : ""} (${modelIndex + 1}/${filteredModels.length})`}
-          items={filteredModels.map((item) => ({ key: item, label: item }))}
-          selectedIndex={modelIndex}
-          windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
-          emptyText={`No models match “${modelQuery}”`}
-        />
-      )
-    }
-
-    if (screen === "sessions") {
-      return (
-        <Picker
-          header={`Resume a session${sessionQuery ? ` · /${sessionQuery}/` : ""} (${sessionIndex + 1}/${filteredSessions.length})`}
-          items={filteredSessions.map((item) => ({
-            key: item.id,
-            label: sessionLabels[item.id] ?? item.title,
-            note: `${item.id === sessionRef.current ? "current · " : ""}${item.id.slice(0, 8)} · ${item.lastSeq} events`,
-          }))}
-          selectedIndex={sessionIndex}
-          windowSize={Math.max(4, Math.min(12, bodyHeight - 4))}
-          emptyText={sessionQuery ? `No sessions match “${sessionQuery}”` : "No sessions yet."}
-        />
-      )
-    }
-
-    const lines = timelineLines(timeline, Math.max(20, columns - 4), expandAll)
-    lineCountRef.current = lines.length
-    return <Timeline lines={lines} bodyHeight={bodyHeight} scrollOffset={scrollOffset} />
+    return null
   })()
 
-  const totalTokens = timeline.reduce(
-    (sum, item) => (item.kind === "usage" ? sum + item.totalTokens : sum),
-    0,
-  )
-  const elapsedMs = runStartedAt !== null ? Date.now() - runStartedAt : lastDurationMs
-  const stats = [
-    elapsedMs !== null ? `${(elapsedMs / 1000).toFixed(1)}s` : undefined,
-    totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : undefined,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+  const transcriptWidth = Math.max(20, columns - 2)
+  const transcriptLines = transcriptMode
+    ? timelineLines(timeline, transcriptWidth, true)
+    : []
+  lineCountRef.current = transcriptLines.length
+  const transcriptPage = Math.max(1, rows - 6)
+  const transcriptEnd = Math.max(0, transcriptLines.length - transcriptScroll)
+  const transcriptStart = Math.max(0, transcriptEnd - transcriptPage)
+  const visibleTranscript = transcriptLines.slice(transcriptStart, transcriptEnd)
 
   return (
-    <Box flexDirection="column" width={columns} height={rows} overflow="hidden">
-      <Header provider={headerProvider} model={headerModel} mode={permissionMode} stats={stats} />
-      <Box
-        flexDirection="column"
-        flexShrink={0}
-        height={bodyHeight}
-        borderStyle="round"
-        borderColor={theme.border}
-        paddingX={1}
-        overflow="hidden"
-      >
-        {body}
-      </Box>
-      {menuOpen ? (
-        <SlashMenu commands={slashMatches} selectedIndex={activeSlashIndex} />
-      ) : null}
-      {fileMenuOpen ? (
-        <Box
-          flexShrink={0}
-          height={fileMenuHeight}
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={theme.border}
-          paddingX={1}
-          overflow="hidden"
-        >
-          <Picker
-            header={`Files${mentionQuery ? ` · /${mentionQuery}/` : ""} (${activeFileIndex + 1}/${fileMatches.length})`}
-            items={fileMatches.map((file) => ({ key: file, label: file }))}
-            selectedIndex={activeFileIndex}
-            windowSize={Math.max(1, fileMenuHeight - 3)}
-            emptyText={filesLoading ? "Loading files…" : "No files match."}
+    <Box flexDirection="column">
+      <Static key={transcriptKey} items={committed}>
+        {(item, index) => (
+          <TranscriptItem
+            key={item.id}
+            item={item}
+            columns={columns}
+            expanded={false}
+            leading={index > 0}
           />
-        </Box>
-      ) : null}
-      {historySearch ? (
-        <Box
-          flexShrink={0}
-          height={historyMenuHeight}
-          flexDirection="column"
-          borderStyle="round"
-          borderColor={theme.border}
-          paddingX={1}
-          overflow="hidden"
-        >
-          <Picker
-            header={`History${historyQuery ? ` · /${historyQuery}/` : ""} (${activeHistoryIndex + 1}/${historyMatches.length})`}
-            items={historyMatches.map((text, index) => ({
-              key: `${index}:${text}`,
-              label: text.replace(/\n/g, " ⏎ "),
-            }))}
-            selectedIndex={activeHistoryIndex}
-            windowSize={Math.max(1, historyMenuHeight - 3)}
-            emptyText="No matching history."
-          />
-        </Box>
-      ) : null}
-      {screen === "chat" ? (
-        <Prompt
-          columns={columns}
-          height={inputHeight}
-          input={historySearch ? historyQuery : input}
-          cursor={historySearch ? historyCursor : cursor}
-          prefix={historySearch ? "search> " : undefined}
-          menuOpen={menuOpen}
-          onInput={
-            historySearch
-              ? (value, at) => {
-                  setHistoryQuery(value)
-                  setHistoryCursor(at)
-                  setHistorySearchIndex(0)
-                }
-              : setDraft
-          }
-          onSubmit={historySearch ? chooseHistory : submitInput}
-          permission={permission}
-          busy={busy}
-          spinner={spinner}
-        />
-      ) : null}
-      <Box
-        paddingX={1}
-        flexShrink={0}
-        height={1}
-        justifyContent="space-between"
-        overflow="hidden"
-      >
-        <Text dimColor wrap="truncate">
-          {footerLine}
-        </Text>
-        {statusText ? (
+        )}
+      </Static>
+
+      {transcriptMode ? (
+        <Box flexDirection="column" height={rows} paddingX={1}>
           <Text dimColor wrap="truncate">
-            {statusText}
+            Transcript · ctrl+o close · ↑/↓ PgUp/PgDn ·
+            {transcriptScroll > 0 ? ` ${transcriptScroll} lines below` : " end"}
           </Text>
-        ) : null}
-      </Box>
+          {visibleTranscript.length === 0 ? (
+            <Text dimColor>(empty)</Text>
+          ) : (
+            visibleTranscript.map((line, index) => (
+              <Text
+                key={`${transcriptStart + index}`}
+                color={line.color}
+                dimColor={line.dim}
+                bold={line.bold}
+                wrap="truncate"
+              >
+                {line.text}
+              </Text>
+            ))
+          )}
+        </Box>
+      ) : (
+        <>
+          {live.length > 0 ? (
+            <Transcript
+              items={live}
+              columns={columns}
+              expanded={false}
+              leading={committed.length > 0}
+            />
+          ) : null}
+
+          {screen === "chat" ? (
+            <>
+              {busy && !permission ? (
+                <Box marginTop={1} paddingX={2}>
+                  <Text color={theme.brand}>{spinnerGlyph} </Text>
+                  <Text>
+                    {activeTool?.kind === "tool"
+                      ? `Running ${toolDisplayName(activeTool.name)}…`
+                      : "Thinking…"}
+                  </Text>
+                  <Text dimColor> ({elapsedSeconds}s · esc to interrupt)</Text>
+                </Box>
+              ) : null}
+
+              {queued.length > 0 ? (
+                <Box paddingX={2}>
+                  <Text dimColor wrap="truncate">
+                    ⏳ Queued: {queued.join(" · ")}
+                  </Text>
+                </Box>
+              ) : null}
+
+              {permission ? (
+                <PermissionPrompt columns={columns} permission={permission} />
+              ) : (
+                <>
+                  <Box marginTop={1}>
+                    <Text dimColor wrap="truncate">
+                      {rule}
+                    </Text>
+                  </Box>
+
+                  {menuOpen ? (
+                    <SlashMenu
+                      commands={slashMatches}
+                      selectedIndex={activeSlashIndex}
+                    />
+                  ) : null}
+
+                  {fileMenuOpen ? (
+                    <Box flexDirection="column" paddingX={2}>
+                      <Picker
+                        header={`Files${mentionQuery ? ` · /${mentionQuery}/` : ""} (${activeFileIndex + 1}/${fileMatches.length})`}
+                        items={fileMatches.map((file) => ({ key: file, label: file }))}
+                        selectedIndex={activeFileIndex}
+                        windowSize={Math.min(8, Math.max(1, rows - 8))}
+                        emptyText={filesLoading ? "Loading files…" : "No files match."}
+                      />
+                    </Box>
+                  ) : null}
+
+                  {historySearch ? (
+                    <Box flexDirection="column" paddingX={2}>
+                      <Picker
+                        header={`History${historyQuery ? ` · /${historyQuery}/` : ""} (${activeHistoryIndex + 1}/${historyMatches.length})`}
+                        items={historyMatches.map((text, index) => ({
+                          key: `${index}:${text}`,
+                          label: text.replace(/\n/g, " ⏎ "),
+                        }))}
+                        selectedIndex={activeHistoryIndex}
+                        windowSize={Math.min(8, Math.max(1, rows - 8))}
+                        emptyText="No matching history."
+                      />
+                    </Box>
+                  ) : null}
+
+                  <Prompt
+                    columns={columns}
+                    input={historySearch ? historyQuery : input}
+                    cursor={historySearch ? historyCursor : cursor}
+                    prefix={historySearch ? "search> " : undefined}
+                    menuOpen={menuOpen}
+                    onInput={
+                      historySearch
+                        ? (value, at) => {
+                            setHistoryQuery(value)
+                            setHistoryCursor(at)
+                            setHistorySearchIndex(0)
+                          }
+                        : setDraft
+                    }
+                    onSubmit={historySearch ? chooseHistory : submitInput}
+                  />
+
+                  <Box>
+                    <Text dimColor wrap="truncate">
+                      {rule}
+                    </Text>
+                  </Box>
+                </>
+              )}
+            </>
+          ) : (
+            <Box flexDirection="column" paddingX={2} marginTop={1}>
+              {screenBody}
+            </Box>
+          )}
+
+          <Box paddingX={2} justifyContent="space-between" overflow="hidden">
+            <Text dimColor wrap="truncate">
+              {footerLeft}
+            </Text>
+            {columns >= 50 ? (
+              <Text dimColor wrap="truncate">
+                {rightStatus}
+              </Text>
+            ) : null}
+          </Box>
+        </>
+      )}
     </Box>
   )
 }
 
 export async function runTui(options: TuiOptions = {}): Promise<void> {
   const instance = render(<App options={options} />, {
-    alternateScreen: Boolean(process.stdout.isTTY),
     kittyKeyboard: { mode: "auto" },
   })
   await instance.waitUntilExit()

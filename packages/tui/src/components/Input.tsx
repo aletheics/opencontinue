@@ -131,7 +131,7 @@ export function Input({
     return (
       <Box flexDirection="column" width={prefix.length + width} height={lineCount}>
         <Box flexDirection="row" height={1}>
-          <Text color={theme.user}>{prefix}</Text>
+          <Text color={theme.assistant}>{prefix}</Text>
           <Text dimColor>
             <Text inverse>{text[0] ?? " "}</Text>
             {text.slice(1)}
@@ -164,7 +164,7 @@ export function Input({
 
         return (
           <Box key={globalLine} flexDirection="row" height={1} overflow="hidden">
-            <Text color={theme.user}>
+            <Text color={theme.assistant}>
               {globalLine === 0 ? prefix : " ".repeat(prefix.length)}
             </Text>
             <Text wrap="truncate">
