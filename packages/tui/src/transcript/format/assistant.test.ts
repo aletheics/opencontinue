@@ -25,9 +25,10 @@ describe("assistant markdown", () => {
     expect(plain).toContain("- first")
     expect(plain).toContain("1. second")
     expect(plain).toContain("▎ quote")
-    expect(plain).toContain("┌─ ts")
-    expect(plain).toContain("│ const x = 1")
-    expect(plain).toContain("└─")
+    expect(plain).toContain("const x = 1")
+    expect(plain).not.toContain("┌─ ts")
+    expect(plain).not.toContain("│ const x = 1")
+    expect(plain).not.toContain("└─")
   })
 
   it("keeps markdown literal inside a code fence", () => {
@@ -36,9 +37,28 @@ describe("assistant markdown", () => {
       40,
     )
     const plain = lines.map((line) => line.text)
-    expect(plain).toContain("│ # not a heading")
-    expect(plain).toContain("│ - not a bullet")
-    expect(plain).not.toContain("- not a bullet")
+    expect(plain).toContain("# not a heading")
+    expect(plain).toContain("- not a bullet")
+  })
+
+  it("highlights fenced code with syntax spans", () => {
+    const lines = formatAssistantLines(
+      ["```ts", "const answer = 42 // note", "```"].join("\n"),
+      60,
+    )
+    const line = lines.find((entry) => entry.text.includes("const answer"))
+    const spans = line?.spans ?? []
+
+    expect(line?.text).toBe("const answer = 42 // note")
+    expect(spans.find((span) => span.text === "const")?.color).toBe(
+      theme.syntaxKeyword,
+    )
+    expect(spans.find((span) => span.text === "42")?.color).toBe(
+      theme.syntaxNumber,
+    )
+    expect(spans.find((span) => span.text === "// note")?.color).toBe(
+      theme.syntaxComment,
+    )
   })
 
   it("wraps a list item under its marker", () => {

@@ -127,8 +127,13 @@ function isSpace(char: string): boolean {
  * Wrap styled characters at spaces before splitting a word, then merge
  * adjacent characters that share a style back into spans.
  */
-export function wrapSpans(spans: Span[], width: number): Span[][] {
+export function wrapSpans(
+  spans: Span[],
+  width: number,
+  options?: { breakWords?: boolean },
+): Span[][] {
   const safeWidth = Math.max(1, width)
+  const breakWords = options?.breakWords ?? true
   const chars: StyledChar[] = []
 
   for (const span of spans) {
@@ -164,10 +169,12 @@ export function wrapSpans(spans: Span[], width: number): Span[][] {
       }
 
       let breakAt = -1
-      for (let index = line.length - 1; index >= 0; index--) {
-        if (isSpace(line[index]!.char)) {
-          breakAt = index
-          break
+      if (breakWords) {
+        for (let index = line.length - 1; index >= 0; index--) {
+          if (isSpace(line[index]!.char)) {
+            breakAt = index
+            break
+          }
         }
       }
 

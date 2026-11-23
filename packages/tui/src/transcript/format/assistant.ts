@@ -1,7 +1,7 @@
 import { theme } from "../../theme.js"
+import { highlightCodeLine, type HighlightState } from "./highlight.js"
 import type { Line, Span } from "./line.js"
 import { lineFromSpans, parseInline, spanWidth, wrapSpans } from "./inline.js"
-import { wrapText } from "./wrap.js"
 
 function baseSpan(text: string, color: string = theme.assistant): Span {
   return { text, color }
@@ -52,6 +52,7 @@ export function formatAssistantLines(text: string, width: number): Line[] {
   const lines: Line[] = []
   let codeLanguage = ""
   let inCode = false
+  let highlightState: HighlightState = { inBlockComment: false }
 
   for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
     const line = raw.replace(/\t/g, "  ")
@@ -59,26 +60,26 @@ export function formatAssistantLines(text: string, width: number): Line[] {
 
     if (fence) {
       if (inCode) {
-        lines.push({ text: "└─", color: theme.muted, dim: true })
         inCode = false
       } else {
         codeLanguage = fence[1] ?? ""
-        lines.push({
-          text: `┌─ ${codeLanguage || "code"}`,
-          color: theme.muted,
-          dim: true,
-        })
+        highlightState = { inBlockComment: false }
         inCode = true
       }
       continue
     }
 
     if (inCode) {
-      for (const part of wrapText(
-        line.length === 0 ? " " : line,
-        Math.max(10, width - 2),
-      )) {
-        lines.push({ text: `│ ${part}`, color: theme.muted, dim: true })
+      if (line.length === 0) {
+        lines.push({ text: "", color: theme.assistant })
+        continue
+      }
+      const highlighted = highlightCodeLine(line, codeLanguage, highlightState)
+      highlightState = highlighted.state
+      for (const spans of wrapSpans(highlighted.spans, Math.max(10, width), {
+        breakWords: false,
+      })) {
+        lines.push(lineFromSpans(spans))
       }
       continue
     }
