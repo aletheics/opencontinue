@@ -2,6 +2,7 @@ export const theme = {
   brand: "cyan",
   logo: "#E07A6A",
   user: "green",
+  userBar: "#3A3A3A",
   assistant: "white",
   tool: "yellow",
   error: "red",

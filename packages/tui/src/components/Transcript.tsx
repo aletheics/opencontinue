@@ -128,8 +128,14 @@ export function TranscriptItem({
 
   if (item.kind === "user") {
     return (
-      <Box marginTop={leading ? 1 : 0} flexDirection="column">
-        {wrapText(item.text || " ", Math.max(10, width - 2)).map((line, index) => (
+      <Box
+        marginTop={leading ? 1 : 0}
+        width={columns}
+        backgroundColor={theme.userBar}
+        paddingX={1}
+        flexDirection="column"
+      >
+        {wrapText(item.text || " ", Math.max(10, width - 4)).map((line, index) => (
           <Text key={index} wrap="truncate">
             <Text color={theme.assistant}>{index === 0 ? "❯ " : "  "}</Text>
             {line}
