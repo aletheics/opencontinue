@@ -104,6 +104,20 @@ function isPrintableInput(
   return character.length > 0 && !key.ctrl && !key.meta && !/[\r\n\t]/.test(character)
 }
 
+function sessionLabel(store: SessionStore, item: SessionSummary): string {
+  const generic =
+    !item.title || item.title === "OpenContinue TUI" || item.title === "Untitled session"
+  if (!generic) return item.title
+
+  const first = store.events(item.id).find((event) => event.type === "message.user")
+  if (first?.type === "message.user") {
+    const text = first.text.replace(/\s+/g, " ").trim()
+    if (text) return text.length > 60 ? `${text.slice(0, 57)}…` : text
+  }
+
+  return item.title || item.id.slice(0, 8)
+}
+
 export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
   const { columns, rows } = useTerminalSize()
@@ -124,6 +138,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [modelIndex, setModelIndex] = useState(0)
   const [modelQuery, setModelQuery] = useState("")
   const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [sessionLabels, setSessionLabels] = useState<Record<string, string>>({})
   const [sessionIndex, setSessionIndex] = useState(0)
   const [sessionQuery, setSessionQuery] = useState("")
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
@@ -208,9 +223,9 @@ export function App({ options }: { options: TuiOptions }) {
     const query = sessionQuery.trim().toLowerCase()
     if (!query) return sessions
     return sessions.filter((item) =>
-      `${item.title} ${item.id}`.toLowerCase().includes(query),
+      `${sessionLabels[item.id] ?? item.title} ${item.id}`.toLowerCase().includes(query),
     )
-  }, [sessions, sessionQuery])
+  }, [sessionLabels, sessions, sessionQuery])
 
   const historyMatches = useMemo(() => {
     if (!historySearch) return []
@@ -401,7 +416,13 @@ export function App({ options }: { options: TuiOptions }) {
     setLastDurationMs(null)
     setRunStartedAt(null)
     runStartedRef.current = null
-    setSessions([...store.list()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)))
+    const list = [...store.list()].sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    )
+    setSessions(list)
+    setSessionLabels(
+      Object.fromEntries(list.map((item) => [item.id, sessionLabel(store, item)])),
+    )
     setSessionQuery("")
     setSessionIndex(0)
     setScreen("sessions")
@@ -1005,7 +1026,7 @@ export function App({ options }: { options: TuiOptions }) {
           header={`Resume a session${sessionQuery ? ` · /${sessionQuery}/` : ""} (${sessionIndex + 1}/${filteredSessions.length})`}
           items={filteredSessions.map((item) => ({
             key: item.id,
-            label: item.title,
+            label: sessionLabels[item.id] ?? item.title,
             note: `${item.id === sessionRef.current ? "current · " : ""}${item.id.slice(0, 8)} · ${item.lastSeq} events`,
           }))}
           selectedIndex={sessionIndex}

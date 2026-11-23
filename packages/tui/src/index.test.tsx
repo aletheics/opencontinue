@@ -227,6 +227,43 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("labels generic sessions from their first message", async () => {
+    const seed = createSessionStore({ workspace: home })
+    const previous = seed.create()
+    seed.append(previous.id, { type: "message.user", text: "fix the parser" })
+    seed.close()
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("/resume")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> /resume"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Resume a session"))
+      expect(lastFrame()).toContain("fix the parser")
+
+      stdin.write("parser")
+      await vi.waitFor(() => expect(lastFrame()).toContain("/parser/"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> fix the parser"), {
+        timeout: 5000,
+      })
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("shows a permission dialog and remembers the tool", async () => {
     const { server, url } = await fakeToolProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
