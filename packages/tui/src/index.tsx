@@ -70,7 +70,7 @@ import {
 } from "./session/checkpoints.js"
 import { formatWorkspaceDiff, workspaceDiff } from "./session/git.js"
 import { summarizeRun, type RunToolResult } from "./session/summary.js"
-import { activeTodo, latestTodos } from "./session/todos.js"
+import { activeTodo, latestTodos, todoProgress } from "./session/todos.js"
 import { workspaceInfo } from "./session/workspace.js"
 import {
   activityLabel,
@@ -150,6 +150,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [sessionQuery, setSessionQuery] = useState("")
   const [rewindList, setRewindList] = useState<Checkpoint[]>([])
   const [checkpointIndex, setCheckpointIndex] = useState(0)
+  const [showTodos, setShowTodos] = useState(true)
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
@@ -1287,6 +1288,11 @@ export function App({ options }: { options: TuiOptions }) {
 
     if (screen !== "chat") return
 
+    if (key.ctrl && character === "t") {
+      setShowTodos((value) => !value)
+      return
+    }
+
     if (permission) {
       const answer = character.toLowerCase()
       if (answer === "y") {
@@ -1452,6 +1458,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   const { committed, live } = partitionTimeline(displayTimeline, busy)
   const todos = useMemo(() => latestTodos(timeline), [timeline])
+  const todoCounts = useMemo(() => todoProgress(todos), [todos])
 
   const now = Date.now()
   const activeTool = [...timeline]
@@ -1760,7 +1767,16 @@ export function App({ options }: { options: TuiOptions }) {
                 </Box>
               ) : null}
 
-              <TodoPanel todos={todos} />
+              {showTodos ? (
+                <TodoPanel todos={todos} />
+              ) : todos.length > 0 ? (
+                <Box paddingX={2} marginTop={1}>
+                  <Text dimColor wrap="truncate">
+                    {glyphs.brand} Tasks {todoCounts.done}/{todoCounts.total} ·
+                    ctrl+t to show
+                  </Text>
+                </Box>
+              ) : null}
 
               {permission ? (
                 <PermissionPrompt columns={columns} permission={permission} />

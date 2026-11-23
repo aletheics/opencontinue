@@ -194,7 +194,7 @@ export function highlightCodeLine(
   return { spans, state: nextState }
 }
 
-function keywordColor(word: string): string {
+function keywordColor(word: string): string | undefined {
   if (SHARED_LITERALS.has(word)) return theme.syntaxLiteral
   return theme.syntaxKeyword
 }

@@ -372,7 +372,8 @@ Do not implement every feature at once. Ship one vertical slice at a time.
 ### P3 — Interaction depth
 
 - [x] Expandable transcript / tool event details.
-- [x] Task checklist and compact progress summary.
+- [x] Task checklist and compact progress summary. `Ctrl+T` toggles the
+    list; the hidden state keeps a `Tasks done/total` line.
 - [x] Clear permission approval UI.
 - [x] Completion summary based only on real file/test results.
 - [ ] Optional fullscreen renderer after inline mode is reliable.

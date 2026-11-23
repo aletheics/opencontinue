@@ -822,6 +822,16 @@ describe("TUI", () => {
         timeout: 5000,
       })
       expect(lastFrame()).toContain("Tasks · 1/2")
+
+      stdin.write("\u0014")
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain("Tasks 1/2 · ctrl+t to show"),
+      )
+      expect(lastFrame()).not.toContain("Inspect the parser")
+
+      stdin.write("\u0014")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Tasks · 1/2"))
+      expect(lastFrame()).toContain("Inspect the parser")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

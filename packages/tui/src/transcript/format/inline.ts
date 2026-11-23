@@ -213,7 +213,7 @@ export function wrapSpans(
  */
 export function lineFromSpans(
   spans: Span[],
-  fallbackColor: string = theme.assistant,
+  fallbackColor: string | undefined = theme.assistant,
 ): Line {
   const text = spanText(spans)
   if (spans.length === 0) return { text: "", color: fallbackColor }

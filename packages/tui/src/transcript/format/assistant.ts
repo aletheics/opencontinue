@@ -3,7 +3,7 @@ import { highlightCodeLine, type HighlightState } from "./highlight.js"
 import type { Line, Span } from "./line.js"
 import { lineFromSpans, parseInline, spanWidth, wrapSpans } from "./inline.js"
 
-function baseSpan(text: string, color: string = theme.assistant): Span {
+function baseSpan(text: string, color: string | undefined = theme.assistant): Span {
   return { text, color }
 }
 
@@ -28,7 +28,7 @@ function pushPrefixed(
   prefix: Span[],
   content: Span[],
   width: number,
-  fallbackColor: string = theme.assistant,
+  fallbackColor: string | undefined = theme.assistant,
 ): void {
   const contentWidth = Math.max(1, width - spanWidth(prefix))
   const indent = " ".repeat(spanWidth(prefix))

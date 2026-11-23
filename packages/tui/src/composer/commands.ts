@@ -23,6 +23,7 @@ const KEY_HELP = [
   "Shift+Tab  cycle Plan/Confirm/Auto",
   "Shift+R    cycle reasoning effort (empty prompt)",
   "Ctrl+O     expanded transcript",
+  "Ctrl+T     show or hide the task list",
   "Ctrl+R     search input history",
   "Esc        interrupt a run or close a menu",
   "Ctrl+C     exit",

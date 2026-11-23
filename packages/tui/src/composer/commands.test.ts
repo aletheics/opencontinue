@@ -24,5 +24,6 @@ describe("slash commands", () => {
     expect(HELP_TEXT).toContain("/resume — resume a session")
     expect(HELP_TEXT).toContain("Shift+Tab  cycle Plan/Confirm/Auto")
     expect(HELP_TEXT).toContain("Ctrl+O     expanded transcript")
+    expect(HELP_TEXT).toContain("Ctrl+T     show or hide the task list")
   })
 })
