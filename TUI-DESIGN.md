@@ -393,7 +393,9 @@ Suggested future commands:
 
 -   `/resume` --- existing documented session-resume entry point.
 -   `/checkpoints` --- implemented as a current-session run list with
-    event seq, time, duration, and status. Selection/restore is future.
+    event seq, time, duration, and status.
+-   `/rewind` --- implemented as a checkpoint picker that forks the
+    conversation into a new session. Code restore is future.
 -   `/sessions` --- proposed session list, if not already covered by
     `/resume`.
 
@@ -637,8 +639,10 @@ Architecture rules:
 -   [x] Add checkpoint notices, `/checkpoints` for the current session,
     and a restored-event summary on resume. Interrupted-operation detail
     still depends on the snapshot exposing raw events.
--   [ ] Add a checkpoint browser with selection/restore. `/checkpoints`
-    lists run boundaries; restoring to one is not implemented.
+-   [x] Add a checkpoint browser with conversation fork. `/rewind` copies
+    events through the selected boundary into a new session via
+    `SessionStore.fork`. Code restore is not implemented; the picker states
+    that the working tree is unchanged.
 -   [x] Add change awareness and `/diff`. `/diff` runs `git status
     --short` and `git diff --stat` directly, outside the agent gate.
 -   [x] Add permission-rule inspection. `/permissions` shows the

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import type { SessionEvent, SessionId, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
 
-import { buildEvent } from "./events.js"
+import { buildEvent, draftOf } from "./events.js"
 import { snapshotOf, summarize } from "./projection.js"
 import type {
   EventDraft,
@@ -112,6 +112,24 @@ export class MemorySessionStore implements SessionStore {
     }
     this.sessions.set(record.id, record)
     return record
+  }
+
+  fork(
+    id: SessionId,
+    atSeq?: number,
+    title?: string,
+  ): SessionRecord | undefined {
+    const source = this.sessions.get(id)
+    if (!source) return undefined
+
+    const record = this.create(title ?? `${source.title} (fork)`)
+    const limit = atSeq ?? Number.POSITIVE_INFINITY
+    for (const event of source.events) {
+      if (event.seq > limit) break
+      const draft = draftOf(event)
+      if (draft) this.append(record.id, draft)
+    }
+    return this.sessions.get(record.id)
   }
 
   recover(): void {

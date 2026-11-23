@@ -8,6 +8,17 @@ export type Checkpoint = {
   durationMs?: number
 }
 
+export function checkpointLabel(checkpoint: Checkpoint): string {
+  const time = Number.isNaN(Date.parse(checkpoint.at))
+    ? checkpoint.at
+    : formatClock(new Date(checkpoint.at))
+  const duration =
+    checkpoint.durationMs === undefined
+      ? ""
+      : ` · ${formatDuration(checkpoint.durationMs)}`
+  return `event ${checkpoint.seq} · ${time}${duration} · ${checkpoint.status}`
+}
+
 export function formatCheckpoints(
   checkpoints: readonly Checkpoint[],
 ): string {
@@ -17,16 +28,7 @@ export function formatCheckpoints(
     `${glyphs.checkpoint} Checkpoints · ${checkpoints.length}`,
   ]
   for (const checkpoint of [...checkpoints].slice(-8).reverse()) {
-    const time = Number.isNaN(Date.parse(checkpoint.at))
-      ? checkpoint.at
-      : formatClock(new Date(checkpoint.at))
-    const duration =
-      checkpoint.durationMs === undefined
-        ? ""
-        : ` · ${formatDuration(checkpoint.durationMs)}`
-    lines.push(
-      `event ${checkpoint.seq} · ${time}${duration} · ${checkpoint.status}`,
-    )
+    lines.push(checkpointLabel(checkpoint))
   }
   return lines.join("\n")
 }

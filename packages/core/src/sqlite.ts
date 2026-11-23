@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite"
 
 import type { SessionEvent, SessionId, SessionSnapshot, SessionSummary } from "@opencontinue/protocol"
 
-import { buildEvent } from "./events.js"
+import { buildEvent, draftOf } from "./events.js"
 import { snapshotOf, summarize } from "./projection.js"
 import type {
   EventDraft,
@@ -202,6 +202,24 @@ export class SqliteSessionStore implements SessionStore {
     const imported = this.get(data.session.id)
     if (!imported) throw new Error(`Failed to import session: ${data.session.id}`)
     return imported
+  }
+
+  fork(
+    id: SessionId,
+    atSeq?: number,
+    title?: string,
+  ): SessionRecord | undefined {
+    const source = this.get(id)
+    if (!source) return undefined
+
+    const record = this.create(title ?? `${source.title} (fork)`)
+    const limit = atSeq ?? Number.POSITIVE_INFINITY
+    for (const event of source.events) {
+      if (event.seq > limit) break
+      const draft = draftOf(event)
+      if (draft) this.append(record.id, draft)
+    }
+    return this.get(record.id)
   }
 
   recover(): void {

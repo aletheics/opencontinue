@@ -6,6 +6,7 @@ import { streamSSE } from "hono/streaming"
 import { createSessionStore, type SessionStore } from "@opencontinue/core"
 import {
   CreateSessionRequest,
+  ForkSessionRequest,
   PermissionDecisionRequest,
   PermissionMode as PermissionModeSchema,
   ReasoningEffort as ReasoningEffortSchema,
@@ -127,6 +128,19 @@ export function createApp(
 
     const session = store.create(parsed.data.title)
     return c.json(store.snapshot(session.id), 201)
+  })
+
+  app.post("/v1/sessions/:id/fork", async (c) => {
+    const sessionId = c.req.param("id")
+    if (!store.get(sessionId)) return c.json({ error: "session not found" }, 404)
+
+    const body = await c.req.json().catch(() => ({}))
+    const parsed = ForkSessionRequest.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+
+    const fork = store.fork(sessionId, parsed.data.atSeq, parsed.data.title)
+    if (!fork) return c.json({ error: "session not found" }, 404)
+    return c.json(store.snapshot(fork.id), 201)
   })
 
   app.get("/v1/sessions", (c) => c.json(store.list()))

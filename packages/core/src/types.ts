@@ -63,6 +63,11 @@ export interface SessionStore {
   snapshot(id: SessionId): SessionSnapshot | undefined
   exportSession(id: SessionId): SessionExport | undefined
   importSession(data: SessionExport): SessionRecord
+  /**
+   * Copy the source session's events through `atSeq` into a new session.
+   * The source is unchanged; the working tree is untouched.
+   */
+  fork(id: SessionId, atSeq?: number, title?: string): SessionRecord | undefined
   recover(): void
   close(): void
 }

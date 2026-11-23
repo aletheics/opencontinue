@@ -63,6 +63,7 @@ import { filterSessions, sessionLabel } from "./session/labels.js"
 import { stableStreamBoundary } from "./session/stream.js"
 import { partitionTimeline } from "./session/transcript.js"
 import {
+  checkpointLabel,
   formatCheckpoints,
   type Checkpoint,
 } from "./session/checkpoints.js"
@@ -102,6 +103,7 @@ type Screen =
   | "loading"
   | "models"
   | "sessions"
+  | "checkpoints"
   | "chat"
   | "error"
 export function App({ options }: { options: TuiOptions }) {
@@ -143,6 +145,8 @@ export function App({ options }: { options: TuiOptions }) {
   const [sessionLabels, setSessionLabels] = useState<Record<string, string>>({})
   const [sessionIndex, setSessionIndex] = useState(0)
   const [sessionQuery, setSessionQuery] = useState("")
+  const [rewindList, setRewindList] = useState<Checkpoint[]>([])
+  const [checkpointIndex, setCheckpointIndex] = useState(0)
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
@@ -520,6 +524,7 @@ export function App({ options }: { options: TuiOptions }) {
     bannerModel: string,
     bannerProvider: string,
     restoredEvents?: number,
+    restoreNotice?: string,
   ) => {
     clientRef.current = client
     sessionRef.current = sessionId
@@ -543,7 +548,9 @@ export function App({ options }: { options: TuiOptions }) {
     setTranscriptScroll(0)
     setTranscriptMode(false)
     setBusy(false)
-    if (restoredEvents && restoredEvents > 0) {
+    if (restoreNotice) {
+      appendSystem(restoreNotice)
+    } else if (restoredEvents && restoredEvents > 0) {
       appendSystem(
         `${glyphs.checkpoint} Restored session · ${restoredEvents} event${restoredEvents === 1 ? "" : "s"}`,
       )
@@ -815,6 +822,52 @@ export function App({ options }: { options: TuiOptions }) {
     })
   }
 
+  const openRewind = () => {
+    const list = [...checkpointsRef.current].reverse()
+    if (list.length === 0) {
+      appendSystem(`${glyphs.checkpoint} No checkpoints yet.`)
+      return
+    }
+    setRewindList(list)
+    setCheckpointIndex(0)
+    setScreen("checkpoints")
+  }
+
+  const forkAtCheckpoint = () => {
+    const client = clientRef.current
+    const sessionId = sessionRef.current
+    const chosen = rewindList[checkpointIndex]
+    if (!client || !sessionId || !chosen) return
+    if (!client.forkSession) {
+      appendSystem("This transport does not support forking.")
+      return
+    }
+
+    const modelName = options.url ? "remote" : model
+    const providerLabel = options.url
+      ? "server"
+      : (preset?.label ?? initial.provider ?? "configured provider")
+
+    void client
+      .forkSession(sessionId, chosen.seq)
+      .then((fork) => {
+        attachSession(
+          client,
+          fork.id,
+          modelName,
+          providerLabel,
+          undefined,
+          `${glyphs.checkpoint} Forked session at event ${chosen.seq} · working tree unchanged`,
+        )
+        setScreen("chat")
+      })
+      .catch((error) => {
+        appendSystem(
+          `Could not fork the session: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      })
+  }
+
   const chooseSession = () => {
     const client = clientRef.current
     const chosen = filteredSessions[sessionIndex]
@@ -884,6 +937,9 @@ export function App({ options }: { options: TuiOptions }) {
         return true
       case "/checkpoints":
         appendSystem(formatCheckpoints(checkpointsRef.current))
+        return true
+      case "/rewind":
+        openRewind()
         return true
       case "/permissions": {
         const client = clientRef.current
@@ -1207,6 +1263,21 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (screen === "checkpoints") {
+      if (key.escape) {
+        setScreen("chat")
+      } else if (key.upArrow) {
+        setCheckpointIndex((index) => Math.max(0, index - 1))
+      } else if (key.downArrow) {
+        setCheckpointIndex((index) =>
+          Math.max(0, Math.min(rewindList.length - 1, index + 1)),
+        )
+      } else if (key.return) {
+        forkAtCheckpoint()
+      }
+      return
+    }
+
     if (screen !== "chat") return
 
     if (permission) {
@@ -1428,8 +1499,10 @@ export function App({ options }: { options: TuiOptions }) {
         (permission
           ? "y allow once · a always allow this tool · n deny"
           : `${modeText}${busyHint}`))
-      : screen === "provider" || screen === "models" || screen === "sessions"
-        ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
+      : screen === "checkpoints"
+        ? "↑/↓ select · Enter fork · Esc back"
+        : screen === "provider" || screen === "models" || screen === "sessions"
+          ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
         : screen === "key" || screen === "baseurl"
           ? "Enter submit · Ctrl+C exit"
           : screen === "loading"
@@ -1500,6 +1573,21 @@ export function App({ options }: { options: TuiOptions }) {
           selectedIndex={sessionIndex}
           windowSize={pickerWindow}
           emptyText={sessionQuery ? `No sessions match “${sessionQuery}”` : "No sessions yet."}
+        />
+      )
+    }
+
+    if (screen === "checkpoints") {
+      return (
+        <Picker
+          header={`Fork from a checkpoint · working tree unchanged (${checkpointIndex + 1}/${rewindList.length})`}
+          items={rewindList.map((checkpoint) => ({
+            key: String(checkpoint.seq),
+            label: checkpointLabel(checkpoint),
+          }))}
+          selectedIndex={checkpointIndex}
+          windowSize={pickerWindow}
+          emptyText="No checkpoints yet."
         />
       )
     }

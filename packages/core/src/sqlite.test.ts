@@ -62,6 +62,28 @@ describe("SqliteSessionStore", () => {
     reopened.close()
   })
 
+  it("forks a session through a sequence", async () => {
+    const file = await makeDbPath()
+    const store = new SqliteSessionStore(file)
+    const session = store.create("source")
+    store.append(session.id, { type: "message.user", text: "hi" })
+    store.append(session.id, { type: "run.started", runId: "r1" })
+    store.append(session.id, {
+      type: "message.assistant.delta",
+      runId: "r1",
+      text: "hello",
+    })
+    store.append(session.id, { type: "run.completed", runId: "r1" })
+
+    const fork = store.fork(session.id, 1, "forked")
+    expect(fork?.title).toBe("forked")
+    expect(store.snapshot(fork!.id)?.messages).toEqual([
+      { role: "user", text: "hi" },
+    ])
+    expect(store.events(session.id)).toHaveLength(5)
+    store.close()
+  })
+
   it("exports and imports sessions", async () => {
     const file = await makeDbPath()
     const store = new SqliteSessionStore(file)

@@ -7,6 +7,7 @@ describe("slash commands", () => {
     expect(matchSlashCommands("/re").map((command) => command.name)).toEqual([
       "/resume",
       "/reasoning",
+      "/rewind",
     ])
   })
 

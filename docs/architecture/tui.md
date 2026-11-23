@@ -36,7 +36,8 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
   - `Up`/`Down` input history
   - `Ctrl+D` exit when input is empty
   - Terminal scrollback handles normal scrolling; the transcript view adds `↑/↓` and `PgUp`/`PgDn`.
-- Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/reasoning`, `/diff`, `/checkpoints`, `/permissions`, `/status`, `/exit`.
+- Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/reasoning`, `/diff`, `/checkpoints`, `/rewind`, `/permissions`, `/status`, `/exit`.
+- `/rewind` opens a checkpoint picker (newest first) and forks the conversation through the chosen event seq into a new session. The runtime `SessionStore.fork` copies events and leaves the source session untouched; the working tree is not restored, and the picker says so. HTTP exposes the same operation at `/v1/sessions/:id/fork`.
 - `/permissions` reads `health()` and prints the effective mode plus the runtime broker's allow/ask/deny lists, including tools remembered with `a` during the session. It is inspection only; editing rule files stays a manual, source-controlled action.
 - Slash menu above the prompt: borderless, filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
 - Session picker via `/resume`: sorted by recency, type-to-filter by title or id, `Esc` returns to chat. Sessions with the generic default title are labeled by their first user message.

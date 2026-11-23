@@ -809,6 +809,43 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("forks the conversation from a checkpoint with /rewind", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("hi")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› hi"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(output(frames)).toContain("hello from tui"), {
+        timeout: 5000,
+      })
+      await vi.waitFor(() => expect(output(frames)).toContain("Checkpoint saved"))
+
+      stdin.write("/rewind")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› /rewind"))
+      stdin.write("\r")
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain("Fork from a checkpoint"),
+      )
+      stdin.write("\r")
+
+      await vi.waitFor(() =>
+        expect(output(frames)).toContain("Forked session at event"),
+      )
+      expect(output(frames)).toContain("working tree unchanged")
+      await vi.waitFor(() => expect(lastFrame()).toContain("hello from tui"))
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 25000)
+
   it("shows working tree changes with /diff", async () => {
     const git = (args: string[]) =>
       execFileSync("git", args, { cwd: home, stdio: "ignore" })

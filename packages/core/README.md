@@ -2,9 +2,9 @@
 
 **Why:** sessions must survive crashes and replay from any client.
 
-**Owns:** append-only event store, projections, SQLite/memory implementations, session export/import, recovery.
+**Owns:** append-only event store, projections, SQLite/memory implementations, session export/import, conversation forks, recovery.
 
-**Public API:** `SessionStore`, `MemorySessionStore`, `SqliteSessionStore`, `createSessionStore`.
+**Public API:** `SessionStore`, `MemorySessionStore`, `SqliteSessionStore`, `createSessionStore`, `draftOf` (strip an event envelope for replay). `fork(id, atSeq?, title?)` copies events through `atSeq` into a new session and leaves the source untouched.
 
 **Allowed imports:** `@opencontinue/protocol`.
 

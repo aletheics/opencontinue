@@ -26,6 +26,28 @@ describe("MemorySessionStore", () => {
     expect(store.events(session.id, 1).map((event) => event.type)).toEqual(["message.user"])
   })
 
+  it("forks a session through a sequence without touching the source", () => {
+    const store = new MemorySessionStore()
+    const session = store.create("source")
+    store.append(session.id, { type: "message.user", text: "first" })
+    store.append(session.id, { type: "run.started", runId: "r1" })
+    store.append(session.id, {
+      type: "message.assistant.delta",
+      runId: "r1",
+      text: "answer",
+    })
+    store.append(session.id, { type: "run.completed", runId: "r1" })
+
+    const fork = store.fork(session.id, 1)
+    expect(fork?.id).not.toBe(session.id)
+    expect(fork?.title).toBe("source (fork)")
+    expect(store.snapshot(fork!.id)?.messages).toEqual([
+      { role: "user", text: "first" },
+    ])
+    expect(store.get(session.id)?.events).toHaveLength(5)
+    expect(store.fork("missing", 1)).toBeUndefined()
+  })
+
   it("notifies subscribers until they unsubscribe", () => {
     const store = new MemorySessionStore()
     const session = store.create()

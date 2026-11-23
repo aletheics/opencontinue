@@ -49,6 +49,12 @@ export interface OpenContinueClient {
   allowToolForSession?(sessionId: string, tool: string): Promise<void> | void
   /** Change the provider reasoning effort when the transport supports it. */
   setReasoningEffort?(effort: ReasoningEffort): Promise<void> | void
+  /** Copy a session through a sequence into a new session. */
+  forkSession?(
+    sessionId: string,
+    atSeq?: number,
+    title?: string,
+  ): Promise<SessionSnapshot>
   subscribe(
     sessionId: string,
     after: number,
@@ -129,6 +135,20 @@ export class HttpSessionClient implements OpenContinueClient {
     await this.request("/v1/reasoning", {
       method: "POST",
       body: JSON.stringify({ effort }),
+    })
+  }
+
+  async forkSession(
+    sessionId: string,
+    atSeq?: number,
+    title?: string,
+  ): Promise<SessionSnapshot> {
+    return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}/fork`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...(atSeq === undefined ? {} : { atSeq }),
+        ...(title === undefined ? {} : { title }),
+      }),
     })
   }
 

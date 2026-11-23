@@ -1,5 +1,5 @@
 export * from "./types.js"
-export { buildEvent } from "./events.js"
+export { buildEvent, draftOf } from "./events.js"
 export { projectMessages, snapshotOf, summarize } from "./projection.js"
 export { MemorySessionStore } from "./memory.js"
 export { SqliteSessionStore } from "./sqlite.js"

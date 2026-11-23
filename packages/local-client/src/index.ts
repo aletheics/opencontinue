@@ -117,6 +117,16 @@ export class LocalSessionClient implements OpenContinueClient {
     return this.snapshot(sessionId)
   }
 
+  async forkSession(
+    sessionId: string,
+    atSeq?: number,
+    title?: string,
+  ): Promise<SessionSnapshot> {
+    const fork = this.store.fork(sessionId, atSeq, title)
+    if (!fork) throw new ClientHttpError(404, "session not found")
+    return this.snapshot(fork.id)
+  }
+
   async sendMessage(sessionId: string, text: string): Promise<void> {
     if (!this.store.get(sessionId)) throw new ClientHttpError(404, "session not found")
 

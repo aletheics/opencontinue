@@ -76,3 +76,68 @@ export function buildEvent(
       }
   }
 }
+
+/** Strip the event envelope so an event can be replayed into another session. */
+export function draftOf(event: SessionEvent): EventDraft | null {
+  switch (event.type) {
+    case "session.created":
+      return null
+    case "message.user":
+      return { type: event.type, text: event.text }
+    case "run.started":
+      return { type: event.type, runId: event.runId }
+    case "message.assistant.delta":
+      return { type: event.type, runId: event.runId, text: event.text }
+    case "run.completed":
+      return { type: event.type, runId: event.runId }
+    case "run.failed":
+      return { type: event.type, runId: event.runId, error: event.error }
+    case "usage":
+      return {
+        type: event.type,
+        runId: event.runId,
+        ...(event.inputTokens === undefined ? {} : { inputTokens: event.inputTokens }),
+        ...(event.outputTokens === undefined ? {} : { outputTokens: event.outputTokens }),
+        ...(event.totalTokens === undefined ? {} : { totalTokens: event.totalTokens }),
+      }
+    case "tool.started":
+      return {
+        type: event.type,
+        runId: event.runId,
+        callId: event.callId,
+        name: event.name,
+        input: event.input,
+      }
+    case "tool.completed":
+      return {
+        type: event.type,
+        runId: event.runId,
+        callId: event.callId,
+        output: event.output,
+        ...(event.diff === undefined ? {} : { diff: event.diff }),
+      }
+    case "tool.failed":
+      return {
+        type: event.type,
+        runId: event.runId,
+        callId: event.callId,
+        error: event.error,
+      }
+    case "permission.requested":
+      return {
+        type: event.type,
+        requestId: event.requestId,
+        tool: event.tool,
+        capability: event.capability,
+        input: event.input,
+        ...(event.detail === undefined ? {} : { detail: event.detail }),
+        ...(event.diff === undefined ? {} : { diff: event.diff }),
+      }
+    case "permission.resolved":
+      return {
+        type: event.type,
+        requestId: event.requestId,
+        approved: event.approved,
+      }
+  }
+}

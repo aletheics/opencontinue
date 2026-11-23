@@ -107,10 +107,16 @@ describe("client/server e2e", () => {
 
       expect(output).toContain("Echo: hello")
       await expect(client.listSessions()).resolves.toHaveLength(1)
-      await expect(client.getSession(session.id)).resolves.toMatchObject({
+      const snapshot = await client.getSession(session.id)
+      expect(snapshot).toMatchObject({
         id: session.id,
         lastSeq: expect.any(Number),
       })
+
+      const fork = await client.forkSession(session.id, snapshot.lastSeq, "fork")
+      expect(fork.id).not.toBe(session.id)
+      expect(fork.messages).toEqual(snapshot.messages)
+      await expect(client.listSessions()).resolves.toHaveLength(2)
     } finally {
       client.close()
       await closeServer(running.server)
