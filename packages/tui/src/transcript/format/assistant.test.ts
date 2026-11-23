@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { assistantBlock, formatAssistantLines } from "./assistant.js"
+import { textWidth } from "./wrap.js"
 
 describe("assistant markdown", () => {
   it("renders headings, lists, quotes, and fenced code", () => {
@@ -50,5 +51,12 @@ describe("assistant markdown", () => {
     const lines = assistantBlock("first\n\nsecond", 40)
     expect(lines.map((line) => line.text)).toEqual(["● first", "", "  second"])
     for (const line of lines) expect(line.text.length).toBeLessThanOrEqual(40)
+  })
+
+  it("wraps CJK assistant text by display width", () => {
+    const lines = assistantBlock("你好".repeat(20), 20)
+    for (const line of lines) {
+      expect(textWidth(line.text)).toBeLessThanOrEqual(20)
+    }
   })
 })

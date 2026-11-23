@@ -69,7 +69,7 @@ The TUI is an inline Ink app:
 
 - `<Static>` owns committed transcript items and prints each once; never mutate a committed item.
 - The live area below it renders the streaming assistant item, running tools, queued notices, spinner, menus, permission dialog, and prompt.
-- Every rendered line must be truncated or pre-wrapped so the terminal cannot auto-wrap. Terminal scrollback is the scrollback; do not replace it with a fixed-height viewport.
+- Every rendered line must be truncated or pre-wrapped so the terminal cannot auto-wrap. Wrapping measures terminal display width, so CJK and fullwidth characters count as two columns. Terminal scrollback is the scrollback; do not replace it with a fixed-height viewport.
 - The expanded `Ctrl+O` transcript is the only scrolling viewport and is rendered on demand.
 - Permission dialogs, pickers, and the provider setup screens may use borders, but the main transcript and prompt do not.
 
