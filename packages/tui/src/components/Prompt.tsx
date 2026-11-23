@@ -1,5 +1,6 @@
 import { Box, Text } from "ink"
 
+import { formatDiffLines } from "../render.js"
 import { theme } from "../theme.js"
 import { Input } from "./Input.js"
 
@@ -12,7 +13,7 @@ export type PromptProps = {
   menuOpen: boolean
   onInput: (value: string, cursor: number) => void
   onSubmit: (value: string) => void
-  permission: { tool: string; detail: string } | null
+  permission: { tool: string; detail: string; diff?: string } | null
   busy: boolean
   spinner: string
 }
@@ -46,6 +47,22 @@ export function Prompt({
             ● Permission needed: {permission.tool}
           </Text>
           <Text wrap="truncate">{permission.detail || "(no details)"}</Text>
+          {permission.diff ? (
+            <Box flexDirection="column" height={3} overflow="hidden">
+              {formatDiffLines(permission.diff, Math.max(20, columns - 4), false)
+                .slice(0, 3)
+                .map((line, index) => (
+                  <Text
+                    key={index}
+                    color={line.color}
+                    dimColor={line.dim}
+                    wrap="truncate"
+                  >
+                    {line.text}
+                  </Text>
+                ))}
+            </Box>
+          ) : null}
           <Text dimColor wrap="truncate">
             [y] allow · [a] allow {permission.tool} for session · [n] deny
           </Text>

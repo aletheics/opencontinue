@@ -53,6 +53,32 @@ describe("tools", () => {
     expect(await readTool.execute({ path: "a.ts" }, context(workspace))).toContain("const y = 3")
   })
 
+  it("previews write and edit diffs without changing files", async () => {
+    const workspace = await makeWorkspace()
+    await writeFile(path.join(workspace, "a.ts"), "const x = 1\nconst y = 2\n")
+
+    const writePreview = await writeTool.preview!(
+      { path: "b.ts", content: "hello\n" },
+      context(workspace),
+    )
+    expect(writePreview.detail).toBe("b.ts")
+    expect(writePreview.diff).toContain("+hello")
+
+    const editPreview = await editTool.preview!(
+      { path: "a.ts", oldString: "const y = 2", newString: "const y = 3" },
+      context(workspace),
+    )
+    expect(editPreview.detail).toBe("a.ts")
+    expect(editPreview.diff).toContain("+const y = 3")
+    expect(await readTool.execute({ path: "a.ts" }, context(workspace))).toContain("const y = 2")
+
+    const missing = await editTool.preview!(
+      { path: "a.ts", oldString: "nope", newString: "x" },
+      context(workspace),
+    )
+    expect(missing.diff).toBeUndefined()
+  })
+
   it("refuses paths outside the workspace", async () => {
     const workspace = await makeWorkspace()
     await expect(readTool.execute({ path: "../outside.txt" }, context(workspace))).rejects.toThrow(

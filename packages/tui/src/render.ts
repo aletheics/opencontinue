@@ -53,7 +53,7 @@ function outputLines(text: string, width: number, expanded: boolean): Line[] {
   return shown
 }
 
-function diffLines(diff: string, width: number, expanded: boolean): Line[] {
+export function formatDiffLines(diff: string, width: number, expanded: boolean): Line[] {
   const lines = diff
     .replace(/\r\n/g, "\n")
     .split("\n")
@@ -236,7 +236,7 @@ export function timelineLines(
     })
 
     if (item.diff) {
-      lines.push(...diffLines(item.diff, width, expanded))
+      lines.push(...formatDiffLines(item.diff, width, expanded))
     } else if (item.output) {
       lines.push(...outputLines(item.output, width, expanded))
     }

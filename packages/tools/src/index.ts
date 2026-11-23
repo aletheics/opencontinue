@@ -24,12 +24,18 @@ export type ToolOutput =
       diff?: string
     }
 
+export type ToolPreview = {
+  detail?: string
+  diff?: string
+}
+
 export type Tool = {
   name: string
   description: string
   capability: ToolCapability
   input: z.ZodTypeAny
   execute(raw: unknown, context: ToolContext): Promise<ToolOutput>
+  preview?(raw: unknown, context: ToolContext): Promise<ToolPreview>
 }
 
 export type ToolExecution =
@@ -110,6 +116,13 @@ export const writeTool: Tool = {
   description: "Create or overwrite a file inside the workspace.",
   capability: "write",
   input: writeInput,
+  async preview(raw, context) {
+    const { path: inputPath, content } = writeInput.parse(raw)
+    const target = resolveInside(context.workspace, inputPath)
+    const before = await fs.readFile(target, "utf8").catch(() => "")
+    const diff = createTwoFilesPatch(inputPath, inputPath, before, content, "", "")
+    return { detail: inputPath, diff: diff.trim() ? diff : undefined }
+  },
   async execute(raw, context) {
     const { path: inputPath, content } = writeInput.parse(raw)
     const target = resolveInside(context.workspace, inputPath)
@@ -137,6 +150,19 @@ export const editTool: Tool = {
     "Replace an exact string in a file. By default oldString must appear exactly once; set replaceAll to override.",
   capability: "write",
   input: editInput,
+  async preview(raw, context) {
+    const { path: inputPath, oldString, newString, replaceAll = false } = editInput.parse(raw)
+    if (!oldString || oldString === newString) return { detail: inputPath }
+
+    const target = resolveInside(context.workspace, inputPath)
+    const content = await fs.readFile(target, "utf8")
+    const count = content.split(oldString).length - 1
+    if (count === 0 || (count > 1 && !replaceAll)) return { detail: inputPath }
+
+    const updated = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
+    const diff = createTwoFilesPatch(inputPath, inputPath, content, updated, "", "")
+    return { detail: inputPath, diff: diff.trim() ? diff : undefined }
+  },
   async execute(raw, context) {
     const { path: inputPath, oldString, newString, replaceAll = false } = editInput.parse(raw)
     if (!oldString) throw new Error("oldString must not be empty")

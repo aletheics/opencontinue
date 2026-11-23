@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import http from "node:http"
 import type { AddressInfo } from "node:net"
 import os from "node:os"
@@ -86,6 +86,58 @@ async function fakeToolProvider(): Promise<{ server: http.Server; url: string }>
                       function: {
                         name: "bash",
                         arguments: JSON.stringify({ command: "echo hi" }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          })}\n\n`,
+        )
+      } else {
+        response.write(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: "done" } }] })}\n\n`,
+        )
+      }
+      response.end("data: [DONE]\n\n")
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
+async function fakeWriteProvider(): Promise<{ server: http.Server; url: string }> {
+  let chatCalls = 0
+  const server = http.createServer((request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      chatCalls++
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      if (chatCalls === 1) {
+        response.write(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      function: {
+                        name: "write",
+                        arguments: JSON.stringify({ path: "note.txt", content: "hello\n" }),
                       },
                     },
                   ],
@@ -258,6 +310,42 @@ describe("TUI", () => {
       await vi.waitFor(() => expect(lastFrame()).toContain("you> fix the parser"), {
         timeout: 5000,
       })
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("previews file diffs in the permission dialog", async () => {
+    await writeFile(path.join(home, "note.txt"), "old\n")
+
+    const { server, url } = await fakeWriteProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{}} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("change it")
+      await vi.waitFor(() => expect(lastFrame()).toContain("you> change it"))
+      stdin.write("\r")
+
+      await vi.waitFor(() => expect(lastFrame()).toContain("Permission needed: write"), {
+        timeout: 5000,
+      })
+      expect(lastFrame()).toContain("note.txt")
+      expect(lastFrame()).toContain("-old")
+      expect(lastFrame()).toContain("+hello")
+
+      stdin.write("n")
+      await vi.waitFor(() => expect(lastFrame()).toContain("done"), { timeout: 5000 })
+      await expect(readFile(path.join(home, "note.txt"), "utf8")).resolves.toBe("old\n")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

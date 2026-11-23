@@ -28,7 +28,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/status`, `/exit`.
 - Slash menu above the input: filters as you type, `↑/↓` selects, `Tab` completes, `Enter` runs, `Esc` closes.
 - Session picker via `/resume`: sorted by recency, type-to-filter by title or id, `Esc` returns to chat. Sessions with the generic default title are labeled by their first user message.
-- Permission dialog: shows the tool name and a readable detail (command, path, or pattern); `y` allows once, `a` remembers the tool for the session, `n` denies. The gate lives in `packages/tui/src/permission-gate.ts`.
+- Permission dialog: shows the tool name and a readable detail (command, path, or pattern); write/edit tools also show a dry-run diff before approval. `y` allows once, `a` remembers the tool for the session, `n` denies. The gate lives in `packages/tui/src/permission-gate.ts`; previews come from the tool's optional `preview` method.
 - Provider/model pickers with type-to-filter search, `Esc` to clear or return, and per-provider API keys inside the same frame.
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
 - A line-buffer renderer in `packages/tui/src/render.ts`: timeline items become styled lines, long text wraps to the content width, and the viewport slices by line so scrolling and clipping are exact.

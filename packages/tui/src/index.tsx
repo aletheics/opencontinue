@@ -905,7 +905,9 @@ export function App({ options }: { options: TuiOptions }) {
   const desiredInputHeight = historySearch
     ? 3
     : permission
-      ? 5
+      ? permission.diff
+        ? 8
+        : 5
       : Math.min(6, Math.max(3, inputLines + 2))
   const inputHeight =
     screen === "chat" ? Math.min(desiredInputHeight, maxInputHeight) : 0

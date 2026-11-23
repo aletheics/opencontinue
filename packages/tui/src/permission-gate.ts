@@ -1,10 +1,11 @@
-import type { PermissionGate, Tool } from "@opencontinue/tools"
+import type { PermissionGate, Tool, ToolContext } from "@opencontinue/tools"
 
 export type PermissionMode = "ask" | "auto" | "readonly"
 
 export type PermissionRequest = {
   tool: string
   detail: string
+  diff?: string
   resolve: (approved: boolean) => void
 }
 
@@ -41,18 +42,26 @@ export class TuiPermissionGate implements PermissionGate {
     this.listener = listener
   }
 
-  async authorize(tool: Tool, input: unknown): Promise<boolean> {
+  async authorize(tool: Tool, input: unknown, context?: ToolContext): Promise<boolean> {
     if (this.mode === "auto") return true
     if (tool.capability === "read") return true
     if (this.mode === "readonly") return false
     if (this.allowed.has(tool.name)) return true
 
-    return new Promise<boolean>((resolve) => {
-      this.pending = {
-        tool: tool.name,
-        detail: permissionDetail(tool.name, input),
-        resolve,
+    let detail = permissionDetail(tool.name, input)
+    let diff: string | undefined
+    if (tool.preview && context) {
+      try {
+        const preview = await tool.preview(input, context)
+        if (preview.detail) detail = preview.detail
+        diff = preview.diff
+      } catch {
+        // Keep the basic detail when a preview cannot be computed.
       }
+    }
+
+    return new Promise<boolean>((resolve) => {
+      this.pending = { tool: tool.name, detail, diff, resolve }
       this.listener?.()
     })
   }
