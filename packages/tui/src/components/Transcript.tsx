@@ -140,9 +140,9 @@ export function TranscriptItem({
       <Welcome
         version={item.version}
         model={item.model}
+        effort={item.effort}
         provider={item.provider}
         workspace={item.workspace}
-        branch={item.branch}
         columns={columns}
       />
     )

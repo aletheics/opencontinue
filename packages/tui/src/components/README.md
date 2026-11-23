@@ -4,7 +4,7 @@
 
 **Files:**
 
-- `Welcome.tsx` — OpenContinue startup header: `◈ OpenContinue`, tagline, aligned model/provider/workspace rows with middle-shortened paths, and a ready line.
+- `Welcome.tsx` — OpenContinue startup header: copper `◈ OpenContinue` with dim version, one neutral `model · effort · provider` line, and a separately middle-shortened workspace path. Layout comes from `../header.ts` and is shared with the fullscreen header and expanded transcript.
 - `Transcript.tsx` — OpenContinue inline blocks: `›` prompts, white `●` assistant dots with a two-column indented markdown body, `↳ Tool(args)` with two-space header wraps, dim `⎿` gutters with normal output, colored diffs, collapsed output hints, `(No output)`, bash timeout/cwd notes, and dim meta lines.
 - `Picker.tsx` — generic type-to-filter list used by provider, model, session, history, and file selection.
 - `TodoPanel.tsx` — the model-maintained task list above the prompt: `✓` completed, `▸` in progress, `○` pending, with an `◈ Tasks · done/total` header.

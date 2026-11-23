@@ -106,15 +106,19 @@ Preferred compact header:
 
 ```text
 ◈ OpenContinue  v0.x
-deepseek-flash · DeepSeek · opencontinue · main
+deepseek-flash[1M] · High · DeepSeek
+D:\soft\vscodefiles\opencontinue
 ────────────────────────────────────────────────────────
 ```
 
 Rules:
 
-- Do not repeat the model in the footer if it is already present in the header.
-- Show the workspace basename by default; provide the full path through `/status`.
-- Show provider and model in one compact metadata line.
+- Keep the brand name warm copper and the version a low-brightness gray.
+- Put model (including any context-window suffix), non-default effort, and provider on one neutral metadata line.
+- Do not repeat the model or provider in the status bar.
+- Give the workspace its own line and shorten long paths from the middle.
+- Drop effort, then provider, before clipping the model on narrow terminals.
+- The branch belongs in the status bar, not the header.
 - The marketing tagline belongs on the first-run welcome screen, not above every conversation.
 - Do not expose credentials or secret values.
 
@@ -151,11 +155,17 @@ Composer:
 ────────────────────────────────────────────────────────
 ```
 
-Idle footer:
+Idle status bar (mode left; branch and help right):
 
 ```text
-◈ AUTO · main                                      ? help
+⟳ Auto                                  main · ? help
 ```
+
+Rules:
+
+- Only mode, git branch, and help belong in the status bar.
+- `Auto` is warm gold, `Plan` soft blue, and `Manual` neutral gray.
+- Drop help, then branch, before clipping the mode on narrow terminals.
 
 Working footer / activity line:
 

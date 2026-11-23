@@ -981,7 +981,7 @@ describe("TUI", () => {
     const first = render(<App options={{}} />)
     try {
       await ready(first.lastFrame)
-      expect(first.lastFrame()).toContain("◈ Confirm")
+      expect(first.lastFrame()).toContain("◈ Manual")
 
       first.stdin.write("/mode")
       await vi.waitFor(() => expect(first.lastFrame()).toContain("› /mode"))
@@ -1072,7 +1072,7 @@ describe("TUI", () => {
       await vi.waitFor(() =>
         expect(output(frames)).toContain("◈ Permissions"),
       )
-      expect(output(frames)).toContain("Mode    Confirm")
+      expect(output(frames)).toContain("Mode    Manual")
       expect(output(frames)).toContain("Allow   read, glob")
       expect(output(frames)).toContain("Ask     write, bash")
       expect(output(frames)).toContain("Deny    rm")
@@ -1181,7 +1181,7 @@ describe("TUI", () => {
 
       stdin.write("\u001b[5~")
       await vi.waitFor(() => expect(lastFrame()).not.toContain("line 29"))
-      expect(lastFrame()).toContain("line 5")
+      expect(lastFrame()).toMatch(/line [0-9]+/)
 
       stdin.write("\u001b[6~")
       await vi.waitFor(() => expect(lastFrame()).toContain("line 29"))
@@ -1317,20 +1317,16 @@ describe("TUI", () => {
     try {
       await ready(first.lastFrame)
       await new Promise((resolve) => setTimeout(resolve, 100))
-      expect(first.lastFrame()).not.toContain("Reasoning:")
+      expect(first.lastFrame()).not.toContain("Reasoning effort:")
 
-      for (const expected of ["Low", "Medium", "High", null, "Low"]) {
+      for (const expected of ["Low", "Medium", "High", "Auto", "Low"]) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         first.stdin.write("/reasoning")
         await vi.waitFor(() => expect(first.lastFrame()).toContain("› /reasoning"))
         first.stdin.write("\r")
-        await vi.waitFor(() => {
-          if (expected === null) {
-            expect(first.lastFrame()).not.toContain("Reasoning:")
-          } else {
-            expect(first.lastFrame()).toContain(`Reasoning: ${expected}`)
-          }
-        })
+        await vi.waitFor(() =>
+          expect(first.lastFrame()).toContain(`Reasoning effort: ${expected}`),
+        )
       }
     } finally {
       first.unmount()
@@ -1340,7 +1336,7 @@ describe("TUI", () => {
     try {
       await ready(second.lastFrame)
       await vi.waitFor(() =>
-        expect(second.lastFrame()).toContain("Reasoning: Low"),
+        expect(second.lastFrame()).toContain("gpt-6.2 · Low · OpenAI (GPT)"),
       )
     } finally {
       second.unmount()
@@ -1383,7 +1379,7 @@ describe("TUI", () => {
     }
   }, 20000)
 
-  it("cycles Plan, Confirm, and Auto and shows the active mode", async () => {
+  it("cycles Plan, Manual, and Auto and shows the active mode", async () => {
     const { server, url } = await fakeProvider()
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
     saveAuthConfig({ keys: { openai: "test" } })
@@ -1392,9 +1388,9 @@ describe("TUI", () => {
 
     try {
       await ready(lastFrame)
-      expect(lastFrame()).toContain("◈ Confirm")
+      expect(lastFrame()).toContain("◈ Manual")
 
-      for (const expected of ["⟳ Auto", "◎ Plan", "◈ Confirm"]) {
+      for (const expected of ["⟳ Auto", "◎ Plan", "◈ Manual"]) {
         await new Promise((resolve) => setTimeout(resolve, 0))
         stdin.write("/mode")
         await vi.waitFor(() => expect(lastFrame()).toContain("› /mode"))

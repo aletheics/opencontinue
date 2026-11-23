@@ -1,26 +1,19 @@
 import { glyphs } from "../glyphs.js"
-import type { PermissionMode } from "../permissions/types.js"
-import { charWidth, textWidth } from "../transcript/format/wrap.js"
+import { truncateToWidth } from "../header.js"
+import { modeName, type PermissionMode } from "../permissions/types.js"
+import { theme } from "../theme.js"
+import { textWidth } from "../transcript/format/wrap.js"
 
-function modeLabel(mode: PermissionMode): string {
-  const glyph =
-    mode === "plan" ? glyphs.plan : mode === "auto" ? glyphs.auto : glyphs.confirm
-  return `${glyph} ${mode.charAt(0).toUpperCase()}${mode.slice(1)}`
+export function modeLabel(mode: PermissionMode): string {
+  const glyph = mode === "auto" ? glyphs.auto : mode === "plan" ? glyphs.plan : glyphs.confirm
+  return `${glyph} ${modeName(mode)}`
 }
 
-function truncateToWidth(text: string, width: number): string {
-  if (textWidth(text) <= width) return text
-  if (width <= 1) return "…"
-
-  let result = ""
-  let used = 0
-  for (const char of text) {
-    const size = charWidth(char)
-    if (used + size > width - 1) break
-    result += char
-    used += size
-  }
-  return `${result}…`
+/** Auto is warm gold, Plan is soft blue, Manual stays neutral. */
+export function modeTint(mode: PermissionMode): string | undefined {
+  if (mode === "auto") return theme.tool
+  if (mode === "plan") return theme.info
+  return theme.textSecondary
 }
 
 export type FooterLayout = {
@@ -29,32 +22,30 @@ export type FooterLayout = {
 }
 
 /**
- * Compact footer: mode first, then branch and interrupt hint. Reasoning is
- * shown only when non-default; help only while idle. Low-priority fields are
- * dropped before the mode is ever clipped.
+ * Status bar: mode on the left; branch and help on the right. Help drops
+ * first, then branch, then the mode is clipped, so narrow terminals never
+ * wrap or collide.
  */
 export function footerLayout(options: {
   mode: PermissionMode
   branch?: string
-  reasoning?: string
-  busy: boolean
   columns: number
 }): FooterLayout {
-  let left = modeLabel(options.mode)
-  if (options.branch) left += ` · ${options.branch}`
-  if (options.busy) left += " · esc to interrupt"
+  const left = modeLabel(options.mode)
+  const rightParts = [options.branch, `${glyphs.approval} help`].filter((part): part is string =>
+    Boolean(part),
+  )
 
-  const rightParts: string[] = []
-  if (options.reasoning && !options.busy) rightParts.push(options.reasoning)
-  if (!options.busy) rightParts.push(`${glyphs.approval} help`)
-
-  const fits = () => {
-    const rightWidth = rightParts.length > 0 ? textWidth(rightParts.join(" · ")) + 2 : 0
-    return textWidth(left) + rightWidth <= options.columns
-  }
+  const right = () => rightParts.join(" · ")
+  const fits = () => textWidth(left) + 2 + textWidth(right()) <= options.columns
 
   while (rightParts.length > 0 && !fits()) rightParts.pop()
-  if (!fits()) left = truncateToWidth(left, options.columns)
 
-  return { left, right: rightParts.join(" · ") }
+  const safeRight = right()
+  if (safeRight) return { left, right: safeRight }
+
+  return {
+    left: truncateToWidth(left, Math.max(1, options.columns)),
+    right: "",
+  }
 }

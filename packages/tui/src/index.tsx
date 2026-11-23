@@ -42,9 +42,10 @@ import { isPrintableInput } from "./composer/keys.js"
 import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
 import { formatPermissions } from "./permissions/format.js"
 import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
-import type { PermissionMode } from "./permissions/types.js"
+import { modeName, type PermissionMode } from "./permissions/types.js"
 import { useTerminalSize } from "./hooks/use-terminal-size.js"
 import { TAGLINE } from "./brand.js"
+import { formatEffort } from "./header.js"
 import { FullscreenTranscript } from "./components/FullscreenTranscript.js"
 import { glyphs } from "./glyphs.js"
 import { LineText } from "./components/LineText.js"
@@ -83,7 +84,7 @@ import {
   activityThresholds,
   progressState,
 } from "./status/activity.js"
-import { footerLayout } from "./status/footer.js"
+import { footerLayout, modeTint } from "./status/footer.js"
 import { formatClock, formatDuration } from "./status/format.js"
 import { pickSpinnerTip } from "./status/spinner.js"
 import { theme } from "./theme.js"
@@ -212,6 +213,8 @@ export function App({ options }: { options: TuiOptions }) {
   const lastActivityRef = useRef(Date.now())
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   permissionModeRef.current = permissionMode
+  const reasoningEffortRef = useRef<ReasoningEffort>(reasoningEffort)
+  reasoningEffortRef.current = reasoningEffort
   const {
     permission,
     answer: answerPermission,
@@ -519,6 +522,9 @@ export function App({ options }: { options: TuiOptions }) {
       .then(() => {
         saveProviderConfig({ reasoningEffort: next })
         setReasoningEffort(next)
+        appendSystem(
+          `${glyphs.brand} Reasoning effort: ${formatEffort(next) ?? "Auto"}`,
+        )
       })
       .catch((error) => {
         appendSystem(
@@ -573,9 +579,9 @@ export function App({ options }: { options: TuiOptions }) {
         id: `banner:${Date.now()}:${Math.random().toString(36).slice(2)}`,
         version: VERSION,
         model: bannerModel,
+        effort: formatEffort(reasoningEffortRef.current),
         provider: bannerProvider,
         workspace,
-        branch: workspaceStatus.branch ?? undefined,
       },
     ])
     setTranscriptKey((key) => key + 1)
@@ -1039,7 +1045,8 @@ export function App({ options }: { options: TuiOptions }) {
             `session: ${sessionRef.current ?? "-"}`,
             `provider: ${preset?.label ?? "-"}`,
             `model: ${options.url ? "remote" : model}`,
-            `mode: ${permissionMode}`,
+            `effort: ${reasoningEffort}`,
+            `mode: ${modeName(permissionMode)}`,
             `tokens: ${tokens}`,
             `workspace: ${workspace}`,
           ].join("\n"),
@@ -1571,9 +1578,7 @@ export function App({ options }: { options: TuiOptions }) {
     ? elapsedMs
     : Math.max(0, now - toolStart)
   const effortLabel =
-    reasoningLevels.length > 0 && reasoningEffort !== "auto"
-      ? `${reasoningEffort.charAt(0).toUpperCase()}${reasoningEffort.slice(1)}`
-      : undefined
+    reasoningLevels.length > 0 ? formatEffort(reasoningEffort) : undefined
   const pulse = !reducedMotion && Math.floor(now / 800) % 2 === 0
 
   const menuHint = historySearch
@@ -1584,23 +1589,15 @@ export function App({ options }: { options: TuiOptions }) {
         ? "↑/↓ select · Tab complete · Enter run · Esc close"
         : null
 
-  const reasoningText =
-    reasoningLevels.length > 0 && reasoningEffort !== "auto"
-      ? `Reasoning: ${reasoningEffort.charAt(0).toUpperCase()}${reasoningEffort.slice(1)}`
-      : undefined
   const normalFooter = footerLayout({
     mode: permissionMode,
     branch: workspaceStatus.branch ?? undefined,
-    reasoning: reasoningText,
-    busy: busy && !permission,
     columns: Math.max(1, columns - 4),
   })
 
   const footerTint =
     screen === "chat" && !transcriptMode && !menuHint && !permission
-      ? permissionMode === "auto"
-        ? theme.tool
-        : theme.brand
+      ? modeTint(permissionMode)
       : undefined
   const footerLeft = transcriptMode
     ? "↑/↓ scroll · PgUp/PgDn page · ctrl+o close"
@@ -1805,7 +1802,7 @@ export function App({ options }: { options: TuiOptions }) {
     fullscreen && screen === "chat" && !permission
       ? fullscreenViewportHeight({
           rows,
-          header: 2,
+          header: 3,
           activity: activityRows,
           todos: todoRows,
           queued: queuedRows,
@@ -1833,13 +1830,13 @@ export function App({ options }: { options: TuiOptions }) {
         <Welcome
           version={VERSION}
           model={options.url ? "remote" : model}
+          effort={effortLabel}
           provider={
             options.url
               ? "server"
               : (preset?.label ?? initial.provider ?? "configured provider")
           }
           workspace={workspace}
-          branch={workspaceStatus.branch ?? undefined}
           columns={columns}
         />
       ) : null}

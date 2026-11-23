@@ -11,7 +11,7 @@ describe("permissions view", () => {
     })
 
     expect(text).toContain("◈ Permissions")
-    expect(text).toContain("Mode    Confirm")
+    expect(text).toContain("Mode    Manual")
     expect(text).toContain("Allow   read, glob")
     expect(text).toContain("Ask     write, bash")
     expect(text).toContain("Deny    edit")

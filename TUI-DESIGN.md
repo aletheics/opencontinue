@@ -112,12 +112,12 @@ Rules:
 
 The inline TUI has four persistent regions:
 
-1.  **Header** --- product, version, model/provider, workspace.
+1.  **Header** --- product/version, model metadata (context, effort,
+    provider), workspace.
 2.  **Conversation and activity** --- user messages, assistant
     responses, concise progress, tool summaries.
 3.  **Prompt** --- input and contextual completion hints.
-4.  **Status line** --- permission mode, reasoning setting (when
-    supported), session/branch context, help hint.
+4.  **Status bar** --- permission mode, branch, help. Nothing else.
 
 Do not add a permanent sidebar to the inline TUI. Use transient panels
 or expanded transcript views for secondary information.
@@ -126,24 +126,26 @@ or expanded transcript views for secondary information.
 
 ``` text
 ◈ OpenContinue  v0.1.0
-The open continuum for AI-assisted engineering.
+deepseek-flash[1M] · High · DeepSeek
+D:\soft\vscodefiles\opencontinue
 
-Model       deepseek-flash
-Provider    DeepSeek
-Workspace   D:\soft\vscodefiles\opencontinue
-
-· Ready. What are we building today?
-
-› Type a message...
-
-? shortcuts                                      main · ready
+────────────────────────────────────────────────────────
+› Type a message…
+────────────────────────────────────────────────────────
+⟳ Auto                                  main · ? help
 ```
 
 Header rules:
 
--   Show product name and version once.
--   Keep model and provider visible but secondary.
--   Shorten long workspace paths from the middle.
+-   Show product name and version once; the name is warm copper, the
+    version a low-brightness gray.
+-   Put model (with its context-window suffix), non-default effort, and
+    provider on one neutral line.
+-   Give the workspace its own line and shorten long paths from the
+    middle.
+-   Drop effort, then provider, before clipping the model on narrow
+    terminals.
+-   Never repeat the model or provider in the status bar.
 -   Never expose secrets or API keys.
 -   If no provider/model is configured, show a clear setup prompt.
 
@@ -151,8 +153,8 @@ Header rules:
 
 ``` text
 ◈ OpenContinue  v0.1.0
-deepseek-flash · D:\soft\vscodefiles\opencontinue
-────────────────────────────────────────────────────────────
+deepseek-flash[1M] · High · DeepSeek
+D:\soft\vscodefiles\opencontinue
 
 › Analyze the authentication module and fix the login bug.
 
@@ -168,9 +170,8 @@ I’m tracing the affected path before proposing a change.
 
 ────────────────────────────────────────────────────────────
 › Type a message...
-
-◈ Confirm                              Reasoning: High
-main · 2 files in context                                  ? help
+────────────────────────────────────────────────────────────
+◈ Manual                                        main · ? help
 ```
 
 Activity rules:
@@ -299,7 +300,7 @@ subject to conflict checks.
 Always show the active mode explicitly:
 
 ``` text
-◈ Confirm
+◈ Manual
 ```
 
 If a mode is unavailable in the current execution context, explain why
@@ -536,10 +537,11 @@ Rules:
 
 ### Wide terminal
 
--   Header may show model, provider, and workspace on separate aligned
-    rows.
+-   Header shows identity, model metadata (context, effort, provider),
+    and workspace on three rows.
 -   Progress steps may include short descriptions.
--   Status line may show mode, effort, branch, and context metadata.
+-   Status bar keeps only mode, branch, and help; effort lives in the
+    header.
 
 ### Narrow terminal
 

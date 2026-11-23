@@ -9,7 +9,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "/model", description: "change model" },
   { name: "/provider", description: "change provider" },
   { name: "/resume", description: "resume a session" },
-  { name: "/mode", description: "cycle Plan/Confirm/Auto" },
+  { name: "/mode", description: "cycle Plan/Manual/Auto" },
   { name: "/reasoning", description: "cycle reasoning effort" },
   { name: "/diff", description: "show working tree changes" },
   { name: "/checkpoints", description: "list run checkpoints" },
@@ -21,7 +21,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
 ]
 
 const KEY_HELP = [
-  "Shift+Tab  cycle Plan/Confirm/Auto",
+  "Shift+Tab  cycle Plan/Manual/Auto",
   "Shift+R    cycle reasoning effort (empty prompt)",
   "Ctrl+O     expanded transcript",
   "Ctrl+T     show or hide the task list",

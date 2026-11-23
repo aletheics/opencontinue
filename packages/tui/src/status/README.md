@@ -5,7 +5,7 @@
 **Files:**
 
 - `activity.ts` — event-driven labels, configurable delayed/stalled thresholds, and metadata width gating.
-- `footer.ts` — compact mode/branch/reasoning/help layout with display-cell width.
+- `footer.ts` — mode/branch/help status bar layout, mode tints, and display-cell width gating.
 - `spinner.ts` — rotating tips (no random work verbs).
 - `format.ts` — compact numbers, clock time, and durations.
 

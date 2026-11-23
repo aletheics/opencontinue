@@ -1,6 +1,4 @@
-import { PRODUCT_NAME } from "../../brand.js"
-import { glyphs } from "../../glyphs.js"
-import { headerMeta } from "../../header.js"
+import { headerLines } from "../../header.js"
 import { theme } from "../../theme.js"
 import type { TimelineItem } from "../../timeline.js"
 import { assistantBlock } from "./assistant.js"
@@ -33,20 +31,16 @@ export function timelineLines(
     }
 
     if (item.kind === "banner") {
-      const title = `${glyphs.brand} ${PRODUCT_NAME}  v${item.version}`
-      lines.push({
-        text: title,
-        color: theme.assistant,
-        spans: [
-          { text: glyphs.brand, color: theme.brand },
-          { text: ` ${PRODUCT_NAME}`, bold: true },
-          { text: `  v${item.version}`, dim: true },
-        ],
-      })
-      lines.push({
-        text: headerMeta(item.model, item.provider, item.workspace, item.branch, width),
-        color: theme.textSecondary,
-      })
+      lines.push(
+        ...headerLines({
+          version: item.version,
+          model: item.model,
+          effort: item.effort,
+          provider: item.provider,
+          workspace: item.workspace,
+          columns: width,
+        }),
+      )
       lines.push({ text: "", dim: true })
       continue
     }

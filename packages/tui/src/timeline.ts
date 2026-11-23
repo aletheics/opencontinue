@@ -1,7 +1,4 @@
-import type {
-  AuthorizationReason,
-  SessionEvent,
-} from "@opencontinue/protocol"
+import type { AuthorizationReason, SessionEvent } from "@opencontinue/protocol"
 
 export type UserTimelineItem = {
   kind: "user"
@@ -63,8 +60,9 @@ export type BannerTimelineItem = {
   version: string
   model: string
   provider: string
+  /** Non-default reasoning effort captured when the session starts. */
+  effort?: string
   workspace: string
-  branch?: string
 }
 
 export type TimelineItem =
@@ -168,8 +166,7 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
         id: `usage:${event.seq}`,
         inputTokens: event.inputTokens ?? 0,
         outputTokens: event.outputTokens ?? 0,
-        totalTokens:
-          event.totalTokens ?? (event.inputTokens ?? 0) + (event.outputTokens ?? 0),
+        totalTokens: event.totalTokens ?? (event.inputTokens ?? 0) + (event.outputTokens ?? 0),
       },
     ]
   }

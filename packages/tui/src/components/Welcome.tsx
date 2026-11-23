@@ -1,43 +1,37 @@
-import { Box, Text } from "ink"
+import { Box } from "ink"
 
-import { PRODUCT_NAME } from "../brand.js"
-import { headerMeta } from "../header.js"
-import { glyphs } from "../glyphs.js"
-import { theme } from "../theme.js"
+import { headerLines } from "../header.js"
+import { LineText } from "./LineText.js"
 
 export type WelcomeProps = {
   version: string
   model: string
+  effort?: string
   provider: string
   workspace: string
-  branch?: string
   columns: number
 }
 
 /**
- * Two-line OpenContinue header: identity/version, then compact metadata.
- * The full workspace path lives in /status.
+ * Three-line OpenContinue header: identity/version, model metadata, then the
+ * workspace path. The layout lives in `header.ts` so the fullscreen header,
+ * inline banner, and expanded transcript cannot drift apart.
  */
-export function Welcome({
-  version,
-  model,
-  provider,
-  workspace,
-  branch,
-  columns,
-}: WelcomeProps) {
-  const meta = headerMeta(model, provider, workspace, branch, Math.max(10, columns))
+export function Welcome({ version, model, effort, provider, workspace, columns }: WelcomeProps) {
+  const lines = headerLines({
+    version,
+    model,
+    effort,
+    provider,
+    workspace,
+    columns,
+  })
 
   return (
     <Box flexDirection="column">
-      <Text wrap="truncate">
-        <Text color={theme.brand}>{glyphs.brand}</Text>
-        <Text bold> {PRODUCT_NAME}</Text>
-        <Text color={theme.textMuted}>{"  "}v{version}</Text>
-      </Text>
-      <Text color={theme.textSecondary} wrap="truncate">
-        {meta}
-      </Text>
+      {lines.map((line, index) => (
+        <LineText key={index} line={line} />
+      ))}
     </Box>
   )
 }
