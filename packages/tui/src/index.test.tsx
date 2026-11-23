@@ -186,12 +186,14 @@ describe("TUI", () => {
         columns={80}
         expanded={false}
         leading={false}
+        permissionMode="auto"
       />,
     )
     const toolFrame = tool.lastFrame() ?? ""
     expect(toolFrame).toContain("● Bash(echo hi)")
     expect(toolFrame).toContain("⎿")
     expect(toolFrame).toContain("ctrl+o to expand")
+    expect(toolFrame).toContain("Allowed by auto mode")
     expect(toolFrame).not.toContain("╭")
     tool.unmount()
 
@@ -621,6 +623,39 @@ describe("TUI", () => {
       await vi.waitFor(() => {
         expect(output(frames)).toContain("show commands")
       })
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("opens the expanded transcript with ctrl+o", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(
+      <App options={{ readonly: true }} />,
+    )
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("hello")
+      await vi.waitFor(() => expect(lastFrame()).toContain("❯ hello"))
+      stdin.write("\r")
+      await vi.waitFor(() => expect(output(frames)).toContain("hello from tui"), {
+        timeout: 5000,
+      })
+
+      stdin.write("\u000f")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Transcript ·"))
+      stdin.write("\u000f")
+      await vi.waitFor(() => expect(lastFrame()).not.toContain("Transcript ·"))
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

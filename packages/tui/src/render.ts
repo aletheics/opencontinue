@@ -83,7 +83,7 @@ export function formatToolOutputLines(
   const lines = text.replace(/\r\n/g, "\n").trimEnd().split("\n")
   if (lines.length === 1 && lines[0] === "") return []
 
-  const max = expanded ? 30 : 3
+  const max = expanded ? 200 : 3
   const contentWidth = Math.max(10, width - 5)
   const shown: Line[] = []
 
@@ -117,7 +117,7 @@ export function formatDiffLines(diff: string, width: number, expanded: boolean):
         !line.startsWith("--- ") &&
         !line.startsWith("+++ "),
     )
-  const max = expanded ? 30 : 4
+  const max = expanded ? 200 : 4
   const shown: Line[] = []
 
   for (const line of lines.slice(0, max)) {

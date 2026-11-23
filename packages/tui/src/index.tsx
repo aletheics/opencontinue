@@ -71,6 +71,15 @@ function formatTokens(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
 }
 
+function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ${minutes % 60}m`
+}
+
 function useTerminalSize(): { columns: number; rows: number } {
   const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
   const read = () => ({
@@ -474,7 +483,7 @@ export function App({ options }: { options: TuiOptions }) {
           const elapsed = Date.now() - started
           setLastDurationMs(elapsed)
           appendMeta(
-            `✻ ${event.type === "run.completed" ? "Worked" : "Failed"} for ${(elapsed / 1000).toFixed(1)}s`,
+            `✻ ${event.type === "run.completed" ? "Worked" : "Failed"} for ${formatDuration(elapsed)}`,
           )
         }
         runStartedRef.current = null
@@ -1030,7 +1039,7 @@ export function App({ options }: { options: TuiOptions }) {
             : "Ctrl+C exit"
 
   const durationText =
-    lastDurationMs !== null ? `${(lastDurationMs / 1000).toFixed(1)}s` : undefined
+    lastDurationMs !== null ? formatDuration(lastDurationMs) : undefined
   const tokenText = totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : undefined
   const rightStatus = [
     workspaceStatus.name,
@@ -1174,6 +1183,7 @@ export function App({ options }: { options: TuiOptions }) {
             columns={columns}
             expanded={false}
             leading={index > 0}
+            permissionMode={permissionMode}
           />
         )}
       </Static>
@@ -1208,6 +1218,7 @@ export function App({ options }: { options: TuiOptions }) {
               columns={columns}
               expanded={false}
               leading={committed.length > 0}
+              permissionMode={permissionMode}
             />
           ) : null}
 
@@ -1221,7 +1232,7 @@ export function App({ options }: { options: TuiOptions }) {
                       ? `Running ${toolDisplayName(activeTool.name)}…`
                       : "Thinking…"}
                   </Text>
-                  <Text dimColor> ({elapsedSeconds}s · esc to interrupt)</Text>
+                  <Text dimColor> ({formatDuration(elapsedSeconds * 1000)} · esc to interrupt)</Text>
                 </Box>
               ) : null}
 

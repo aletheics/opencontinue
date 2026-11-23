@@ -7,6 +7,7 @@ import {
   toolHeaderLines,
   wrapText,
 } from "../render.js"
+import type { PermissionMode } from "../permission-gate.js"
 import { theme } from "../theme.js"
 import type { TimelineItem, ToolTimelineItem } from "../timeline.js"
 
@@ -15,6 +16,7 @@ type TranscriptItemProps = {
   columns: number
   expanded: boolean
   leading: boolean
+  permissionMode?: PermissionMode
 }
 
 function ToolBlock({
@@ -22,11 +24,13 @@ function ToolBlock({
   columns,
   expanded,
   leading,
+  permissionMode,
 }: {
   item: ToolTimelineItem
   columns: number
   expanded: boolean
   leading: boolean
+  permissionMode?: PermissionMode
 }) {
   const width = Math.max(20, columns - 2)
   const header = toolHeaderLines(item, width)
@@ -83,6 +87,14 @@ function ToolBlock({
             </Text>
           ))
         : null}
+
+      {permissionMode === "auto" &&
+      item.status === "done" &&
+      !["read", "grep", "glob"].includes(item.name) ? (
+        <Text dimColor wrap="truncate">
+          {"  ⎿  Allowed by auto mode"}
+        </Text>
+      ) : null}
     </Box>
   )
 }
@@ -92,6 +104,7 @@ export function TranscriptItem({
   columns,
   expanded,
   leading,
+  permissionMode,
 }: TranscriptItemProps) {
   const width = Math.max(20, columns - 2)
 
@@ -136,6 +149,7 @@ export function TranscriptItem({
         columns={columns}
         expanded={expanded}
         leading={leading}
+        permissionMode={permissionMode}
       />
     )
   }
@@ -166,11 +180,13 @@ export function Transcript({
   columns,
   expanded,
   leading,
+  permissionMode,
 }: {
   items: TimelineItem[]
   columns: number
   expanded: boolean
   leading: boolean
+  permissionMode?: PermissionMode
 }) {
   if (items.length === 0) return null
   return (
@@ -182,6 +198,7 @@ export function Transcript({
           columns={columns}
           expanded={expanded}
           leading={leading || index > 0}
+          permissionMode={permissionMode}
         />
       ))}
     </Box>
