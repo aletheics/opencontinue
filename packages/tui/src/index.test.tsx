@@ -592,6 +592,8 @@ describe("TUI", () => {
       await ready(lastFrame)
       expect(output(frames)).toContain("OpenContinue v0.0.1")
       expect(output(frames)).toContain("gpt-6.2 · OpenAI (GPT)")
+      expect(output(frames)).toContain(home)
+      expect(output(frames)).not.toContain("Welcome to OpenContinue")
       expect(lastFrame()).toContain("← 1 agent")
 
       stdin.write("hi")

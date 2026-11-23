@@ -1,6 +1,8 @@
 export const theme = {
   brand: "cyan",
-  logo: "#E07A6A",
+  logo: "#D77757",
+  claude: "#D77757",
+  claudeShimmer: "#F59575",
   user: "green",
   userBar: "#3A3A3A",
   assistant: "white",
