@@ -4,5 +4,8 @@ Copyright 2026 The OpenContinue Authors
 This product includes software developed by the OpenContinue project.
 
 Portions of the design are inspired by OpenCode (MIT) and Continue (Apache-2.0).
+Windows shell selection and process-tree termination are adapted from OpenCode
+(MIT), packages/core/src/shell/select.ts and
+packages/util/src/cross-spawn-spawner.ts.
 
 Licensed under the Apache License, Version 2.0. See LICENSE for the full text.

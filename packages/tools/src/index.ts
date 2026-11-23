@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process"
+import { spawn, type ChildProcess } from "node:child_process"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
@@ -7,7 +7,10 @@ import { createTwoFilesPatch } from "diff"
 import { z } from "zod"
 import { zodToJsonSchema } from "zod-to-json-schema"
 
+import { decodeOutput, resolveShell } from "./shell.js"
+
 export * from "./files.js"
+export { decodeOutput, resolveShell, shellArgs } from "./shell.js"
 
 export type ToolCapability = "read" | "write" | "execute"
 
@@ -168,6 +171,40 @@ const editInput = z.object({
   replaceAll: z.boolean().optional().describe("Replace every occurrence instead of requiring a unique match"),
 })
 
+/**
+ * Replace exact text, accepting LF model output in a CRLF file. Mixed line
+ * endings are normalized to CRLF when a fallback match is needed.
+ */
+function replaceText(
+  content: string,
+  oldString: string,
+  newString: string,
+  replaceAll: boolean,
+): { updated: string; count: number } | undefined {
+  const direct = content.split(oldString).length - 1
+  if (direct > 0) {
+    return {
+      updated: replaceAll
+        ? content.split(oldString).join(newString)
+        : content.replace(oldString, newString),
+      count: direct,
+    }
+  }
+
+  if (!content.includes("\r\n")) return undefined
+
+  const lfContent = content.replace(/\r\n/g, "\n")
+  const lfOld = oldString.replace(/\r\n/g, "\n")
+  const count = lfContent.split(lfOld).length - 1
+  if (count === 0) return undefined
+
+  const lfNew = newString.replace(/\r\n/g, "\n")
+  const updated = replaceAll
+    ? lfContent.split(lfOld).join(lfNew)
+    : lfContent.replace(lfOld, lfNew)
+  return { updated: updated.replace(/\n/g, "\r\n"), count }
+}
+
 export const editTool: Tool = {
   name: "edit",
   description:
@@ -180,11 +217,19 @@ export const editTool: Tool = {
 
     const target = resolveInside(context.workspace, inputPath)
     const content = await fs.readFile(target, "utf8")
-    const count = content.split(oldString).length - 1
-    if (count === 0 || (count > 1 && !replaceAll)) return { detail: inputPath }
+    const replacement = replaceText(content, oldString, newString, replaceAll)
+    if (!replacement || (replacement.count > 1 && !replaceAll)) {
+      return { detail: inputPath }
+    }
 
-    const updated = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
-    const diff = createTwoFilesPatch(inputPath, inputPath, content, updated, "", "")
+    const diff = createTwoFilesPatch(
+      inputPath,
+      inputPath,
+      content,
+      replacement.updated,
+      "",
+      "",
+    )
     return { detail: inputPath, diff: diff.trim() ? diff : undefined }
   },
   async execute(raw, context) {
@@ -194,13 +239,16 @@ export const editTool: Tool = {
 
     const target = resolveInside(context.workspace, inputPath)
     const content = await fs.readFile(target, "utf8")
-    const count = content.split(oldString).length - 1
-    if (count === 0) throw new Error(`oldString not found in ${inputPath}`)
-    if (count > 1 && !replaceAll) {
-      throw new Error(`oldString appears ${count} times in ${inputPath}; make it unique or set replaceAll`)
+    const replacement = replaceText(content, oldString, newString, replaceAll)
+    if (!replacement) throw new Error(`oldString not found in ${inputPath}`)
+    if (replacement.count > 1 && !replaceAll) {
+      throw new Error(
+        `oldString appears ${replacement.count} times in ${inputPath}; make it unique or set replaceAll`,
+      )
     }
 
-    const updated = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString)
+    const updated = replacement.updated
+    const count = replacement.count
     await fs.writeFile(target, updated, "utf8")
     const diff = createTwoFilesPatch(inputPath, inputPath, content, updated, "", "")
     return {
@@ -359,6 +407,36 @@ export const todoTool: Tool = {
   },
 }
 
+/**
+ * Kill the whole process tree. Node's child.kill only reaches the shell on
+ * Windows; descendants keep running and hold the workspace directory.
+ */
+function killProcessTree(
+  child: ChildProcess,
+  signal: NodeJS.Signals = "SIGTERM",
+): void {
+  const pid = child.pid
+  if (!pid) return
+
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      windowsHide: true,
+      stdio: "ignore",
+    })
+    return
+  }
+
+  try {
+    process.kill(-pid, signal)
+  } catch {
+    try {
+      child.kill(signal)
+    } catch {
+      // The process already exited.
+    }
+  }
+}
+
 export const bashTool: Tool = {
   name: "bash",
   description: "Run a shell command inside the workspace and return combined stdout/stderr.",
@@ -368,39 +446,80 @@ export const bashTool: Tool = {
     const { command, cwd = ".", timeoutMs = 120_000 } = bashInput.parse(raw)
     const workdir = resolveInside(context.workspace, cwd)
 
+    if (context.signal?.aborted) throw new Error("Aborted")
+
+    const shell = resolveShell(command)
+    const maxBytes = MAX_OUTPUT_CHARS * 4
+
     return await new Promise<ToolOutput>((resolve, reject) => {
-      const child = spawn(command, {
-        shell: true,
+      const child = spawn(shell.file, shell.args, {
         cwd: workdir,
         env: { ...process.env, OPENCONTINUE_SESSION_ID: context.sessionId },
+        windowsHide: true,
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
       })
 
-      let output = ""
+      const chunks: Buffer[] = []
+      let bytes = 0
+      let truncated = false
       let timedOut = false
+      let forceTimer: ReturnType<typeof setTimeout> | undefined
+
       const append = (chunk: Buffer) => {
-        output = truncate(output + chunk.toString())
+        if (bytes >= maxBytes) {
+          truncated = true
+          return
+        }
+        const take = chunk.subarray(0, maxBytes - bytes)
+        chunks.push(take)
+        bytes += take.length
+        if (take.length < chunk.length) truncated = true
       }
 
       child.stdout?.on("data", append)
       child.stderr?.on("data", append)
 
+      const stop = () => {
+        killProcessTree(child)
+        if (process.platform !== "win32") {
+          if (forceTimer) clearTimeout(forceTimer)
+          forceTimer = setTimeout(() => {
+            killProcessTree(child, "SIGKILL")
+          }, 2_000)
+        }
+      }
+
       const timer = setTimeout(() => {
         timedOut = true
-        child.kill()
+        stop()
       }, timeoutMs)
 
-      const abort = () => child.kill()
-      context.signal?.addEventListener("abort", abort, { once: true })
+      const abort = () => stop()
+      if (context.signal?.aborted) abort()
+      else context.signal?.addEventListener("abort", abort, { once: true })
+
+      const cleanup = () => {
+        clearTimeout(timer)
+        if (forceTimer) clearTimeout(forceTimer)
+        context.signal?.removeEventListener("abort", abort)
+      }
 
       child.on("error", (error) => {
-        clearTimeout(timer)
-        context.signal?.removeEventListener("abort", abort)
+        cleanup()
         reject(error)
       })
 
       child.on("close", (code) => {
-        clearTimeout(timer)
-        context.signal?.removeEventListener("abort", abort)
+        cleanup()
+
+        let output = decodeOutput(Buffer.concat(chunks))
+        if (output.length > MAX_OUTPUT_CHARS) {
+          output = output.slice(0, MAX_OUTPUT_CHARS)
+          truncated = true
+        }
+        if (truncated) output = `${output}\n...(truncated)`
+
         const failed = code !== 0 || timedOut
         resolve({
           output: [

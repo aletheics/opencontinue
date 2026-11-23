@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 
@@ -53,6 +53,28 @@ describe("tools", () => {
     if (typeof written !== "string") expect(written.diff).toContain("+hello")
 
     expect(await readTool.execute({ path: "a.ts" }, context(workspace))).toContain("const y = 3")
+  })
+
+  it("edits CRLF files with LF model strings", async () => {
+    const workspace = await makeWorkspace()
+    const file = path.join(workspace, "crlf.txt")
+    await writeFile(file, "one\r\ntwo\r\n")
+
+    const preview = await editTool.preview!(
+      { path: "crlf.txt", oldString: "one\ntwo", newString: "one\nthree" },
+      context(workspace),
+    )
+    expect(preview.diff).toContain("+three")
+    await expect(readFile(file, "utf8")).resolves.toBe("one\r\ntwo\r\n")
+
+    const edited = await editTool.execute(
+      { path: "crlf.txt", oldString: "one\ntwo", newString: "one\nthree" },
+      context(workspace),
+    )
+    expect(typeof edited === "string" ? edited : edited.output).toContain(
+      "Replaced 1",
+    )
+    await expect(readFile(file, "utf8")).resolves.toBe("one\r\nthree\r\n")
   })
 
   it("previews write and edit diffs without changing files", async () => {
@@ -114,6 +136,43 @@ describe("tools", () => {
     expect(failed).toMatchObject({ failed: true, exitCode: 3, timedOut: false })
     expect(typeof failed === "string" ? failed : failed.output).toContain("Exit code 3")
   })
+
+  it("returns UTF-8 Chinese output", async () => {
+    const workspace = await makeWorkspace()
+    const result = await bashTool.execute(
+      { command: `node -e "console.log('中文输出')"` },
+      context(workspace),
+    )
+
+    expect(typeof result === "string" ? result : result.output).toContain(
+      "中文输出",
+    )
+  })
+
+  it("times out and kills descendant processes", async () => {
+    const workspace = await makeWorkspace()
+
+    const result = await bashTool.execute(
+      {
+        command:
+          'node -e "setTimeout(() => require(\'fs\').writeFileSync(\'marker.txt\',\'late\'), 700)"',
+        timeoutMs: 100,
+      },
+      context(workspace),
+    )
+
+    expect(result).toMatchObject({ failed: true, timedOut: true })
+    expect(typeof result === "string" ? result : result.output).toContain(
+      "(timed out)",
+    )
+
+    // The process-group assertion is reliable on POSIX. The Windows runner
+    // uses taskkill /T /F, which some sandboxed CI hosts deny.
+    if (process.platform !== "win32") {
+      await new Promise((resolve) => setTimeout(resolve, 900))
+      await expect(access(path.join(workspace, "marker.txt"))).rejects.toThrow()
+    }
+  }, 5000)
 
   it("keeps bash failure metadata through the registry", async () => {
     const workspace = await makeWorkspace()
