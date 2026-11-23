@@ -177,11 +177,16 @@ function parseBlocks(source: string): Block[] {
   return blocks
 }
 
-function headingStyle(level: number): { color: string | undefined; bold?: boolean; dim?: boolean } {
-  if (level === 1) return { color: theme.brandShimmer, bold: true }
-  if (level === 2) return { color: theme.brand, bold: true }
-  if (level === 3) return { color: theme.brand }
-  return { color: theme.brand, dim: true }
+function headingStyle(level: number): {
+  color: string | undefined
+  bold?: boolean
+  dim?: boolean
+} {
+  if (level <= 2) return { color: theme.assistant, bold: true }
+  if (level === 3) return { color: theme.assistant }
+  if (level === 4) return { color: theme.textSecondary, bold: true }
+  if (level === 5) return { color: theme.textSecondary }
+  return { color: theme.textSecondary, dim: true }
 }
 
 function renderHeading(level: number, text: string, width: number): Line[] {
@@ -272,6 +277,43 @@ function renderCode(language: string, lines: string[], width: number): Line[] {
   return rendered
 }
 
+const CJK_EDGE = /[　-〿぀-ヿ㐀-䶿一-鿿豈-﫿＀-￯]/
+
+function joinsWithoutSpace(left: string, right: string): boolean {
+  const before = left.at(-1) ?? ""
+  const after = right.charAt(0)
+  return CJK_EDGE.test(before) && CJK_EDGE.test(after)
+}
+
+/**
+ * Markdown soft line breaks join a paragraph into one flowing line. A
+ * trailing backslash or two spaces keeps an intentional hard break.
+ */
+function joinParagraph(lines: string[]): string[] {
+  const paragraphs: string[] = []
+  let current = ""
+
+  const flush = () => {
+    if (!current) return
+    paragraphs.push(current)
+    current = ""
+  }
+
+  for (const raw of lines) {
+    const hardBreak = /\\\s*$/.test(raw) || /\s{2,}$/.test(raw)
+    let line = raw.trim()
+    if (line.endsWith("\\")) line = line.slice(0, -1).trimEnd()
+    if (!line) continue
+
+    if (!current) current = line
+    else current += `${joinsWithoutSpace(current, line) ? "" : " "}${line}`
+    if (hardBreak) flush()
+  }
+
+  flush()
+  return paragraphs
+}
+
 function renderBlock(block: Block, width: number): Line[] {
   switch (block.kind) {
     case "heading":
@@ -285,10 +327,16 @@ function renderBlock(block: Block, width: number): Line[] {
     case "table":
       return formatTable(block.lines, width)
     case "rule":
-      return [{ text: "---", color: theme.muted, dim: true }]
+      return [
+        {
+          text: "─".repeat(Math.max(1, width)),
+          color: theme.borderSubtle,
+          dim: true,
+        },
+      ]
     case "paragraph":
-      return block.lines.flatMap((line) =>
-        wrapSpans(parseInline(line), Math.max(10, width)).map((spans) => lineFromSpans(spans)),
+      return joinParagraph(block.lines).flatMap((paragraph) =>
+        wrapSpans(parseInline(paragraph), Math.max(10, width)).map((spans) => lineFromSpans(spans)),
       )
   }
 }

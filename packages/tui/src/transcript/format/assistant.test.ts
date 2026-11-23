@@ -21,7 +21,7 @@ describe("assistant markdown", () => {
 
     expect(plain).toContain("Title")
     expect(lines.find((line) => line.text === "Title")?.bold).toBe(true)
-    expect(lines.find((line) => line.text === "Title")?.color).toBe(theme.brandShimmer)
+    expect(lines.find((line) => line.text === "Title")?.color).toBe(theme.assistant)
     expect(plain).toContain("- first")
     expect(plain).toContain("1. second")
     expect(plain).toContain("▎ quote")
@@ -75,9 +75,9 @@ describe("assistant markdown", () => {
     ])
   })
 
-  it("keeps one blank line around headings and uses Copper tiers", () => {
+  it("keeps one blank line around headings and uses a soft-white hierarchy", () => {
     const lines = formatAssistantLines(
-      ["body", "# H1", "## H2", "### H3", "#### H4", "tail"].join("\n"),
+      ["body", "# H1", "## H2", "### H3", "#### H4", "##### H5", "###### H6", "tail"].join("\n"),
       40,
     )
 
@@ -92,21 +92,75 @@ describe("assistant markdown", () => {
       "",
       "H4",
       "",
+      "H5",
+      "",
+      "H6",
+      "",
       "tail",
     ])
     expect(lines.find((line) => line.text === "H1")).toMatchObject({
-      color: theme.brandShimmer,
+      color: theme.assistant,
       bold: true,
     })
     expect(lines.find((line) => line.text === "H2")).toMatchObject({
-      color: theme.brand,
+      color: theme.assistant,
       bold: true,
     })
-    expect(lines.find((line) => line.text === "H3")?.color).toBe(theme.brand)
+    expect(lines.find((line) => line.text === "H3")?.color).toBe(theme.assistant)
     expect(lines.find((line) => line.text === "H4")).toMatchObject({
-      color: theme.brand,
+      color: theme.textSecondary,
+      bold: true,
+    })
+    expect(lines.find((line) => line.text === "H5")?.color).toBe(theme.textSecondary)
+    expect(lines.find((line) => line.text === "H6")).toMatchObject({
+      color: theme.textSecondary,
       dim: true,
     })
+  })
+
+  it("joins soft line breaks into a flowing paragraph", () => {
+    const lines = formatAssistantLines("first line\nsecond line\nthird line", 60)
+    expect(lines.map((line) => line.text)).toEqual(["first line second line third line"])
+  })
+
+  it("does not insert spaces between CJK soft-wrapped lines", () => {
+    const lines = formatAssistantLines("第一句。\n第二句。", 60)
+    expect(lines.map((line) => line.text)).toEqual(["第一句。第二句。"])
+  })
+
+  it("keeps hard line breaks", () => {
+    const lines = formatAssistantLines(
+      ["first line  ", "second line\\", "third line"].join("\n"),
+      60,
+    )
+    expect(lines.map((line) => line.text)).toEqual(["first line", "second line", "third line"])
+  })
+
+  it("renders a full-width low-contrast horizontal rule", () => {
+    const lines = formatAssistantLines("before\n\n---\n\nafter", 20)
+    const rule = lines.find((line) => line.text.startsWith("─"))
+
+    expect(rule?.text).toBe("─".repeat(20))
+    expect(rule?.color).toBe(theme.borderSubtle)
+    expect(rule?.dim).toBe(true)
+  })
+
+  it("keeps list items together and separates content blocks", () => {
+    const lines = formatAssistantLines(
+      ["- one", "- two", "", "paragraph", "", "> quote", "", "```", "code", "```"].join("\n"),
+      40,
+    )
+
+    expect(lines.map((line) => line.text)).toEqual([
+      "- one",
+      "- two",
+      "",
+      "paragraph",
+      "",
+      "▎ quote",
+      "",
+      "code",
+    ])
   })
 
   it("preserves nested list indentation", () => {

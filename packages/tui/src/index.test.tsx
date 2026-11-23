@@ -150,7 +150,7 @@ async function fakeLineProvider(
       for (let index = 0; index < lines; index++) {
         response.write(
           `data: ${JSON.stringify({
-            choices: [{ delta: { content: `line ${index}\n` } }],
+            choices: [{ delta: { content: `line ${index}\n\n` } }],
           })}\n\n`,
         )
         await new Promise((resolve) => setTimeout(resolve, 5))
@@ -547,7 +547,7 @@ describe("TUI", () => {
 
   it("clips a long live assistant response to the viewport", () => {
     const text = Array.from({ length: 10 }, (_, index) => `line ${index}`).join(
-      "\n",
+      "\n\n",
     )
     const view = render(
       <Transcript
