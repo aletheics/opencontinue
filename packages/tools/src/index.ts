@@ -7,6 +7,8 @@ import { createTwoFilesPatch } from "diff"
 import { z } from "zod"
 import { zodToJsonSchema } from "zod-to-json-schema"
 
+export * from "./files.js"
+
 export type ToolCapability = "read" | "write" | "execute"
 
 export type ToolContext = {

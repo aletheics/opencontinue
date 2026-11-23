@@ -58,7 +58,7 @@ OPENCONTINUE_MODEL=gpt-6.2
 
 ## Usage
 
-`opencontinue` starts the TUI: enter your API key, choose a model, and chat. Use `/resume` to switch to a previous session.
+`opencontinue` starts the TUI: enter your API key, choose a model, and chat. Use `/resume` to switch to a previous session, `@` to complete workspace files, and `ctrl+r` to search input history.
 
 ```bash
 opencontinue                    # TUI

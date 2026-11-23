@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import http from "node:http"
 import type { AddressInfo } from "node:net"
 import os from "node:os"
@@ -287,6 +287,40 @@ describe("TUI", () => {
       stdin.write("\u001b")
       await vi.waitFor(() => expect(lastFrame()).toContain("Type a message…"))
       expect(lastFrame()).not.toContain("/resume — resume a session")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("completes @file mentions", async () => {
+    await mkdir(path.join(home, "src"), { recursive: true })
+    await writeFile(path.join(home, "src", "app.ts"), "export const app = 1\n")
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("look @ap")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Files · /ap/"), {
+        timeout: 5000,
+      })
+      expect(lastFrame()).toContain("src/app.ts")
+
+      stdin.write("\t")
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain("you> look @src/app.ts"),
+      )
+      expect(lastFrame()).not.toContain("Files · /ap/")
     } finally {
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))

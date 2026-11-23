@@ -36,6 +36,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - Markdown-style assistant output: headings, lists, task boxes, blockquotes, rules, and fenced code with a gutter. Styling is line-level because the renderer is a line buffer.
 - A cursor-aware input (`components/Input.tsx` plus pure `input.ts`): horizontal and vertical scrolling, readline keys, forward delete, and multi-line entry when the terminal reports modifiers.
 - `Ctrl+R` history search: filters submitted prompts, previews them above the input, and restores the chosen entry as a draft.
+- `@file` completion: a bounded workspace scan from `@opencontinue/tools` feeds a ranked picker; `Tab`/`Enter` inserts the path with a trailing space.
 - Ink's `alternateScreen` and `kittyKeyboard` auto mode instead of manual escape writes.
 
 ## Rendering contract
@@ -59,7 +60,6 @@ The current TUI uses upstream Ink so the team can keep upgrading it. We copy the
 
 ## Next slices
 
-1. `@file` completion in the prompt.
-2. Inline code styling and syntax highlighting for fenced code.
-3. A typed `packages/client` so the TUI talks to the server instead of running the runtime in-process.
-4. Optional OpenTUI evaluation if Ink becomes the limiting factor.
+1. Inline code styling and syntax highlighting for fenced code.
+2. A typed `packages/client` so the TUI talks to the server instead of running the runtime in-process.
+3. Optional OpenTUI evaluation if Ink becomes the limiting factor.

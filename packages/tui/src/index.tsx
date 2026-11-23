@@ -18,7 +18,7 @@ import {
 } from "@opencontinue/providers"
 import type { SessionSummary } from "@opencontinue/protocol"
 import { runAgent } from "@opencontinue/runtime"
-import { ToolRegistry } from "@opencontinue/tools"
+import { listWorkspaceFiles, ToolRegistry } from "@opencontinue/tools"
 
 import { Header } from "./components/Header.js"
 import { Picker } from "./components/Picker.js"
@@ -144,6 +144,11 @@ export function App({ options }: { options: TuiOptions }) {
   const [historyQuery, setHistoryQuery] = useState("")
   const [historyCursor, setHistoryCursor] = useState(0)
   const [historySearchIndex, setHistorySearchIndex] = useState(0)
+  const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([])
+  const [filesLoading, setFilesLoading] = useState(false)
+  const [fileIndex, setFileIndex] = useState(0)
+  const [dismissedMention, setDismissedMention] = useState<string | null>(null)
+  const filesLoadedRef = useRef(false)
   const [scrollOffset, setScrollOffset] = useState(0)
 
   const storeRef = useRef<SessionStore | null>(null)
@@ -172,6 +177,16 @@ export function App({ options }: { options: TuiOptions }) {
   useEffect(() => {
     setSlashIndex(0)
   }, [input])
+
+  useEffect(() => {
+    if (screen !== "chat" || filesLoadedRef.current) return
+    filesLoadedRef.current = true
+    setFilesLoading(true)
+    void listWorkspaceFiles(process.env.INIT_CWD ?? process.cwd())
+      .then(setWorkspaceFiles)
+      .catch(() => setWorkspaceFiles([]))
+      .finally(() => setFilesLoading(false))
+  }, [screen])
 
   const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10] ?? "⠋"
 
@@ -205,6 +220,37 @@ export function App({ options }: { options: TuiOptions }) {
       : history
     return [...matches].reverse().slice(0, 20)
   }, [history, historyQuery, historySearch])
+
+  const mentionMatch =
+    screen === "chat" ? input.slice(0, cursor).match(/(?:^|\s)@([^\s@]*)$/) : null
+  const mentionQuery = mentionMatch?.[1] ?? null
+
+  const fileMatches = useMemo(() => {
+    if (mentionQuery === null) return []
+    const query = mentionQuery.toLowerCase()
+    const score = (file: string): number => {
+      const lower = file.toLowerCase()
+      const base = lower.split("/").at(-1) ?? ""
+      if (base.startsWith(query)) return 0
+      if (lower.startsWith(query)) return 1
+      if (base.includes(query)) return 2
+      return 3
+    }
+
+    return workspaceFiles
+      .filter((file) => file.toLowerCase().includes(query))
+      .sort(
+        (left, right) =>
+          score(left) - score(right) ||
+          left.length - right.length ||
+          left.localeCompare(right),
+      )
+      .slice(0, 20)
+  }, [mentionQuery, workspaceFiles])
+
+  useEffect(() => {
+    setFileIndex(0)
+  }, [mentionQuery])
 
   useEffect(() => {
     return () => {
@@ -498,6 +544,16 @@ export function App({ options }: { options: TuiOptions }) {
     closeHistorySearch()
   }
 
+  const completeMention = (file: string) => {
+    const before = input.slice(0, cursor)
+    const match = before.match(/(^|\s)@([^\s@]*)$/)
+    if (!match) return
+    const start = before.length - (match[0]?.length ?? 0) + (match[1]?.length ?? 0)
+    const next = `${input.slice(0, start)}@${file} ${input.slice(cursor)}`
+    setDraft(next, start + file.length + 2)
+    setDismissedMention(null)
+  }
+
   const send = (value: string) => {
     const text = value.trim()
     if (!text) return
@@ -677,6 +733,22 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
+    if (fileMenuOpen) {
+      if (key.upArrow) {
+        setFileIndex((index) => Math.max(0, index - 1))
+      } else if (key.downArrow) {
+        setFileIndex((index) =>
+          Math.max(0, Math.min(fileMatches.length - 1, index + 1)),
+        )
+      } else if (key.tab && !key.shift) {
+        const chosen = fileMatches[activeFileIndex]
+        if (chosen) completeMention(chosen)
+      } else if (key.escape) {
+        setDismissedMention(mentionQuery ?? "")
+      }
+      return
+    }
+
     if (menuOpen) {
       if (key.upArrow) {
         setSlashIndex((index) => Math.max(0, index - 1))
@@ -770,12 +842,23 @@ export function App({ options }: { options: TuiOptions }) {
   const slashMatches = slashQuery
     ? SLASH_COMMANDS.filter((command) => command.name.startsWith(slashQuery)).slice(0, 5)
     : []
+  const fileMenuOpen =
+    screen === "chat" &&
+    mentionQuery !== null &&
+    dismissedMention !== mentionQuery &&
+    !busy &&
+    !permission &&
+    !historySearch &&
+    rows >= 18
+  const activeFileIndex = Math.min(fileIndex, Math.max(0, fileMatches.length - 1))
+  const fileMenuHeight = fileMenuOpen ? 6 : 0
   const menuOpen =
     screen === "chat" &&
     slashMatches.length > 0 &&
     !busy &&
     !permission &&
     !historySearch &&
+    !fileMenuOpen &&
     rows >= 18
   const activeSlashIndex = Math.min(slashIndex, Math.max(0, slashMatches.length - 1))
   const menuHeight = menuOpen ? slashMatches.length + 2 : 0
@@ -786,12 +869,17 @@ export function App({ options }: { options: TuiOptions }) {
   )
   const footerText = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
-    : menuOpen
-      ? "↑/↓ select · Tab complete · Enter run · Esc close"
-      : footer
+    : fileMenuOpen
+      ? "↑/↓ select · Tab/Enter insert · Esc close"
+      : menuOpen
+        ? "↑/↓ select · Tab complete · Enter run · Esc close"
+        : footer
   const footerLine = footerText.slice(0, Math.max(10, columns - 2))
 
-  const maxInputHeight = Math.max(3, rows - 8 - menuHeight - historyMenuHeight)
+  const maxInputHeight = Math.max(
+    3,
+    rows - 8 - menuHeight - historyMenuHeight - fileMenuHeight,
+  )
   const inputLines = input.split("\n").length
   const desiredInputHeight = historySearch
     ? 3
@@ -802,10 +890,18 @@ export function App({ options }: { options: TuiOptions }) {
     screen === "chat" ? Math.min(desiredInputHeight, maxInputHeight) : 0
   const bodyHeight = Math.max(
     4,
-    rows - 3 - inputHeight - menuHeight - historyMenuHeight - 1,
+    rows - 3 - inputHeight - menuHeight - historyMenuHeight - fileMenuHeight - 1,
   )
 
   const submitInput = (value: string) => {
+    if (fileMenuOpen) {
+      const chosen = fileMatches[activeFileIndex]
+      if (chosen) {
+        completeMention(chosen)
+        return
+      }
+      if (filesLoading) return
+    }
     if (menuOpen) {
       const chosen = slashMatches[activeSlashIndex]
       if (chosen) {
@@ -952,6 +1048,25 @@ export function App({ options }: { options: TuiOptions }) {
       </Box>
       {menuOpen ? (
         <SlashMenu commands={slashMatches} selectedIndex={activeSlashIndex} />
+      ) : null}
+      {fileMenuOpen ? (
+        <Box
+          flexShrink={0}
+          height={fileMenuHeight}
+          flexDirection="column"
+          borderStyle="round"
+          borderColor={theme.border}
+          paddingX={1}
+          overflow="hidden"
+        >
+          <Picker
+            header={`Files${mentionQuery ? ` · /${mentionQuery}/` : ""} (${activeFileIndex + 1}/${fileMatches.length})`}
+            items={fileMatches.map((file) => ({ key: file, label: file }))}
+            selectedIndex={activeFileIndex}
+            windowSize={Math.max(1, fileMenuHeight - 3)}
+            emptyText={filesLoading ? "Loading files…" : "No files match."}
+          />
+        </Box>
       ) : null}
       {historySearch ? (
         <Box
