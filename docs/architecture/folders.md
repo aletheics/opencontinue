@@ -40,7 +40,7 @@ Apps can compose packages. Packages never import apps. The boundary test enforce
 | `packages/providers` | Model transport and provider catalog | provider presets, OpenAI-compatible SSE, native Anthropic | `createProvider`, `listModels`, `PROVIDER_PRESETS` | external only | core, runtime, clients | `provider.test.ts`, `catalog.test.ts`, `sse.test.ts` |
 | `packages/tools` | Local capabilities and policy gate | read/write/edit/glob/grep/bash, tool registry | tools, `ToolRegistry`, `PermissionGate` | providers | core runtime, clients | `index.test.ts` |
 | `packages/runtime` | The agent loop, independent of transport | `runAgent`, history projection, permissions, project context | `runAgent`, `PermissionBroker`, `loadProjectConfig` | protocol, core, providers, tools | server, CLI, TUI | `agent.test.ts`, `permissions.test.ts`, `project.test.ts` |
-| `packages/tui` | A client that happens to render in a terminal | Ink screens, model picker, permission prompt | `runTui`, `App` | config, core, protocol, providers, runtime, tools | `apps/cli`, `apps/server` | `index.test.tsx`, `timeline.test.ts` |
+| `packages/tui` | A client that happens to render in a terminal | Ink screens, model picker, permission prompt | `runTui`, `App` | client, local-client, config, core, protocol, providers, tools | `apps/cli`, `apps/server` | `index.test.tsx`, `timeline.test.ts` |
 
 ## Repository-level folders
 
@@ -56,7 +56,7 @@ Apps can compose packages. Packages never import apps. The boundary test enforce
 
 These are deliberate next steps, not accidents:
 
-1. **TUI still imports the runtime directly.** Both transports now exist (`packages/client` and `packages/local-client`); the next boundary is moving the TUI state machine onto the shared interface.
+1. **TUI HTTP mode is not wired.** The TUI now runs on `LocalSessionClient` behind `OpenContinueClient`; the remaining client boundary is `--url`/`HttpSessionClient` selection.
 2. **Checks live in `apps/cli`.** When checks need a web or CI UI, extract `packages/checks` with the worktree/patch domain.
 3. **No web or desktop app yet.** When added, they are `apps/web` and `apps/desktop`, composed from `packages/client` and shared UI packages.
 4. **No generated SDK yet.** `packages/protocol` is the source; generated bindings come after the hand-written client contract stabilizes.

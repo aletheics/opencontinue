@@ -38,7 +38,7 @@ export type LocalClientOptions = {
 export class LocalSessionClient implements OpenContinueClient {
   readonly baseUrl = "local://"
   private readonly store: SessionStore
-  private readonly provider: ChatProvider
+  private provider: ChatProvider
   private readonly workspace: string
   private readonly systemPrompt: string
   private readonly tools: ToolRegistry
@@ -61,8 +61,16 @@ export class LocalSessionClient implements OpenContinueClient {
     this.permissions = new PermissionBroker(
       options.store,
       options.permissionMode ?? project.permissionMode ?? "ask",
-      options.permissionPolicy,
+      options.permissionPolicy ?? {
+        allow: project.allow,
+        ask: project.ask,
+        deny: project.deny,
+      },
     )
+  }
+
+  setProvider(provider: ChatProvider): void {
+    this.provider = provider
   }
 
   async health(): Promise<{ ok: boolean }> {

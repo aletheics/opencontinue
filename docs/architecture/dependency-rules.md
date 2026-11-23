@@ -14,7 +14,7 @@ The boundary is enforced by [`scripts/validate-boundaries.test.ts`](../../script
 | `providers` | external only | core, runtime, clients |
 | `tools` | `providers` | core runtime, clients |
 | `runtime` | `protocol`, `core`, `providers`, `tools` | server, CLI, TUI |
-| `tui` | `client`, `local-client`, `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | server, CLI |
+| `tui` | `client`, `local-client`, `config`, `core`, `protocol`, `providers`, `tools` | server, CLI |
 | `server` | `config`, `core`, `protocol`, `providers`, `runtime`, `tools` | CLI, TUI |
 | `cli` | any package, `packages/local-client`, and `apps/server` | none (entrypoint) |
 
@@ -27,7 +27,7 @@ The boundary is enforced by [`scripts/validate-boundaries.test.ts`](../../script
 - `providers` and `tools` are capabilities. They do not know about sessions or the agent loop.
 - `runtime` composes core, providers, and tools. It does not know how it is transported.
 - `server` is an adapter. It may use the runtime but not a client.
-- `tui` is a client. It may use `client`; the remaining direct runtime imports are the in-process adapter gap.
+- `tui` is a client. It uses `client` and `local-client`; it does not call `runAgent` or own a permission gate.
 - `cli` is an entrypoint. It composes everything but owns no reusable domain logic.
 
 ## Public API
@@ -51,4 +51,4 @@ apps/cli ──> packages/tui ──> packages/client ──> protocol
     └──> apps/server ──> packages/runtime
 ```
 
-The in-process adapter now exists as `packages/local-client`. Next, the TUI should consume `OpenContinueClient` and choose `LocalSessionClient` or `HttpSessionClient`; `apps/web` and `apps/desktop` use the HTTP client directly. Cross-client continuity becomes a protocol feature instead of a per-client implementation.
+The TUI now consumes `OpenContinueClient` through `LocalSessionClient`. Next, add `--url` selection with `HttpSessionClient`; `apps/web` and `apps/desktop` use the HTTP client directly. Cross-client continuity becomes a protocol feature instead of a per-client implementation.

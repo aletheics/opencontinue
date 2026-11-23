@@ -7,9 +7,10 @@ import {
   toolHeaderLines,
   wrapText,
 } from "../render.js"
-import type { PermissionMode } from "../permission-gate.js"
 import { theme } from "../theme.js"
 import type { TimelineItem, ToolTimelineItem } from "../timeline.js"
+
+type PermissionMode = "ask" | "auto" | "readonly"
 
 type TranscriptItemProps = {
   item: TimelineItem

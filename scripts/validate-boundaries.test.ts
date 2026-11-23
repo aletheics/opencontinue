@@ -22,7 +22,7 @@ const RULES: Record<string, ReadonlySet<string>> = {
   providers: new Set(),
   tools: new Set(["providers"]),
   runtime: new Set(["protocol", "core", "providers", "tools"]),
-  tui: new Set(["client", "local-client", "config", "core", "protocol", "providers", "runtime", "tools"]),
+  tui: new Set(["client", "local-client", "config", "core", "protocol", "providers", "tools"]),
   server: new Set(["config", "core", "protocol", "providers", "runtime", "tools"]),
   cli: new Set([
     "client",

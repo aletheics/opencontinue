@@ -11,31 +11,42 @@ import {
   saveAuthConfig,
   saveProviderConfig,
 } from "@opencontinue/config"
+import {
+  type OpenContinueClient,
+  type SessionSubscription,
+} from "@opencontinue/client"
 import { createSessionStore, type SessionStore } from "@opencontinue/core"
+import { LocalSessionClient } from "@opencontinue/local-client"
 import {
   createProvider,
   listModels,
   PROVIDER_PRESETS,
-  type ChatProvider,
   type ProviderPreset,
 } from "@opencontinue/providers"
-import type { SessionSummary } from "@opencontinue/protocol"
-import { runAgent } from "@opencontinue/runtime"
-import { listWorkspaceFiles, ToolRegistry } from "@opencontinue/tools"
+import type {
+  SessionEvent,
+  SessionSnapshot,
+  SessionSummary,
+} from "@opencontinue/protocol"
+import { listWorkspaceFiles } from "@opencontinue/tools"
 
 import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
 import { SlashMenu } from "./components/SlashMenu.js"
 import { Transcript, TranscriptItem } from "./components/Transcript.js"
-import {
-  TuiPermissionGate,
-  type PermissionMode,
-  type PermissionRequest,
-} from "./permission-gate.js"
 import { timelineLines, toolDisplayName } from "./render.js"
 import { theme } from "./theme.js"
-import { reduceTimeline, timelineFromEvents, type TimelineItem } from "./timeline.js"
+import { reduceTimeline, type TimelineItem } from "./timeline.js"
+
+type PermissionMode = "ask" | "auto" | "readonly"
+
+type PermissionPromptState = {
+  requestId: string
+  tool: string
+  detail: string
+  diff?: string
+}
 
 export type TuiOptions = {
   auto?: boolean
@@ -156,16 +167,14 @@ function isCommittedItem(
   return false
 }
 
-function sessionLabel(store: SessionStore, item: SessionSummary): string {
+function sessionLabel(snapshot: SessionSnapshot, item: SessionSummary): string {
   const generic =
     !item.title || item.title === "OpenContinue TUI" || item.title === "Untitled session"
   if (!generic) return item.title
 
-  const first = store.events(item.id).find((event) => event.type === "message.user")
-  if (first?.type === "message.user") {
-    const text = first.text.replace(/\s+/g, " ").trim()
-    if (text) return text.length > 60 ? `${text.slice(0, 57)}…` : text
-  }
+  const first = snapshot.messages.find((message) => message.role === "user")
+  const text = first?.text.replace(/\s+/g, " ").trim()
+  if (text) return text.length > 60 ? `${text.slice(0, 57)}…` : text
 
   return item.title || item.id.slice(0, 8)
 }
@@ -210,7 +219,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [transcriptKey, setTranscriptKey] = useState(0)
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [lastDurationMs, setLastDurationMs] = useState<number | null>(null)
-  const [permission, setPermission] = useState<PermissionRequest | null>(null)
+  const [permission, setPermission] = useState<PermissionPromptState | null>(null)
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [historySearch, setHistorySearch] = useState(false)
@@ -224,21 +233,14 @@ export function App({ options }: { options: TuiOptions }) {
   const filesLoadedRef = useRef(false)
 
   const storeRef = useRef<SessionStore | null>(null)
+  const clientRef = useRef<OpenContinueClient | null>(null)
   const sessionRef = useRef<string | null>(null)
-  const providerRef = useRef<ChatProvider | null>(null)
-  const unsubscribeRef = useRef<(() => void) | null>(null)
+  const subscriptionRef = useRef<SessionSubscription | null>(null)
   const runStartedRef = useRef<number | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
   const lineCountRef = useRef(0)
-  const gateRef = useRef<TuiPermissionGate | null>(null)
-  if (!gateRef.current) {
-    gateRef.current = new TuiPermissionGate(permissionMode)
-  }
-  const gate = gateRef.current
-
-  useEffect(() => {
-    gate.onChange(() => setPermission(gate.pending))
-  }, [gate])
+  const permissionModeRef = useRef<PermissionMode>(permissionMode)
+  const allowedToolsRef = useRef<Set<string>>(new Set())
+  permissionModeRef.current = permissionMode
 
   useEffect(() => {
     if (!busy) return
@@ -352,7 +354,8 @@ export function App({ options }: { options: TuiOptions }) {
 
   useEffect(() => {
     return () => {
-      unsubscribeRef.current?.()
+      subscriptionRef.current?.close()
+      clientRef.current?.close()
       storeRef.current?.close()
     }
   }, [])
@@ -438,11 +441,29 @@ export function App({ options }: { options: TuiOptions }) {
     setScreen("loading")
   }
 
+  const answerPermission = (approved: boolean, remember = false) => {
+    const request = permission
+    if (!request) return
+    if (approved && remember) allowedToolsRef.current.add(request.tool)
+    const client = clientRef.current
+    const sessionId = sessionRef.current
+    if (client && sessionId) {
+      void client
+        .resolvePermission(sessionId, request.requestId, approved)
+        .catch(() => {})
+    }
+    setPermission(null)
+  }
+
   const cycleMode = () => {
     const next: PermissionMode =
       permissionMode === "ask" ? "auto" : permissionMode === "auto" ? "readonly" : "ask"
     setPermissionMode(next)
-    gate.setMode(next)
+    permissionModeRef.current = next
+    if (permission) {
+      if (next === "auto") answerPermission(true)
+      else if (next === "readonly") answerPermission(false)
+    }
   }
 
   const appendSystem = (text: string) => {
@@ -467,16 +488,61 @@ export function App({ options }: { options: TuiOptions }) {
     ])
   }
 
-  const attachSession = (store: SessionStore, sessionId: string) => {
-    storeRef.current = store
+  const handlePermissionRequest = (
+    event: Extract<SessionEvent, { type: "permission.requested" }>,
+  ) => {
+    const client = clientRef.current
+    const sessionId = sessionRef.current
+    if (!client || !sessionId) return
+
+    if (allowedToolsRef.current.has(event.tool)) {
+      void client.resolvePermission(sessionId, event.requestId, true).catch(() => {})
+      return
+    }
+
+    const mode = permissionModeRef.current
+    if (mode === "auto") {
+      void client.resolvePermission(sessionId, event.requestId, true).catch(() => {})
+      return
+    }
+    if (mode === "readonly") {
+      void client.resolvePermission(sessionId, event.requestId, false).catch(() => {})
+      return
+    }
+
+    setPermission({
+      requestId: event.requestId,
+      tool: event.tool,
+      detail: event.detail ?? JSON.stringify(event.input).slice(0, 200),
+      diff: event.diff,
+    })
+  }
+
+  const attachSession = (client: OpenContinueClient, sessionId: string) => {
+    clientRef.current = client
     sessionRef.current = sessionId
-    setTimeline(timelineFromEvents(store.events(sessionId)))
+    subscriptionRef.current?.close()
+    allowedToolsRef.current = new Set()
+    setPermission(null)
+    setTimeline([])
     setTranscriptKey((key) => key + 1)
     setTranscriptScroll(0)
     setTranscriptMode(false)
-    unsubscribeRef.current?.()
-    unsubscribeRef.current = store.subscribe(sessionId, (event) => {
+    setBusy(false)
+
+    const subscription = client.subscribe(sessionId, -1, (event) => {
       setTimeline((items) => reduceTimeline(items, event))
+
+      if (event.type === "permission.requested") {
+        handlePermissionRequest(event)
+        return
+      }
+      if (event.type === "permission.resolved") {
+        setPermission((current) =>
+          current?.requestId === event.requestId ? null : current,
+        )
+        return
+      }
       if (event.type === "run.completed" || event.type === "run.failed") {
         const started = runStartedRef.current
         if (started !== null) {
@@ -488,53 +554,72 @@ export function App({ options }: { options: TuiOptions }) {
         }
         runStartedRef.current = null
         setRunStartedAt(null)
-        abortRef.current = null
         setBusy(false)
       }
     })
+
+    void subscription.ready.catch((error) => {
+      appendSystem(`Session error: ${error instanceof Error ? error.message : String(error)}`)
+    })
+    subscriptionRef.current = subscription
   }
 
   const clearSession = () => {
-    if (!providerRef.current) return
-    abortRef.current?.abort()
-    unsubscribeRef.current?.()
-    storeRef.current?.close()
+    const client = clientRef.current
+    if (!client) return
 
-    const store = createSessionStore({ workspace })
-    const session = store.create("OpenContinue TUI")
-    attachSession(store, session.id)
-    setBusy(false)
-    appendSystem("Started a new session.")
+    const current = sessionRef.current
+    if (current) void client.abort(current).catch(() => {})
+
+    void (async () => {
+      const session = await client.createSession("OpenContinue TUI")
+      attachSession(client, session.id)
+      appendSystem("Started a new session.")
+    })().catch((error) => {
+      appendSystem(`Could not create a session: ${error instanceof Error ? error.message : String(error)}`)
+    })
   }
 
   const openSessions = () => {
-    const store = storeRef.current
-    if (!store) return
-    abortRef.current?.abort()
-    abortRef.current = null
-    if (gate.pending) gate.answer(false)
+    const client = clientRef.current
+    if (!client) return
+
+    const current = sessionRef.current
+    if (current) void client.abort(current).catch(() => {})
     setPermission(null)
     setBusy(false)
     setLastDurationMs(null)
     setRunStartedAt(null)
     runStartedRef.current = null
-    const list = [...store.list()].sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt),
-    )
-    setSessions(list)
-    setSessionLabels(
-      Object.fromEntries(list.map((item) => [item.id, sessionLabel(store, item)])),
-    )
-    setSessionQuery("")
-    setSessionIndex(0)
-    setScreen("sessions")
+
+    void (async () => {
+      const list = [...(await client.listSessions())].sort((left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt),
+      )
+      const labels = await Promise.all(
+        list.map(async (item) => {
+          try {
+            return [item.id, sessionLabel(await client.getSession(item.id), item)] as const
+          } catch {
+            return [item.id, item.title] as const
+          }
+        }),
+      )
+      setSessions(list)
+      setSessionLabels(Object.fromEntries(labels))
+      setSessionQuery("")
+      setSessionIndex(0)
+      setScreen("sessions")
+    })().catch((error) => {
+      appendSystem(`Could not list sessions: ${error instanceof Error ? error.message : String(error)}`)
+    })
   }
 
   const chooseSession = () => {
-    const store = storeRef.current
+    const client = clientRef.current
     const chosen = filteredSessions[sessionIndex]
-    if (!store || !chosen) return
-    attachSession(store, chosen.id)
+    if (!client || !chosen) return
+    attachSession(client, chosen.id)
     setSessionQuery("")
     setScreen("chat")
   }
@@ -619,20 +704,42 @@ export function App({ options }: { options: TuiOptions }) {
         apiKey: apiKey || settings.apiKey,
         model: chosen,
       }).provider
-      providerRef.current = provider
       setModel(chosen)
 
-      if (storeRef.current && sessionRef.current) {
+      const existing = clientRef.current
+      if (existing instanceof LocalSessionClient) {
+        existing.setProvider(provider)
         setScreen("chat")
         return
       }
 
-      const store = createSessionStore({ workspace })
-      const session = (options.resume ? store.get(options.resume) : undefined) ?? store.create(
-        "OpenContinue TUI",
-      )
-      attachSession(store, session.id)
-      setScreen("chat")
+      const store = storeRef.current ?? createSessionStore({ workspace })
+      storeRef.current = store
+      const client = new LocalSessionClient({
+        store,
+        provider,
+        workspace,
+        permissionMode: "ask",
+      })
+
+      void (async () => {
+        let sessionId = options.resume
+        if (sessionId) {
+          try {
+            await client.getSession(sessionId)
+          } catch {
+            sessionId = undefined
+          }
+        }
+        const session = sessionId
+          ? { id: sessionId }
+          : await client.createSession("OpenContinue TUI")
+        attachSession(client, session.id)
+        setScreen("chat")
+      })().catch((cause) => {
+        setError(cause instanceof Error ? cause.message : String(cause))
+        setScreen("error")
+      })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
       setScreen("error")
@@ -688,10 +795,9 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
 
-    const store = storeRef.current
+    const client = clientRef.current
     const sessionId = sessionRef.current
-    const provider = providerRef.current
-    if (!store || !sessionId || !provider) return
+    if (!client || !sessionId) return
 
     if (busy) {
       queuedRef.current.push(text)
@@ -712,24 +818,13 @@ export function App({ options }: { options: TuiOptions }) {
     setRunStartedAt(started)
     runStartedRef.current = started
 
-    const controller = new AbortController()
-    abortRef.current = controller
-
-    store.append(sessionId, { type: "message.user", text })
-
-    void runAgent({
-      store,
-      sessionId,
-      provider,
-      tools: new ToolRegistry(),
-      permissions: gate,
-      workspace,
-      systemPrompt:
-        "You are OpenContinue, a concise coding assistant. Be concrete. Answer in the user's language.",
-      signal: controller.signal,
-    }).catch(() => {
-      abortRef.current = null
+    void client.sendMessage(sessionId, text).catch((error) => {
+      runStartedRef.current = null
+      setRunStartedAt(null)
       setBusy(false)
+      appendSystem(
+        `Send failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
     })
   }
 
@@ -802,7 +897,7 @@ export function App({ options }: { options: TuiOptions }) {
         if (providerQuery) {
           setProviderQuery("")
           setProviderIndex(0)
-        } else if (storeRef.current) {
+        } else if (clientRef.current) {
           setScreen("chat")
         }
       } else if (key.backspace || key.delete) {
@@ -828,7 +923,7 @@ export function App({ options }: { options: TuiOptions }) {
         if (modelQuery) {
           setModelQuery("")
           setModelIndex(Math.max(0, models.indexOf(model)))
-        } else if (storeRef.current) {
+        } else if (clientRef.current) {
           setScreen("chat")
         }
       } else if (key.backspace || key.delete) {
@@ -880,14 +975,11 @@ export function App({ options }: { options: TuiOptions }) {
     if (permission) {
       const answer = character.toLowerCase()
       if (answer === "y") {
-        gate.answer(true)
-        setPermission(null)
+        answerPermission(true)
       } else if (answer === "a") {
-        gate.answer(true, true)
-        setPermission(null)
+        answerPermission(true, true)
       } else if (answer === "n" || key.escape) {
-        gate.answer(false)
-        setPermission(null)
+        answerPermission(false)
       }
       return
     }
@@ -950,7 +1042,9 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (key.escape && busy) {
-      abortRef.current?.abort()
+      const client = clientRef.current
+      const sessionId = sessionRef.current
+      if (client && sessionId) void client.abort(sessionId).catch(() => {})
       return
     }
 
