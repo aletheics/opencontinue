@@ -22,6 +22,8 @@ export type ToolTimelineItem = {
   name: string
   input: unknown
   status: "running" | "done" | "failed"
+  /** ISO timestamp of tool.started, used for real activity timing. */
+  startedAt?: string
   output?: string
   error?: string
   diff?: string
@@ -109,6 +111,7 @@ export function reduceTimeline(items: TimelineItem[], event: SessionEvent): Time
         name: event.name,
         input: event.input,
         status: "running",
+        startedAt: event.at,
       },
     ]
   }

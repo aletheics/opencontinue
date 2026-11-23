@@ -45,7 +45,7 @@ export function footerLayout(options: {
   if (options.busy) left += " · esc to interrupt"
 
   const rightParts: string[] = []
-  if (options.reasoning) rightParts.push(options.reasoning)
+  if (options.reasoning && !options.busy) rightParts.push(options.reasoning)
   if (!options.busy) rightParts.push(`${glyphs.approval} help`)
 
   const fits = () => {

@@ -1,85 +1,84 @@
 import { render } from "ink-testing-library"
 import { describe, expect, it } from "vitest"
 
-import { spinnerFrames } from "../status/spinner.js"
 import { SpinnerLine } from "./SpinnerLine.js"
-
-const frames = spinnerFrames()
 
 function plain(frame: string | undefined): string {
   return (frame ?? "").replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
 }
 
 describe("SpinnerLine", () => {
-  it("shows the verb and tip without timer or tokens early in a run", () => {
+  it("shows a real label with elapsed time and tokens", () => {
     const { lastFrame } = render(
       <SpinnerLine
-        verb="Scampering"
-        tip="Press esc to interrupt the current run"
-        elapsedMs={1_000}
-        tokens={500}
-        stalled={0}
-        columns={100}
-        frames={frames}
-      />,
-    )
-    const frame = plain(lastFrame())
-
-    expect(frame).toContain("Scampering…")
-    expect(frame).toContain("⎿  Tip: Press esc to interrupt the current run")
-    expect(frame).not.toContain("tokens")
-    expect(frame).not.toContain("(1s")
-  })
-
-  it("reveals elapsed time and tokens after 30 seconds", () => {
-    const { lastFrame } = render(
-      <SpinnerLine
-        verb="Topsy-turvying"
-        tip="Press ctrl+o to open the full transcript"
+        label="Running command"
+        state="active"
         elapsedMs={39_000}
         tokens={1_800}
-        stalled={0}
+        effort="High"
         columns={120}
-        frames={frames}
+        tip="Press ctrl+o to open the full transcript"
+        pulse={false}
       />,
     )
     const frame = plain(lastFrame())
 
-    expect(frame).toContain("Topsy-turvying…")
-    expect(frame).toContain("(39s · ↓ 1.8k tokens)")
+    expect(frame).toContain("◈ Running command · 39s · 1.8k tokens · High")
+    expect(frame).toContain("⎿  Tip: Press ctrl+o to open the full transcript")
   })
 
-  it("drops the token count before the timer on narrow terminals", () => {
+  it("labels a delayed wait without calling it failed", () => {
     const { lastFrame } = render(
       <SpinnerLine
-        verb="Scampering"
-        tip="Press esc to interrupt the current run"
-        elapsedMs={39_000}
-        tokens={1_800}
-        stalled={0}
-        columns={30}
-        frames={frames}
-      />,
-    )
-    const frame = plain(lastFrame())
-
-    expect(frame).toContain("(39s)")
-    expect(frame).not.toContain("tokens")
-  })
-
-  it("keeps the verb visible while stalled", () => {
-    const { lastFrame } = render(
-      <SpinnerLine
-        verb="Scampering"
-        tip="Press esc to interrupt the current run"
-        elapsedMs={9_000}
+        label="Waiting for model"
+        state="delayed"
+        elapsedMs={12_000}
         tokens={0}
-        stalled={1}
         columns={100}
-        frames={frames}
+        tip="tip"
+        pulse={false}
       />,
     )
+    const frame = plain(lastFrame())
 
-    expect(plain(lastFrame())).toContain("Scampering…")
+    expect(frame).toContain("Waiting for model · still working")
+    expect(frame).not.toContain("Failed")
+  })
+
+  it("labels a stalled wait with an explicit warning, not failure", () => {
+    const { lastFrame } = render(
+      <SpinnerLine
+        label="Waiting for model"
+        state="stalled"
+        elapsedMs={45_000}
+        tokens={0}
+        columns={100}
+        tip="tip"
+        pulse={false}
+      />,
+    )
+    const frame = plain(lastFrame())
+
+    expect(frame).toContain("Still waiting — no recent activity · 45s")
+    expect(frame).not.toContain("Failed")
+  })
+
+  it("drops metadata before clipping the label on narrow terminals", () => {
+    const { lastFrame } = render(
+      <SpinnerLine
+        label="Responding"
+        state="active"
+        elapsedMs={12_000}
+        tokens={1_800}
+        effort="High"
+        columns={24}
+        tip="tip"
+        pulse={false}
+      />,
+    )
+    const frame = plain(lastFrame())
+
+    expect(frame).toContain("◈ Responding · High")
+    expect(frame).not.toContain("tokens")
   })
 })

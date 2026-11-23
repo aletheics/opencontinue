@@ -10,6 +10,7 @@ describe("glyphs", () => {
     expect(set.tool).toBe("↳")
     expect(set.done).toBe("✓")
     expect(set.failed).toBe("×")
+    expect(set.interrupted).toBe("■")
     expect(set.approval).toBe("?")
     expect(set.checkpoint).toBe("◆")
     expect(set.pending).toBe("○")
@@ -17,7 +18,6 @@ describe("glyphs", () => {
     expect(set.plan).toBe("◎")
     expect(set.confirm).toBe("◈")
     expect(set.auto).toBe("⟳")
-    expect(set.spinnerFrames).toContain("⠋")
   })
 
   it("falls back to ASCII when requested", () => {
@@ -27,6 +27,7 @@ describe("glyphs", () => {
     expect(set.tool).toBe(">")
     expect(set.done).toBe("+")
     expect(set.failed).toBe("x")
+    expect(set.interrupted).toBe("=")
     expect(set.approval).toBe("!")
     expect(set.checkpoint).toBe("*")
     expect(set.pending).toBe("o")
@@ -34,6 +35,5 @@ describe("glyphs", () => {
     expect(set.plan).toBe("o")
     expect(set.confirm).toBe("C")
     expect(set.auto).toBe("A")
-    expect(set.spinnerFrames).toEqual(["|", "/", "-", "\\"])
   })
 })

@@ -46,6 +46,6 @@ describe("footer layout", () => {
       busy: true,
     })
     expect(footer.left).toContain("esc to interrupt")
-    expect(footer.right).toBe("Reasoning: High")
+    expect(footer.right).toBe("")
   })
 })

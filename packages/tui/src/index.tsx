@@ -70,21 +70,22 @@ import {
 } from "./session/checkpoints.js"
 import { formatWorkspaceDiff, workspaceDiff } from "./session/git.js"
 import { summarizeRun, type RunToolResult } from "./session/summary.js"
-import { latestTodos } from "./session/todos.js"
+import { activeTodo, latestTodos } from "./session/todos.js"
 import { workspaceInfo } from "./session/workspace.js"
+import {
+  activityLabel,
+  activityThresholds,
+  progressState,
+} from "./status/activity.js"
 import { footerLayout } from "./status/footer.js"
 import { formatClock, formatDuration } from "./status/format.js"
-import {
-  pickSpinnerTip,
-  pickSpinnerVerb,
-  spinnerFrames,
-  stallIntensity,
-} from "./status/spinner.js"
+import { pickSpinnerTip } from "./status/spinner.js"
 import { theme } from "./theme.js"
 import {
   reduceTimeline,
   type AssistantTimelineItem,
   type TimelineItem,
+  type ToolTimelineItem,
 } from "./timeline.js"
 
 const VERSION = "0.0.1"
@@ -181,9 +182,9 @@ export function App({ options }: { options: TuiOptions }) {
   const sessionRef = useRef<string | null>(null)
   const subscriptionRef = useRef<SessionSubscription | null>(null)
   const runStartedRef = useRef<number | null>(null)
+  const interruptedRef = useRef(false)
   const lineCountRef = useRef(0)
   const autoStartedRef = useRef(false)
-  const spinnerVerbRef = useRef<string>(pickSpinnerVerb())
   const spinnerTipRef = useRef<string>(pickSpinnerTip())
   const activeRunIdRef = useRef<string | null>(null)
   const runToolsRef = useRef(new Map<string, RunToolResult>())
@@ -192,8 +193,8 @@ export function App({ options }: { options: TuiOptions }) {
   const streamRef = useRef(
     new Map<string, { committed: number; chunk: number }>(),
   )
-  const stallRef = useRef(0)
-  const spinnerFrameSet = useMemo(() => spinnerFrames(), [])
+  const activityLimits = useMemo(() => activityThresholds(), [])
+  const reducedMotion = process.env.OPENCONTINUE_REDUCED_MOTION === "1"
   const lastActivityRef = useRef(Date.now())
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   permissionModeRef.current = permissionMode
@@ -211,7 +212,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   useEffect(() => {
     if (!busy) return
-    const timer = setInterval(() => setTick((value) => value + 1), 50)
+    const timer = setInterval(() => setTick((value) => value + 1), 500)
     return () => clearInterval(timer)
   }, [busy])
 
@@ -533,6 +534,7 @@ export function App({ options }: { options: TuiOptions }) {
     resetPermissions()
     streamRef.current = new Map()
     setStreamChunks([])
+    interruptedRef.current = false
     checkpointsRef.current = []
     runStartsRef.current = new Map()
     setTimeline([
@@ -626,10 +628,19 @@ export function App({ options }: { options: TuiOptions }) {
         const started = runStartedRef.current
         if (started !== null) {
           const elapsed = Date.now() - started
-          const symbol =
-            event.type === "run.completed" ? glyphs.done : glyphs.failed
-          const outcome =
-            event.type === "run.completed" ? "Completed" : "Failed"
+          const interrupted =
+            event.type === "run.failed" && interruptedRef.current
+          interruptedRef.current = false
+          const symbol = interrupted
+            ? glyphs.interrupted
+            : event.type === "run.completed"
+              ? glyphs.done
+              : glyphs.failed
+          const outcome = interrupted
+            ? "Interrupted"
+            : event.type === "run.completed"
+              ? "Completed"
+              : "Failed"
           const summary = summarizeRun([...runToolsRef.current.values()])
           const lines = [
             `${symbol} ${outcome} in ${formatDuration(elapsed)} · ${formatClock()}`,
@@ -1093,10 +1104,9 @@ export function App({ options }: { options: TuiOptions }) {
     setHistory((items) => [...items, text])
     setHistoryIndex(-1)
     setBusy(true)
-    spinnerVerbRef.current = pickSpinnerVerb()
     spinnerTipRef.current = pickSpinnerTip()
+    interruptedRef.current = false
     activeRunIdRef.current = null
-    stallRef.current = 0
     lastActivityRef.current = Date.now()
 
     const started = Date.now()
@@ -1371,6 +1381,7 @@ export function App({ options }: { options: TuiOptions }) {
     if (key.escape && busy) {
       const client = clientRef.current
       const sessionId = sessionRef.current
+      interruptedRef.current = true
       if (client && sessionId) void client.abort(sessionId).catch(() => {})
       return
     }
@@ -1442,15 +1453,18 @@ export function App({ options }: { options: TuiOptions }) {
   const { committed, live } = partitionTimeline(displayTimeline, busy)
   const todos = useMemo(() => latestTodos(timeline), [timeline])
 
+  const now = Date.now()
   const activeTool = [...timeline]
     .reverse()
-    .find((item) => item.kind === "tool" && item.status === "running")
-  const elapsedMs = runStartedAt !== null ? Date.now() - runStartedAt : 0
-  const idleMs = busy ? Date.now() - lastActivityRef.current : 0
-  const targetStall = busy ? stallIntensity(idleMs, Boolean(activeTool)) : 0
-  if (busy) stallRef.current += (targetStall - stallRef.current) * 0.1
-  else stallRef.current = 0
-  const stalled = stallRef.current
+    .find(
+      (item): item is ToolTimelineItem =>
+        item.kind === "tool" && item.status === "running",
+    )
+  const elapsedMs = runStartedAt !== null ? now - runStartedAt : 0
+  const idleMs = busy ? now - lastActivityRef.current : 0
+  const progress = busy
+    ? progressState(idleMs, Boolean(activeTool), activityLimits)
+    : "active"
   const activeRunId = activeRunIdRef.current
   const runChars = activeRunId
     ? timeline.reduce(
@@ -1462,6 +1476,26 @@ export function App({ options }: { options: TuiOptions }) {
       )
     : 0
   const runTokens = Math.round(runChars / 4)
+
+  const todoActive = activeTodo(todos)
+  const activity = activityLabel({
+    activeTool,
+    hasText: runChars > 0,
+    todoLabel: todoActive
+      ? (todoActive.activeForm ?? todoActive.content)
+      : undefined,
+  })
+  const toolStart = activeTool?.startedAt
+    ? Date.parse(activeTool.startedAt)
+    : Number.NaN
+  const activityElapsed = Number.isNaN(toolStart)
+    ? elapsedMs
+    : Math.max(0, now - toolStart)
+  const effortLabel =
+    reasoningLevels.length > 0 && reasoningEffort !== "auto"
+      ? `${reasoningEffort.charAt(0).toUpperCase()}${reasoningEffort.slice(1)}`
+      : undefined
+  const pulse = !reducedMotion && Math.floor(now / 800) % 2 === 0
 
   const menuHint = historySearch
     ? "↑/↓ select · Enter use · Esc cancel"
@@ -1707,13 +1741,14 @@ export function App({ options }: { options: TuiOptions }) {
             <>
               {busy && !permission ? (
                 <SpinnerLine
-                  verb={spinnerVerbRef.current}
-                  tip={spinnerTipRef.current}
-                  elapsedMs={elapsedMs}
+                  label={activity}
+                  state={progress}
+                  elapsedMs={activityElapsed}
                   tokens={runTokens}
-                  stalled={stalled}
+                  effort={effortLabel}
                   columns={columns}
-                  frames={spinnerFrameSet}
+                  tip={spinnerTipRef.current}
+                  pulse={pulse}
                 />
               ) : null}
 

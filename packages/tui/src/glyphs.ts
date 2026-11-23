@@ -4,6 +4,7 @@ export type Glyphs = {
   tool: string
   done: string
   failed: string
+  interrupted: string
   approval: string
   checkpoint: string
   pending: string
@@ -11,7 +12,6 @@ export type Glyphs = {
   plan: string
   confirm: string
   auto: string
-  spinnerFrames: readonly string[]
 }
 
 const UNICODE: Glyphs = {
@@ -20,6 +20,7 @@ const UNICODE: Glyphs = {
   tool: "↳",
   done: "✓",
   failed: "×",
+  interrupted: "■",
   approval: "?",
   checkpoint: "◆",
   pending: "○",
@@ -27,7 +28,6 @@ const UNICODE: Glyphs = {
   plan: "◎",
   confirm: "◈",
   auto: "⟳",
-  spinnerFrames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
 }
 
 const ASCII: Glyphs = {
@@ -36,6 +36,7 @@ const ASCII: Glyphs = {
   tool: ">",
   done: "+",
   failed: "x",
+  interrupted: "=",
   approval: "!",
   checkpoint: "*",
   pending: "o",
@@ -43,7 +44,6 @@ const ASCII: Glyphs = {
   plan: "o",
   confirm: "C",
   auto: "A",
-  spinnerFrames: ["|", "/", "-", "\\"],
 }
 
 export function getGlyphs(env: Record<string, string | undefined> = process.env): Glyphs {

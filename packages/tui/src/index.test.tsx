@@ -76,6 +76,65 @@ async function fakeProvider(
   return { server, url: `http://127.0.0.1:${address.port}/v1` }
 }
 
+async function fakeBlockingProvider(): Promise<{
+  server: http.Server
+  url: string
+}> {
+  const server = http.createServer((request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      request.on("close", () => {
+        if (!response.writableEnded) response.end()
+      })
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
+async function fakeSlowProvider(
+  delayMs = 500,
+): Promise<{ server: http.Server; url: string }> {
+  const server = http.createServer(async (request, response) => {
+    if (request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" })
+      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      return
+    }
+
+    if (request.url === "/v1/chat/completions") {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+      response.writeHead(200, { "content-type": "text/event-stream" })
+      response.write(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: "slow done" } }] })}\n\n`,
+      )
+      response.end("data: [DONE]\n\n")
+      return
+    }
+
+    response.writeHead(404)
+    response.end()
+  })
+
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const address = server.address() as AddressInfo
+  return { server, url: `http://127.0.0.1:${address.port}/v1` }
+}
+
 async function fakeLineProvider(
   lines = 30,
 ): Promise<{ server: http.Server; url: string }> {
@@ -804,6 +863,75 @@ describe("TUI", () => {
       expect(output(frames)).toContain("Ask     write, bash")
       expect(output(frames)).toContain("Deny    rm")
     } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("labels an interrupted run separately from failure", async () => {
+    const { server, url } = await fakeBlockingProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("block")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› block"))
+      stdin.write("\r")
+
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain("Waiting for model"),
+      )
+      stdin.write("\u001b")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("Interrupted"), {
+        timeout: 5000,
+      })
+      expect(output(frames)).not.toContain("Failed")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
+  it("does not label a long model wait as failed", async () => {
+    const { server, url } = await fakeSlowProvider(2_000)
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+    process.env.OPENCONTINUE_DELAYED_MS = "80"
+    process.env.OPENCONTINUE_STALLED_MS = "150"
+
+    const { stdin, lastFrame, frames, unmount } = render(<App options={{}} />)
+
+    try {
+      await ready(lastFrame)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      stdin.write("wait")
+      await vi.waitFor(() => expect(lastFrame()).toContain("› wait"))
+      stdin.write("\r")
+
+      await vi.waitFor(
+        () =>
+          expect(lastFrame()).toContain(
+            "Still waiting — no recent activity",
+          ),
+        { timeout: 5000 },
+      )
+      expect(output(frames)).not.toContain("Failed")
+
+      await vi.waitFor(() => expect(output(frames)).toContain("slow done"), {
+        timeout: 5000,
+      })
+      await vi.waitFor(() => expect(output(frames)).toContain("Completed in"), {
+        timeout: 5000,
+      })
+      expect(output(frames)).not.toContain("Failed")
+    } finally {
+      delete process.env.OPENCONTINUE_DELAYED_MS
+      delete process.env.OPENCONTINUE_STALLED_MS
       unmount()
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }

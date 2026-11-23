@@ -1,73 +1,66 @@
 import { Box, Text } from "ink"
 
+import { glyphs } from "../glyphs.js"
 import {
-  glimmerIndex,
-  isShimmerChar,
-  spinnerGlyph,
-  stallTint,
-  visibleStatusParts,
-} from "../status/spinner.js"
+  activityTailParts,
+  displayActivityLabel,
+  type ProgressState,
+} from "../status/activity.js"
 import { theme } from "../theme.js"
-import { textWidth } from "../transcript/format/wrap.js"
 
 export type SpinnerLineProps = {
-  verb: string
-  tip: string
+  /** Real phase or tool label; never a random verb. */
+  label: string
+  state: ProgressState
   elapsedMs: number
   tokens: number
-  stalled: number
+  effort?: string
   columns: number
-  frames: readonly string[]
+  tip: string
+  /** Restrained copper pulse; disabled for reduced motion. */
+  pulse: boolean
 }
 
 /**
- * Claude Code's live status: the glyph and verb sweep through the coral
- * palette, fade to red when output stalls, and only reveal elapsed time and
- * tokens after 30 seconds. The tip sits on a dim `⎿` line below.
+ * Event-driven activity line. The label comes from the running tool or the
+ * model-authored todo, and elapsed time uses that tool's real start. A long
+ * wait becomes a delayed/stalled warning with explicit text; it is never
+ * labeled as a failure.
  */
 export function SpinnerLine({
-  verb,
-  tip,
+  label,
+  state,
   elapsedMs,
   tokens,
-  stalled,
+  effort,
   columns,
-  frames,
+  tip,
+  pulse,
 }: SpinnerLineProps) {
-  const message = `${verb}…`
-  const tint = stalled > 0 ? stallTint(stalled) : theme.working
-  const glyph = spinnerGlyph(elapsedMs, frames)
-  const shimmerAt = glimmerIndex(message.length, elapsedMs)
-  const statusParts = visibleStatusParts(
+  const display = displayActivityLabel(label, state)
+  const parts = activityTailParts({
+    label: display,
     elapsedMs,
     tokens,
-    Math.max(0, columns - textWidth(message) - 9),
-  )
+    effort,
+    width: Math.max(1, columns - 4),
+  })
+  const color =
+    state === "stalled"
+      ? theme.error
+      : state === "delayed"
+        ? theme.brand
+        : pulse
+          ? theme.brandShimmer
+          : theme.warning
 
   return (
     <>
       <Box marginTop={1} paddingX={2}>
-        <Text color={tint}>{glyph} </Text>
-        {stalled > 0 ? (
-          <Text color={tint}>{message}</Text>
-        ) : (
-          <Text>
-            {Array.from(message).map((character, index) => (
-              <Text
-                key={index}
-                color={
-                  isShimmerChar(index, shimmerAt)
-                    ? theme.workingShimmer
-                    : theme.working
-                }
-              >
-                {character}
-              </Text>
-            ))}
-          </Text>
-        )}
-        {statusParts.length > 0 ? (
-          <Text dimColor> ({statusParts.join(" · ")})</Text>
+        <Text color={color}>{glyphs.brand} </Text>
+        <Text color={color}>{display}</Text>
+        {parts.length > 0 ? (
+          <Text dimColor> · {parts.join(" · ")}</Text>
         ) : null}
       </Box>
       <Box paddingX={2}>

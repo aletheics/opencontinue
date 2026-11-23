@@ -1,12 +1,14 @@
 # status
 
-**Why:** token and duration strings are display primitives used by the banner, spinner, and footer.
+**Why:** activity, footer, and number formatting are display primitives reused across the TUI.
 
 **Files:**
 
-- `format.ts` — `formatTokens`, `formatDuration`.
-- `spinner.ts` — verb pairs, tip, stall intensity, yellow-to-red color.
+- `activity.ts` — event-driven labels, configurable delayed/stalled thresholds, and metadata width gating.
+- `footer.ts` — compact mode/branch/reasoning/help layout with display-cell width.
+- `spinner.ts` — rotating tips (no random work verbs).
+- `format.ts` — compact numbers, clock time, and durations.
 
-**Rule:** no React, no session state.
+**Rule:** labels derive from real protocol events (running tool, model-authored todo, first-token state). A timer can produce a delayed/stalled warning, but never a failure.
 
-**Tests:** `format.test.ts`, `spinner.test.ts`.
+**Tests:** `activity.test.ts`, `footer.test.ts`, `spinner.test.ts`, `format.test.ts`.

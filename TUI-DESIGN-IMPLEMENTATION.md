@@ -264,6 +264,15 @@ Important safety/UX rules:
 9. On actual provider/tool error, transition immediately to `failed`; do not wait for a timer.
 10. Provide `reducedMotion`; in that mode use a static glyph and state text.
 
+Implementation: `packages/tui/src/status/activity.ts` derives the label from
+the running tool, the model-authored todo, or the first-token state.
+Thresholds default to 10s/30s and honor `OPENCONTINUE_DELAYED_MS` /
+`OPENCONTINUE_STALLED_MS`. A running tool uses its own `tool.started`
+timestamp and is never treated as a stalled model. `Esc` produces
+`■ Interrupted`; only `run.failed` produces `× Failed`. Set
+`OPENCONTINUE_REDUCED_MOTION=1` to disable the pulse and
+`OPENCONTINUE_ASCII=1` for ASCII glyphs.
+
 ## 7. Status bar compaction and width handling
 
 Priority order when the terminal is narrow:
@@ -352,19 +361,20 @@ Do not implement every feature at once. Ship one vertical slice at a time.
 
 ### P2 — Event-driven activity and spinner
 
-- [ ] Map real protocol events to the view state.
-- [ ] Add one low-frequency spinner animation loop.
-- [ ] Add meaningful phase labels.
-- [ ] Add yellow → amber → red no-progress warning with configurable thresholds.
-- [ ] Keep approval, actual failure, interruption, and long-running tools distinct.
-- [ ] Add reduced-motion and ASCII fallback.
+- [x] Map real protocol events to the view state.
+- [x] Add one low-frequency spinner animation loop. The app clock runs at
+    500ms; the glyph pulse changes every 800ms.
+- [x] Add meaningful phase labels.
+- [x] Add yellow → amber → red no-progress warning with configurable thresholds.
+- [x] Keep approval, actual failure, interruption, and long-running tools distinct.
+- [x] Add reduced-motion and ASCII fallback.
 
 ### P3 — Interaction depth
 
-- [ ] Expandable transcript / tool event details.
-- [ ] Task checklist and compact progress summary.
-- [ ] Clear permission approval UI.
-- [ ] Completion summary based only on real file/test results.
+- [x] Expandable transcript / tool event details.
+- [x] Task checklist and compact progress summary.
+- [x] Clear permission approval UI.
+- [x] Completion summary based only on real file/test results.
 - [ ] Optional fullscreen renderer after inline mode is reliable.
 
 ## 11. Verification matrix
