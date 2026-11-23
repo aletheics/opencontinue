@@ -26,7 +26,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
   - `PgUp`/`PgDn` scroll the timeline
   - `Ctrl+D` exit when input is empty
 - Slash commands: `/help`, `/clear`, `/model`, `/provider`, `/mode`, `/status`, `/exit`.
-- Provider/model pickers and per-provider API keys inside the same frame.
+- Provider/model pickers with type-to-filter search, `Esc` to clear or return, and per-provider API keys inside the same frame.
 - A pure timeline reducer in `packages/tui/src/timeline.ts`.
 - A line-buffer renderer in `packages/tui/src/render.ts`: timeline items become styled lines, long text wraps to the content width, and the viewport slices by line so scrolling and clipping are exact.
 

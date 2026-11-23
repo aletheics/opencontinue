@@ -123,6 +123,13 @@ function initialProviderIndex(provider: string | undefined): number {
   return index >= 0 ? index : 0
 }
 
+function isPrintableInput(
+  character: string,
+  key: { ctrl?: boolean; meta?: boolean },
+): boolean {
+  return character.length > 0 && !key.ctrl && !key.meta && !/[\r\n\t]/.test(character)
+}
+
 function Header({
   provider,
   model,
@@ -169,6 +176,7 @@ export function App({ options }: { options: TuiOptions }) {
   const initial = useMemo(() => resolveProviderSettings(), [])
   const [screen, setScreen] = useState<Screen>("provider")
   const [providerIndex, setProviderIndex] = useState(() => initialProviderIndex(initial.provider))
+  const [providerQuery, setProviderQuery] = useState("")
   const [preset, setPreset] = useState<ProviderPreset | null>(null)
   const [apiKey, setApiKey] = useState(initial.apiKey ?? "")
   const [baseUrl, setBaseUrl] = useState("")
@@ -176,6 +184,7 @@ export function App({ options }: { options: TuiOptions }) {
   const [baseInput, setBaseInput] = useState("")
   const [models, setModels] = useState<string[]>([])
   const [modelIndex, setModelIndex] = useState(0)
+  const [modelQuery, setModelQuery] = useState("")
   const [model, setModel] = useState(initial.model ?? "gpt-6.2")
   const [error, setError] = useState("")
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
@@ -214,6 +223,20 @@ export function App({ options }: { options: TuiOptions }) {
   }, [busy])
 
   const spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"][tick % 10]
+
+  const filteredProviders = useMemo(() => {
+    const query = providerQuery.trim().toLowerCase()
+    if (!query) return PROVIDER_PRESETS
+    return PROVIDER_PRESETS.filter((item) =>
+      `${item.label} ${item.id} ${item.note ?? ""}`.toLowerCase().includes(query),
+    )
+  }, [providerQuery])
+
+  const filteredModels = useMemo(() => {
+    const query = modelQuery.trim().toLowerCase()
+    if (!query) return models
+    return models.filter((item) => item.toLowerCase().includes(query))
+  }, [models, modelQuery])
 
   useEffect(() => {
     return () => {
@@ -262,7 +285,7 @@ export function App({ options }: { options: TuiOptions }) {
   }, [screen, preset, baseUrl, apiKey, initial.model])
 
   const chooseProvider = () => {
-    const selected = PROVIDER_PRESETS[providerIndex]
+    const selected = filteredProviders[providerIndex]
     if (!selected) return
 
     const sameProvider =
@@ -363,9 +386,19 @@ export function App({ options }: { options: TuiOptions }) {
         clearSession()
         return true
       case "/model":
-        setScreen(models.length > 0 ? "models" : "provider")
+        setModelQuery("")
+        setModelIndex(Math.max(0, models.indexOf(model)))
+        if (models.length === 0) {
+          setProviderQuery("")
+          setProviderIndex(initialProviderIndex(preset?.id ?? initial.provider))
+          setScreen("provider")
+        } else {
+          setScreen("models")
+        }
         return true
       case "/provider":
+        setProviderQuery("")
+        setProviderIndex(initialProviderIndex(preset?.id ?? initial.provider))
         setScreen("provider")
         return true
       case "/mode":
@@ -400,7 +433,7 @@ export function App({ options }: { options: TuiOptions }) {
 
   const chooseModel = () => {
     if (!preset) return
-    const chosen = models[modelIndex]
+    const chosen = filteredModels[modelIndex]
     if (!chosen) return
 
     try {
@@ -504,17 +537,54 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (screen === "provider") {
-      if (key.upArrow) setProviderIndex((index) => Math.max(0, index - 1))
-      else if (key.downArrow) {
-        setProviderIndex((index) => Math.min(PROVIDER_PRESETS.length - 1, index + 1))
-      } else if (key.return) chooseProvider()
+      if (key.escape) {
+        if (providerQuery) {
+          setProviderQuery("")
+          setProviderIndex(0)
+        } else if (storeRef.current) {
+          setScreen("chat")
+        }
+      } else if (key.backspace || key.delete) {
+        setProviderQuery((query) => query.slice(0, -1))
+        setProviderIndex(0)
+      } else if (key.upArrow) {
+        setProviderIndex((index) => Math.max(0, index - 1))
+      } else if (key.downArrow) {
+        setProviderIndex((index) =>
+          Math.max(0, Math.min(filteredProviders.length - 1, index + 1)),
+        )
+      } else if (key.return) {
+        chooseProvider()
+      } else if (isPrintableInput(character, key)) {
+        setProviderQuery((query) => query + character)
+        setProviderIndex(0)
+      }
       return
     }
 
     if (screen === "models") {
-      if (key.upArrow) setModelIndex((index) => Math.max(0, index - 1))
-      else if (key.downArrow) setModelIndex((index) => Math.min(models.length - 1, index + 1))
-      else if (key.return) chooseModel()
+      if (key.escape) {
+        if (modelQuery) {
+          setModelQuery("")
+          setModelIndex(Math.max(0, models.indexOf(model)))
+        } else if (storeRef.current) {
+          setScreen("chat")
+        }
+      } else if (key.backspace || key.delete) {
+        setModelQuery((query) => query.slice(0, -1))
+        setModelIndex(0)
+      } else if (key.upArrow) {
+        setModelIndex((index) => Math.max(0, index - 1))
+      } else if (key.downArrow) {
+        setModelIndex((index) =>
+          Math.max(0, Math.min(filteredModels.length - 1, index + 1)),
+        )
+      } else if (key.return) {
+        chooseModel()
+      } else if (isPrintableInput(character, key)) {
+        setModelQuery((query) => query + character)
+        setModelIndex(0)
+      }
       return
     }
 
@@ -585,7 +655,7 @@ export function App({ options }: { options: TuiOptions }) {
     screen === "chat" ? model : screen === "models" ? "select model" : "—"
   const footer =
     screen === "provider" || screen === "models"
-      ? "↑/↓ select · Enter confirm · Ctrl+C exit"
+      ? "type to filter · ↑/↓ select · Enter confirm · Esc back"
       : screen === "key" || screen === "baseurl"
         ? "Enter submit · Ctrl+C exit"
         : screen === "chat"
@@ -611,20 +681,33 @@ export function App({ options }: { options: TuiOptions }) {
 
   const body = (() => {
     if (screen === "provider") {
+      if (filteredProviders.length === 0) {
+        return (
+          <>
+            <Text dimColor wrap="truncate">
+              No providers match “{providerQuery}”
+            </Text>
+            <Text dimColor wrap="truncate">
+              Backspace to edit · Esc to clear
+            </Text>
+          </>
+        )
+      }
+
       const windowSize = Math.max(4, Math.min(12, bodyHeight - 4))
       const start = Math.max(
         0,
         Math.min(
           providerIndex - Math.floor(windowSize / 2),
-          Math.max(0, PROVIDER_PRESETS.length - windowSize),
+          Math.max(0, filteredProviders.length - windowSize),
         ),
       )
-      const visible = PROVIDER_PRESETS.slice(start, start + windowSize)
+      const visible = filteredProviders.slice(start, start + windowSize)
 
       return (
         <>
           <Text dimColor wrap="truncate">
-            Select a provider ({providerIndex + 1}/{PROVIDER_PRESETS.length})
+            {`Select a provider${providerQuery ? ` · /${providerQuery}/` : ""} (${providerIndex + 1}/${filteredProviders.length})`}
           </Text>
           {visible.map((item, offset) => {
             const index = start + offset
@@ -703,17 +786,33 @@ export function App({ options }: { options: TuiOptions }) {
     }
 
     if (screen === "models") {
+      if (filteredModels.length === 0) {
+        return (
+          <>
+            <Text dimColor wrap="truncate">
+              No models match “{modelQuery}”
+            </Text>
+            <Text dimColor wrap="truncate">
+              Backspace to edit · Esc to clear
+            </Text>
+          </>
+        )
+      }
+
       const windowSize = Math.max(4, Math.min(12, bodyHeight - 4))
       const start = Math.max(
         0,
-        Math.min(modelIndex - Math.floor(windowSize / 2), Math.max(0, models.length - windowSize)),
+        Math.min(
+          modelIndex - Math.floor(windowSize / 2),
+          Math.max(0, filteredModels.length - windowSize),
+        ),
       )
-      const visible = models.slice(start, start + windowSize)
+      const visible = filteredModels.slice(start, start + windowSize)
 
       return (
         <>
           <Text dimColor wrap="truncate">
-            Select a model · {preset?.label} ({modelIndex + 1}/{models.length})
+            {`Select a model · ${preset?.label ?? "provider"}${modelQuery ? ` · /${modelQuery}/` : ""} (${modelIndex + 1}/${filteredModels.length})`}
           </Text>
           {visible.map((item, offset) => {
             const index = start + offset

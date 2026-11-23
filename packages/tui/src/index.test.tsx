@@ -31,11 +31,13 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-async function fakeProvider(): Promise<{ server: http.Server; url: string }> {
+async function fakeProvider(
+  models: string[] = ["gpt-6.2"],
+): Promise<{ server: http.Server; url: string }> {
   const server = http.createServer((request, response) => {
     if (request.url === "/v1/models") {
       response.writeHead(200, { "content-type": "application/json" })
-      response.end(JSON.stringify({ data: [{ id: "gpt-6.2" }] }))
+      response.end(JSON.stringify({ data: models.map((id) => ({ id })) }))
       return
     }
 
@@ -89,6 +91,50 @@ describe("TUI", () => {
     })
 
     unmount()
+  })
+
+  it("filters providers by typed query", async () => {
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    stdin.write("deepinfra")
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Select a provider · /deepinfra/ (1/1)")
+    })
+    expect(lastFrame()).toContain("DeepInfra")
+    expect(lastFrame()).not.toContain("OpenAI (GPT)")
+
+    stdin.write("\u001b")
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain("Select a provider (")
+    })
+    expect(lastFrame()).toContain("OpenAI (GPT)")
+
+    unmount()
+  })
+
+  it("filters models by typed query", async () => {
+    const { server, url } = await fakeProvider(["gpt-6.2", "deepseek-chat"])
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), {
+        timeout: 5000,
+      })
+
+      stdin.write("deep")
+      await vi.waitFor(() => {
+        expect(lastFrame()).toContain("Select a model · OpenAI (GPT) · /deep/ (1/1)")
+      })
+      expect(lastFrame()).toContain("deepseek-chat")
+      expect(lastFrame()).not.toContain("gpt-6.2")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   })
 
   it("runs the provider -> model -> chat loop", async () => {
