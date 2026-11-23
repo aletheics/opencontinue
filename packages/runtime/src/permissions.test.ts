@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 
 import { MemorySessionStore } from "@opencontinue/core"
 import type { Tool, ToolContext } from "@opencontinue/tools"
 
-import { PermissionBroker, type PermissionPolicy } from "./permissions.js"
+import { permissionDetail, PermissionBroker, type PermissionPolicy } from "./permissions.js"
 
 const writeTool: Tool = {
   name: "write",
@@ -23,6 +23,22 @@ const readTool: Tool = {
   input: z.object({}),
   async execute() {
     return ""
+  },
+}
+
+const previewTool: Tool = {
+  name: "write",
+  description: "write",
+  capability: "write",
+  input: z.object({ path: z.string() }),
+  async execute() {
+    return ""
+  },
+  async preview(input) {
+    return {
+      detail: (input as { path: string }).path,
+      diff: "@@ -1 +1 @@\n-old\n+new",
+    }
   },
 }
 
@@ -64,6 +80,33 @@ describe("PermissionBroker", () => {
       .find((event) => event.type === "permission.requested")
     if (request?.type !== "permission.requested") throw new Error("request missing")
 
+    expect(broker.resolve(request.requestId, true)).toBe(true)
+    await expect(pending).resolves.toBe(true)
+  })
+
+  it("describes and previews a permission request", async () => {
+    expect(permissionDetail("bash", { command: "npm   test" })).toBe("npm test")
+    expect(permissionDetail("write", { path: "a.txt" })).toBe("a.txt")
+
+    const { store, session, context, broker } = setup("ask")
+    const pending = broker.authorize(previewTool, { path: "a.txt" }, context)
+
+    await vi.waitFor(() => {
+      const request = store
+        .events(session.id)
+        .find((event) => event.type === "permission.requested")
+      expect(request).toMatchObject({
+        type: "permission.requested",
+        tool: "write",
+        detail: "a.txt",
+        diff: expect.stringContaining("+new"),
+      })
+    })
+
+    const request = store
+      .events(session.id)
+      .find((event) => event.type === "permission.requested")
+    if (request?.type !== "permission.requested") throw new Error("request missing")
     expect(broker.resolve(request.requestId, true)).toBe(true)
     await expect(pending).resolves.toBe(true)
   })

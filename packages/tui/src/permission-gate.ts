@@ -9,19 +9,9 @@ export type PermissionRequest = {
   resolve: (approved: boolean) => void
 }
 
-export function permissionDetail(name: string, input: unknown): string {
-  const value =
-    typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {}
-  const text = (key: string): string | undefined =>
-    typeof value[key] === "string" ? (value[key] as string) : undefined
+import { permissionDetail } from "@opencontinue/runtime"
 
-  const detail =
-    name === "bash"
-      ? text("command")
-      : text("path") ?? text("pattern") ?? text("query") ?? JSON.stringify(input)
-
-  return (detail ?? "").replace(/\s+/g, " ").trim()
-}
+export { permissionDetail }
 
 /**
  * Bridges async tool authorization to the TUI. Read-only tools pass; writes

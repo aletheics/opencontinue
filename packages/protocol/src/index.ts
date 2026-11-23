@@ -83,6 +83,8 @@ export const SessionEvent = z.discriminatedUnion("type", [
     tool: z.string(),
     capability: z.enum(["read", "write", "execute"]),
     input: z.unknown(),
+    detail: z.string().optional(),
+    diff: z.string().optional(),
   }),
   z.object({
     ...eventBase,

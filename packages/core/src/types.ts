@@ -35,6 +35,8 @@ export type EventDraft =
       tool: string
       capability: "read" | "write" | "execute"
       input: unknown
+      detail?: string
+      diff?: string
     }
   | { type: "permission.resolved"; requestId: string; approved: boolean }
 

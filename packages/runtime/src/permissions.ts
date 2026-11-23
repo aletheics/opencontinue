@@ -18,6 +18,20 @@ type Pending = {
   resolve: (approved: boolean) => void
 }
 
+export function permissionDetail(name: string, input: unknown): string {
+  const value =
+    typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {}
+  const text = (key: string): string | undefined =>
+    typeof value[key] === "string" ? (value[key] as string) : undefined
+
+  const detail =
+    name === "bash"
+      ? text("command")
+      : text("path") ?? text("pattern") ?? text("query") ?? JSON.stringify(input)
+
+  return (detail ?? "").replace(/\s+/g, " ").trim()
+}
+
 /**
  * Server-side permission broker.
  *
@@ -46,7 +60,19 @@ export class PermissionBroker implements PermissionGate {
     return this.request(tool, input, context)
   }
 
-  private request(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {
+  private async request(tool: Tool, input: unknown, context: ToolContext): Promise<boolean> {
+    let detail = permissionDetail(tool.name, input)
+    let diff: string | undefined
+    if (tool.preview) {
+      try {
+        const preview = await tool.preview(input, context)
+        if (preview.detail) detail = preview.detail
+        diff = preview.diff
+      } catch {
+        // Keep the basic detail when a preview cannot be computed.
+      }
+    }
+
     const requestId = randomUUID()
     const decision = new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {
@@ -74,6 +100,8 @@ export class PermissionBroker implements PermissionGate {
       tool: tool.name,
       capability: tool.capability,
       input,
+      detail,
+      ...(diff === undefined ? {} : { diff }),
     })
 
     return decision

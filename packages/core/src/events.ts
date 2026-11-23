@@ -64,6 +64,8 @@ export function buildEvent(
         tool: draft.tool,
         capability: draft.capability,
         input: draft.input,
+        ...(draft.detail === undefined ? {} : { detail: draft.detail }),
+        ...(draft.diff === undefined ? {} : { diff: draft.diff }),
       }
     case "permission.resolved":
       return {
