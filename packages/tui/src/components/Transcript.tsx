@@ -42,7 +42,7 @@ function ToolBlock({
       ? theme.error
       : item.status === "running"
         ? theme.tool
-        : theme.muted
+        : theme.user
 
   return (
     <Box marginTop={leading ? 1 : 0} flexDirection="column">
