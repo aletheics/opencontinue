@@ -1,6 +1,6 @@
 import { theme } from "../../theme.js"
 import type { TimelineItem } from "../../timeline.js"
-import { formatAssistantLines } from "./assistant.js"
+import { assistantBlock } from "./assistant.js"
 import { formatDiffLines } from "./diff.js"
 import type { Line } from "./line.js"
 import { formatToolOutputLines, toolHeaderLines } from "./tool.js"
@@ -55,7 +55,7 @@ export function timelineLines(
 
     if (item.kind === "assistant") {
       if (!item.text) continue
-      lines.push(...formatAssistantLines(item.text, width))
+      lines.push(...assistantBlock(item.text, width))
       continue
     }
 

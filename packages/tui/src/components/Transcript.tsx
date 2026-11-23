@@ -1,7 +1,7 @@
 import { Box, Text } from "ink"
 
 import {
-  formatAssistantLines,
+  assistantBlock,
   formatDiffLines,
   formatToolOutputLines,
   toolHeaderLines,
@@ -147,17 +147,16 @@ export function TranscriptItem({
 
   if (item.kind === "assistant") {
     if (!item.text) return null
-    const all = formatAssistantLines(item.text, Math.max(10, width - 2))
+    const all = assistantBlock(item.text, width)
     const limit = maxLines ? Math.max(1, maxLines) : all.length
     const hidden = all.length > limit ? all.length - (limit - 1) : 0
     const visible = hidden > 0 ? all.slice(hidden) : all
-    const bulletIndex = visible.findIndex((line) => line.text.length > 0)
 
     return (
       <Box marginTop={leading ? 1 : 0} flexDirection="column">
         {hidden > 0 ? (
           <Text dimColor wrap="truncate">
-            … +{hidden} earlier lines
+            {"  "}… +{hidden} earlier lines
           </Text>
         ) : null}
         {visible.map((line, index) => (
@@ -168,14 +167,7 @@ export function TranscriptItem({
             bold={line.bold}
             wrap="truncate"
           >
-            {index === bulletIndex ? (
-              <>
-                <Text color={theme.muted}>● </Text>
-                {line.text}
-              </>
-            ) : (
-              line.text
-            )}
+            {line.text}
           </Text>
         ))}
       </Box>

@@ -1,4 +1,4 @@
-export { formatAssistantLines } from "./assistant.js"
+export { assistantBlock, formatAssistantLines } from "./assistant.js"
 export { diffStats, formatDiffLines } from "./diff.js"
 export type { Line } from "./line.js"
 export { timelineLines } from "./lines.js"

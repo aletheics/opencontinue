@@ -216,6 +216,19 @@ describe("TUI", () => {
     )
     expect(user.lastFrame() ?? "").toContain("❯ fix the bug")
     user.unmount()
+
+    const assistant = render(
+      <TranscriptItem
+        item={{ kind: "assistant", id: "a1", runId: "r1", text: "first\n\nsecond" }}
+        columns={40}
+        expanded={false}
+        leading={false}
+      />,
+    )
+    const assistantFrame = assistant.lastFrame() ?? ""
+    expect(assistantFrame).toContain("● first")
+    expect(assistantFrame).toContain("  second")
+    assistant.unmount()
   })
 
   it("clips a long live assistant response to the viewport", () => {

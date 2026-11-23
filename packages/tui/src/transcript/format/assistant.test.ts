@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatAssistantLines } from "./assistant.js"
+import { assistantBlock, formatAssistantLines } from "./assistant.js"
 
 describe("assistant markdown", () => {
   it("renders headings, lists, quotes, and fenced code", () => {
@@ -19,9 +19,10 @@ describe("assistant markdown", () => {
 
     expect(plain).toContain("Title")
     expect(lines.find((line) => line.text === "Title")?.bold).toBe(true)
-    expect(plain).toContain("• first")
+    expect(lines.find((line) => line.text === "Title")?.color).toBe("white")
+    expect(plain).toContain("- first")
     expect(plain).toContain("1. second")
-    expect(plain).toContain("│ quote")
+    expect(plain).toContain("▎ quote")
     expect(plain).toContain("┌─ ts")
     expect(plain).toContain("│ const x = 1")
     expect(plain).toContain("└─")
@@ -35,13 +36,19 @@ describe("assistant markdown", () => {
     const plain = lines.map((line) => line.text)
     expect(plain).toContain("│ # not a heading")
     expect(plain).toContain("│ - not a bullet")
-    expect(plain).not.toContain("• not a bullet")
+    expect(plain).not.toContain("- not a bullet")
   })
 
   it("wraps a list item under its marker", () => {
     const lines = formatAssistantLines(`- ${"word ".repeat(20)}`, 30)
-    expect(lines[0]?.text.startsWith("• word")).toBe(true)
+    expect(lines[0]?.text.startsWith("- word")).toBe(true)
     expect(lines[1]?.text.startsWith("  ")).toBe(true)
     for (const line of lines) expect(line.text.length).toBeLessThanOrEqual(30)
+  })
+
+  it("places the body beside the dot and indents continuation lines", () => {
+    const lines = assistantBlock("first\n\nsecond", 40)
+    expect(lines.map((line) => line.text)).toEqual(["● first", "", "  second"])
+    for (const line of lines) expect(line.text.length).toBeLessThanOrEqual(40)
   })
 })

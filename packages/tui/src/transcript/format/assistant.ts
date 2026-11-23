@@ -69,14 +69,14 @@ export function formatAssistantLines(text: string, width: number): Line[] {
         heading[2] ?? "",
         Math.max(10, width - markerWidth),
       )) {
-        lines.push({ text: part, color: theme.brand, bold: true })
+        lines.push({ text: part, color: theme.assistant, bold: true })
       }
       continue
     }
 
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
       lines.push({
-        text: "─".repeat(Math.min(width, 24)),
+        text: "---",
         color: theme.muted,
         dim: true,
       })
@@ -85,20 +85,20 @@ export function formatAssistantLines(text: string, width: number): Line[] {
 
     const quote = line.match(/^\s*>\s?(.*)$/)
     if (quote) {
-      pushPrefixed(lines, "│ ", quote[1] ?? "", width, theme.muted)
+      pushPrefixed(lines, "▎ ", quote[1] ?? "", width, theme.muted)
       continue
     }
 
     const task = line.match(/^(\s*)[-*+]\s+\[([ xX])\]\s+(.*)$/)
     if (task) {
       const box = task[2]?.toLowerCase() === "x" ? "[x]" : "[ ]"
-      pushPrefixed(lines, `${task[1] ?? ""}• ${box} `, task[3] ?? "", width)
+      pushPrefixed(lines, `${task[1] ?? ""}- ${box} `, task[3] ?? "", width)
       continue
     }
 
     const bullet = line.match(/^(\s*)[-*+]\s+(.*)$/)
     if (bullet) {
-      pushPrefixed(lines, `${bullet[1] ?? ""}• `, bullet[2] ?? "", width)
+      pushPrefixed(lines, `${bullet[1] ?? ""}- `, bullet[2] ?? "", width)
       continue
     }
 
@@ -119,4 +119,23 @@ export function formatAssistantLines(text: string, width: number): Line[] {
   }
 
   return lines
+}
+
+/**
+ * Claude Code puts the whole markdown body in a two-column content area next
+ * to the assistant dot: the first content line starts with `● ` and every
+ * following line is indented by two spaces. Blank lines stay empty.
+ */
+export function assistantBlock(text: string, width: number): Line[] {
+  const body = formatAssistantLines(text, Math.max(10, width - 2))
+  let dotted = false
+
+  return body.map((line) => {
+    if (line.text.length === 0) return line
+    if (!dotted) {
+      dotted = true
+      return { ...line, text: `● ${line.text}` }
+    }
+    return { ...line, text: `  ${line.text}` }
+  })
 }
