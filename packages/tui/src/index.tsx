@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
+
 import { Box, Text, render, useApp, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -104,6 +107,30 @@ function isPrintableInput(
   return character.length > 0 && !key.ctrl && !key.meta && !/[\r\n\t]/.test(character)
 }
 
+function workspaceInfo(workspace: string): { name: string; branch: string | null } {
+  const root = path.resolve(workspace)
+  let branch: string | null = null
+  let directory = root
+
+  for (let depth = 0; depth < 8; depth++) {
+    try {
+      const head = readFileSync(path.join(directory, ".git", "HEAD"), "utf8").trim()
+      if (head.startsWith("ref: refs/heads/")) {
+        branch = head.slice("ref: refs/heads/".length)
+      } else if (head) {
+        branch = head.slice(0, 7)
+      }
+      break
+    } catch {
+      const parent = path.dirname(directory)
+      if (parent === directory) break
+      directory = parent
+    }
+  }
+
+  return { name: path.basename(root), branch }
+}
+
 function sessionLabel(store: SessionStore, item: SessionSummary): string {
   const generic =
     !item.title || item.title === "OpenContinue TUI" || item.title === "Untitled session"
@@ -126,6 +153,8 @@ export function App({ options }: { options: TuiOptions }) {
   )
 
   const initial = useMemo(() => resolveProviderSettings(), [])
+  const workspace = useMemo(() => process.env.INIT_CWD ?? process.cwd(), [])
+  const workspaceStatus = useMemo(() => workspaceInfo(workspace), [workspace])
   const [screen, setScreen] = useState<Screen>("provider")
   const [providerIndex, setProviderIndex] = useState(() => initialProviderIndex(initial.provider))
   const [providerQuery, setProviderQuery] = useState("")
@@ -197,7 +226,7 @@ export function App({ options }: { options: TuiOptions }) {
     if (screen !== "chat" || filesLoadedRef.current) return
     filesLoadedRef.current = true
     setFilesLoading(true)
-    void listWorkspaceFiles(process.env.INIT_CWD ?? process.cwd())
+    void listWorkspaceFiles(workspace)
       .then(setWorkspaceFiles)
       .catch(() => setWorkspaceFiles([]))
       .finally(() => setFilesLoading(false))
@@ -398,7 +427,7 @@ export function App({ options }: { options: TuiOptions }) {
     unsubscribeRef.current?.()
     storeRef.current?.close()
 
-    const store = createSessionStore({ workspace: process.env.INIT_CWD ?? process.cwd() })
+    const store = createSessionStore({ workspace })
     const session = store.create("OpenContinue TUI")
     attachSession(store, session.id)
     setBusy(false)
@@ -481,7 +510,7 @@ export function App({ options }: { options: TuiOptions }) {
             `model: ${model}`,
             `mode: ${permissionMode}`,
             `tokens: ${tokens}`,
-            `workspace: ${process.env.INIT_CWD ?? process.cwd()}`,
+            `workspace: ${workspace}`,
           ].join("\n"),
         )
         return true
@@ -525,7 +554,7 @@ export function App({ options }: { options: TuiOptions }) {
         return
       }
 
-      const store = createSessionStore({ workspace: process.env.INIT_CWD ?? process.cwd() })
+      const store = createSessionStore({ workspace })
       const session = (options.resume ? store.get(options.resume) : undefined) ?? store.create(
         "OpenContinue TUI",
       )
@@ -613,7 +642,7 @@ export function App({ options }: { options: TuiOptions }) {
       provider,
       tools: new ToolRegistry(),
       permissions: gate,
-      workspace: process.env.INIT_CWD ?? process.cwd(),
+      workspace,
       systemPrompt:
         "You are OpenContinue, a concise coding assistant. Be concrete. Answer in the user's language.",
       signal: controller.signal,
@@ -895,7 +924,17 @@ export function App({ options }: { options: TuiOptions }) {
       : menuOpen
         ? "↑/↓ select · Tab complete · Enter run · Esc close"
         : footer
-  const footerLine = footerText.slice(0, Math.max(10, columns - 2))
+  const statusText =
+    screen === "chat"
+      ? `${workspaceStatus.name}${workspaceStatus.branch ? ` · ${workspaceStatus.branch}` : ""}`.slice(
+          0,
+          Math.max(0, Math.floor(columns / 3)),
+        )
+      : ""
+  const footerLine = footerText.slice(
+    0,
+    Math.max(10, columns - 2 - (statusText ? statusText.length + 3 : 0)),
+  )
 
   const maxInputHeight = Math.max(
     3,
@@ -1136,10 +1175,21 @@ export function App({ options }: { options: TuiOptions }) {
           spinner={spinner}
         />
       ) : null}
-      <Box paddingX={1} flexShrink={0} height={1} overflow="hidden">
+      <Box
+        paddingX={1}
+        flexShrink={0}
+        height={1}
+        justifyContent="space-between"
+        overflow="hidden"
+      >
         <Text dimColor wrap="truncate">
           {footerLine}
         </Text>
+        {statusText ? (
+          <Text dimColor wrap="truncate">
+            {statusText}
+          </Text>
+        ) : null}
       </Box>
     </Box>
   )

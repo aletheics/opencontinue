@@ -37,6 +37,7 @@ Reference studied: `D:\soft\vscodefiles\continue\openclaude` (MIT), a Claude Cod
 - A cursor-aware input (`components/Input.tsx` plus pure `input.ts`): horizontal and vertical scrolling, readline keys, forward delete, and multi-line entry when the terminal reports modifiers.
 - `Ctrl+R` history search: filters submitted prompts, previews them above the input, and restores the chosen entry as a draft.
 - `@file` completion: a bounded workspace scan from `@opencontinue/tools` feeds a ranked picker; `Tab`/`Enter` inserts the path with a trailing space.
+- Status line: the footer's right side shows the workspace folder and the git branch (read directly from `.git/HEAD`, with a short hash when detached).
 - Ink's `alternateScreen` and `kittyKeyboard` auto mode instead of manual escape writes.
 
 ## Rendering contract

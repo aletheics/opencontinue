@@ -418,6 +418,29 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("shows the workspace and git branch in the status line", async () => {
+    await mkdir(path.join(home, ".git"), { recursive: true })
+    await writeFile(path.join(home, ".git", "HEAD"), "ref: refs/heads/main\n")
+
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const { stdin, lastFrame, unmount } = render(<App options={{ readonly: true }} />)
+
+    try {
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("Select a model"), { timeout: 5000 })
+      stdin.write("\r")
+      await vi.waitFor(() => expect(lastFrame()).toContain("model: gpt-6.2"), { timeout: 5000 })
+      expect(lastFrame()).toContain(path.basename(home))
+      expect(lastFrame()).toContain("main")
+    } finally {
+      unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("completes @file mentions", async () => {
     await mkdir(path.join(home, "src"), { recursive: true })
     await writeFile(path.join(home, "src", "app.ts"), "export const app = 1\n")

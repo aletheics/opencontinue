@@ -2,7 +2,7 @@
 
 **Why:** a terminal client should be a package, not a mode inside the CLI.
 
-**Owns:** provider picker, per-provider key prompt, model picker, streaming chat, permission prompt, session resume (generic sessions are labeled by their first prompt), Claude Code-style timeline (user/assistant/tool blocks), markdown-style assistant output (headings, lists, quotes, fenced code), collapsible tool output, colored diffs, token/time stats, spinner, cursor-aware multi-line input, `ctrl+r` history search, `@file` completion, fixed header/body/input/footer.
+**Owns:** provider picker, per-provider key prompt, model picker, streaming chat, permission prompt, session resume (generic sessions are labeled by their first prompt), Claude Code-style timeline (user/assistant/tool blocks), markdown-style assistant output (headings, lists, quotes, fenced code), collapsible tool output, colored diffs, token/time stats, spinner, cursor-aware multi-line input, `ctrl+r` history search, `@file` completion, workspace/git-branch status line, fixed header/body/input/footer.
 
 **Files:** `index.tsx` owns state, screens, and event wiring; `components/` holds the fixed frame pieces (Header, Picker, Timeline, Prompt, Input, SlashMenu); `input.ts` holds pure editing and viewport math; `permission-gate.ts` bridges async authorization to the prompt; `render.ts` turns timeline items into a clipped line buffer (one terminal row per line); `timeline.ts` reduces session events; `theme.ts` holds color tokens.
 
@@ -16,6 +16,6 @@
 
 **Slash commands:** `/help`, `/clear`, `/model`, `/provider`, `/resume`, `/mode`, `/status`, `/exit`.
 
-**Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, slash-menu filtering and completion, key entry, session resume labels, the permission dialog with a preview diff, `ctrl+r` history search, `@file` completion, the full provider → model → chat loop, and a fixed frame after repeated help output; `src/input.test.ts` covers cursor editing and viewport math; `src/permission-gate.test.ts` covers modes and per-session tool memory; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, diff colorization, output collapsing, and line clipping. The frame is fixed: one header, one body, one input box, one footer.
+**Tests:** `src/index.test.tsx` covers provider selection, type-to-filter pickers, slash-menu filtering and completion, key entry, session resume labels, the permission dialog with a preview diff, `ctrl+r` history search, `@file` completion, the workspace/git status line, the full provider → model → chat loop, and a fixed frame after repeated help output; `src/input.test.ts` covers cursor editing and viewport math; `src/permission-gate.test.ts` covers modes and per-session tool memory; `src/timeline.test.ts` covers tool/assistant interleaving, diffs, and usage; `src/render.test.ts` covers wrapping, markdown, diff colorization, output collapsing, and line clipping. The frame is fixed: one header, one body, one input box, one footer.
 
 **Known gap:** it currently runs the runtime in-process. The target is `packages/client` over the server.
