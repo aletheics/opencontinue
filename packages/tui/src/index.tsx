@@ -94,11 +94,19 @@ type Screen =
 export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
   const { columns, rows } = useTerminalSize()
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
-    options.auto ? "auto" : options.plan || options.readonly ? "plan" : "confirm",
-  )
-
   const initial = useMemo(() => resolveProviderSettings(), [])
+  const configuredMode = useMemo<PermissionMode | undefined>(
+    () =>
+      options.auto
+        ? "auto"
+        : options.plan || options.readonly
+          ? "plan"
+          : initial.permissionMode,
+    [],
+  )
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(
+    configuredMode ?? "confirm",
+  )
   const workspace = useMemo(() => process.env.INIT_CWD ?? process.cwd(), [])
   const workspaceStatus = useMemo(() => workspaceInfo(workspace), [workspace])
   const [screen, setScreen] = useState<Screen>(options.url ? "loading" : "provider")
@@ -395,6 +403,7 @@ export function App({ options }: { options: TuiOptions }) {
           : "plan"
     const client = clientRef.current
     if (!client) {
+      saveProviderConfig({ permissionMode: next })
       applyMode(next)
       return
     }
@@ -403,7 +412,10 @@ export function App({ options }: { options: TuiOptions }) {
       return
     }
     void Promise.resolve(client.setPermissionMode(next))
-      .then(() => applyMode(next))
+      .then(() => {
+        saveProviderConfig({ permissionMode: next })
+        applyMode(next)
+      })
       .catch((error) => {
         appendSystem(
           `Could not change permission mode: ${error instanceof Error ? error.message : String(error)}`,
@@ -500,6 +512,15 @@ export function App({ options }: { options: TuiOptions }) {
       appendSystem(`Session error: ${error instanceof Error ? error.message : String(error)}`)
     })
     subscriptionRef.current = subscription
+
+    void client
+      .health()
+      .then((result) => {
+        if (!result.permissionMode) return
+        setPermissionMode(result.permissionMode)
+        permissionModeRef.current = result.permissionMode
+      })
+      .catch(() => {})
   }
 
   const openLocalSession = (
@@ -514,7 +535,7 @@ export function App({ options }: { options: TuiOptions }) {
       store,
       provider,
       workspace,
-      permissionMode: permissionModeRef.current,
+      permissionMode: configuredMode,
     })
 
     void (async () => {
@@ -556,11 +577,6 @@ export function App({ options }: { options: TuiOptions }) {
       attachSession(client, session.id, "remote", "server")
       setModel("remote")
       setScreen("chat")
-      const health = await client.health().catch(() => null)
-      if (health?.permissionMode) {
-        setPermissionMode(health.permissionMode)
-        permissionModeRef.current = health.permissionMode
-      }
     })().catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause))
       setScreen("error")

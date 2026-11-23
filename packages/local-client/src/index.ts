@@ -81,8 +81,11 @@ export class LocalSessionClient implements OpenContinueClient {
     this.permissions.allowForSession(tool)
   }
 
-  async health(): Promise<{ ok: boolean }> {
-    return { ok: true }
+  async health(): Promise<{
+    ok: boolean
+    permissionMode?: PermissionMode
+  }> {
+    return { ok: true, permissionMode: this.permissions.getMode() }
   }
 
   async listSessions(): Promise<SessionSummary[]> {

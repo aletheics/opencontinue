@@ -11,7 +11,10 @@ import {
   SendMessageRequest,
   type SessionEvent,
 } from "@opencontinue/protocol"
-import { resolveProviderSettings } from "@opencontinue/config"
+import {
+  resolveProviderSettings,
+  saveProviderConfig,
+} from "@opencontinue/config"
 import { createProvider, type ChatProvider } from "@opencontinue/providers"
 import {
   DEFAULT_SYSTEM_PROMPT,
@@ -71,6 +74,7 @@ export function createApp(
     if (!parsed.success) return c.json({ error: "invalid permission mode" }, 400)
 
     permissions.setMode(parsed.data)
+    saveProviderConfig({ permissionMode: parsed.data })
     return c.json({ mode: permissions.getMode() })
   })
 
@@ -218,7 +222,12 @@ export function startServer(options: StartServerOptions = {}): RunningServer {
     ? `${baseSystemPrompt}\n\n${project.instructions}`
     : baseSystemPrompt
   const tools = options.tools ?? new ToolRegistry()
-  const permissionMode = options.permissionMode ?? project.permissionMode ?? "confirm"
+  const settings = resolveProviderSettings()
+  const permissionMode =
+    options.permissionMode ??
+    settings.permissionMode ??
+    project.permissionMode ??
+    "confirm"
   const permissions = new PermissionBroker(store, permissionMode, project)
 
   const app = createApp(store, selection.provider, systemPrompt, tools, permissions, workspace)

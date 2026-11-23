@@ -245,7 +245,10 @@ Status: implemented. The runtime defines one canonical policy in
 Old config values and flags keep working: `readonly` normalizes to
 `plan`, `ask` normalizes to `confirm`, and `--readonly` is an alias for
 `--plan`. Mode changes from the TUI call the client/runtime broker, so the
-UI does not duplicate authorization logic.
+UI does not duplicate authorization logic. The selected mode is saved in
+`~/.opencontinue/config.json`; startup resolves explicit flag → saved
+preference → project config → Confirm, and the client `health()` endpoint
+syncs the effective runtime mode.
 
 Mapping:
 

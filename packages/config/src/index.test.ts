@@ -67,6 +67,20 @@ describe("config", () => {
       baseUrl: "https://env.example.test/v1",
       apiKey: "env-key",
       model: "env-model",
+      permissionMode: undefined,
     })
+  })
+
+  it("persists and resolves the permission mode", () => {
+    saveProviderConfig({ permissionMode: "auto" })
+    expect(resolveProviderSettings({}).permissionMode).toBe("auto")
+    expect(
+      resolveProviderSettings({ OPENCONTINUE_PERMISSION_MODE: "plan" })
+        .permissionMode,
+    ).toBe("plan")
+    expect(
+      resolveProviderSettings({ OPENCONTINUE_PERMISSION_MODE: "readonly" })
+        .permissionMode,
+    ).toBe("plan")
   })
 })

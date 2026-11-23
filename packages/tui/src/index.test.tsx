@@ -632,6 +632,34 @@ describe("TUI", () => {
     }
   }, 20000)
 
+  it("persists the selected mode across launches", async () => {
+    const { server, url } = await fakeProvider()
+    saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })
+    saveAuthConfig({ keys: { openai: "test" } })
+
+    const first = render(<App options={{}} />)
+    try {
+      await ready(first.lastFrame)
+      expect(first.lastFrame()).toContain("◈ Confirm")
+
+      first.stdin.write("/mode")
+      await vi.waitFor(() => expect(first.lastFrame()).toContain("› /mode"))
+      first.stdin.write("\r")
+      await vi.waitFor(() => expect(first.lastFrame()).toContain("⟳ Auto"))
+    } finally {
+      first.unmount()
+    }
+
+    const second = render(<App options={{}} />)
+    try {
+      await ready(second.lastFrame)
+      expect(second.lastFrame()).toContain("⟳ Auto")
+    } finally {
+      second.unmount()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 20000)
+
   it("commits streamed lines to scrollback instead of hiding them", async () => {
     const { server, url } = await fakeLineProvider(30)
     saveProviderConfig({ provider: "openai", baseUrl: url, model: "gpt-6.2" })

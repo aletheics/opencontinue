@@ -24,7 +24,7 @@ export type SessionSubscription = {
 
 export interface OpenContinueClient {
   readonly baseUrl: string
-  health(): Promise<{ ok: boolean }>
+  health(): Promise<{ ok: boolean; permissionMode?: PermissionMode }>
   listSessions(): Promise<SessionSummary[]>
   createSession(title?: string): Promise<SessionSnapshot>
   getSession(sessionId: string): Promise<SessionSnapshot>

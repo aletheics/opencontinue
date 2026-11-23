@@ -9,11 +9,22 @@ import { HttpSessionClient } from "@opencontinue/client"
 import { createSessionStore } from "@opencontinue/core"
 import { EchoProvider, type ChatProvider, type ChatRequest } from "@opencontinue/providers"
 import { closeServer, startServer } from "@opencontinue/server"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 const temporary: string[] = []
+let home = ""
+let previousHome: string | undefined
+
+beforeEach(async () => {
+  home = await mkdtemp(path.join(os.tmpdir(), "opencontinue-e2e-home-"))
+  previousHome = process.env.OPENCONTINUE_HOME
+  process.env.OPENCONTINUE_HOME = home
+})
 
 afterEach(async () => {
+  if (previousHome === undefined) delete process.env.OPENCONTINUE_HOME
+  else process.env.OPENCONTINUE_HOME = previousHome
+  await rm(home, { recursive: true, force: true })
   await Promise.all(
     temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
   )
