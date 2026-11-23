@@ -1,4 +1,4 @@
-import { Box, Static, Text, render, useApp, useInput, useStdout } from "ink"
+import { Box, Static, Text, render, useApp, useInput } from "ink"
 import TextInput from "ink-text-input"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -31,9 +31,11 @@ import {
   mentionQueryAt,
 } from "./composer/mentions.js"
 import { historyIndexAfterMove, searchHistory } from "./composer/history.js"
+import { isPrintableInput } from "./composer/keys.js"
 import { HELP_TEXT, matchSlashCommands } from "./composer/commands.js"
 import { usePermissionPrompt } from "./permissions/use-permission-prompt.js"
 import type { PermissionMode } from "./permissions/types.js"
+import { useTerminalSize } from "./hooks/use-terminal-size.js"
 import { Picker } from "./components/Picker.js"
 import { PermissionPrompt } from "./components/PermissionPrompt.js"
 import { Prompt } from "./components/Prompt.js"
@@ -70,32 +72,6 @@ type Screen =
   | "sessions"
   | "chat"
   | "error"
-function useTerminalSize(): { columns: number; rows: number } {
-  const stdout = useStdout().stdout as unknown as { columns?: number; rows?: number }
-  const read = () => ({
-    columns: Math.max(40, (stdout.columns ?? 80) - 1),
-    rows: Math.max(12, (stdout.rows ?? 24) - 1),
-  })
-  const [size, setSize] = useState(read)
-
-  useEffect(() => {
-    const onResize = () => setSize(read())
-    process.stdout.on("resize", onResize)
-    return () => {
-      process.stdout.off("resize", onResize)
-    }
-  }, [])
-
-  return size
-}
-
-function isPrintableInput(
-  character: string,
-  key: { ctrl?: boolean; meta?: boolean },
-): boolean {
-  return character.length > 0 && !key.ctrl && !key.meta && !/[\r\n\t]/.test(character)
-}
-
 export function App({ options }: { options: TuiOptions }) {
   const { exit } = useApp()
   const { columns, rows } = useTerminalSize()

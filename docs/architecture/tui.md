@@ -50,6 +50,7 @@ packages/tui/src/
   session/         transcript partition, session labels, workspace info
   providers/       provider/model picker filtering
   permissions/     approval decision and prompt controller
+  hooks/           terminal integration hooks
   status/          token and duration formatting
   components/      presentational Ink components
   transcript/format/  wrap, markdown, diff, tool, transcript lines
